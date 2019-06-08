@@ -1,0 +1,43 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "CommandLineKit",
+        "repositoryURL": "https://github.com/pvieito/CommandLineKit",
+        "state": {
+          "branch": "master",
+          "revision": "698faa52e6de9ecf6aac8429dfaf0effa5be2257",
+          "version": null
+        }
+      },
+      {
+        "package": "Defile",
+        "repositoryURL": "https://github.com/donn/Defile.git",
+        "state": {
+          "branch": "master",
+          "revision": "93a240f718741f232088b2cf2c22bc75db1270ec",
+          "version": null
+        }
+      },
+      {
+        "package": "LoggerKit",
+        "repositoryURL": "https://github.com/pvieito/LoggerKit.git",
+        "state": {
+          "branch": "master",
+          "revision": "32d3eedcf4b7014cf89757f8a5f06beaff1eb5ff",
+          "version": null
+        }
+      },
+      {
+        "package": "PythonTool",
+        "repositoryURL": "https://github.com/pvieito/PythonKit",
+        "state": {
+          "branch": "master",
+          "revision": "29e05a7f7174d9aa64f1b3713fee9f5161b84a51",
+          "version": null
+        }
+      }
+    ]
+  },
+  "version": 1
+}

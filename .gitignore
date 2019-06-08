@@ -1,0 +1,12 @@
+.DS_Store
+
+/.build
+/Packages
+/*.xcodeproj
+__pycache__
+Netlists
+
+*.out
+*.vcd
+/*.py
+/*.sv
