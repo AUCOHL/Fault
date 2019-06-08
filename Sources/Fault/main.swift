@@ -120,7 +120,6 @@ if (inputs.count == 0) {
 if (outputs.count == 0) {
     print("Module has no outputs.")
     exit(0)
-
 }
 
 func generateTestbench(for module: String, ports: [String: Port], faultPoint: String, stuckAt: Int) {
@@ -140,15 +139,21 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
     let folderName = "faultTest\(UInt16.random(in: 0..<UInt16.max))"
     let _ = "mkdir -p \(folderName)".sh()
 
+    var finalVector: [String: UInt]? = nil
+
     // in loop?
     for _ in 0..<tvAttempts {
         var inputAssignment = ""
+
+        var vector = [String: UInt]()
         for input in inputs {
-            inputAssignment += "        \(input.name) = \(UInt.random(in: 0...UInt.max));\n"
+            let num = UInt.random(in: 0...UInt.max)
+            vector[input.name] = num
+            inputAssignment += "        \(input.name) = \(num);\n"
         }
 
         let vcdName = "\(folderName)/dump.vcd";
-        let vcdGMName = "\(folderName)/dump.vcd";
+        let vcdGMName = "\(folderName)/dumpGM.vcd";
 
         let bench = """
         /*
@@ -191,23 +196,45 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
         let aoutName = "\(folderName)/a.out"
 
         // Test GM
-        let iverilogGMResult = "iverilog -o \(aoutName) \(tbName)".sh()
+        let iverilogGMResult = "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogGMResult != EX_OK {
             exit(Int32(iverilogGMResult))
         }
-        let vvpGMResult = "vvp \(aoutName)".sh()
+        let vvpGMResult = "vvp \(aoutName) > /dev/null".sh()
         if vvpGMResult != EX_OK {
             exit(Int32(vvpGMResult))
         }
 
-        break
+        let _ = "mv '\(vcdName)' '\(vcdGMName)'".sh()
+
+        let iverilogResult = "iverilog -Ttyp -D FAULT_WITH -o \(aoutName) \(tbName) ".sh()
+        if iverilogResult != EX_OK {
+            exit(Int32(iverilogGMResult))
+        }
+        let vvpResult = "vvp \(aoutName) > /dev/null".sh()
+        if vvpResult != EX_OK {
+            exit(Int32(vvpGMResult))
+        }
+
+        let difference = "diff \(vcdName) \(vcdGMName) > /dev/null".sh() == 1
+        if (difference) {
+            finalVector = vector
+            break
+        } else {
+            //print("Vector \(vector) not viable for \(faultPoint) stuck at \(stuckAt)")
+        }
     }
 
-    //let _ = "rm -rf \(folderName)".sh()
+    if let testVector = finalVector {
+        print("Vector found for \(faultPoint) stuck at \(stuckAt):", testVector)
+    } else {
+        print("Vector not found for \(faultPoint) stuck at \(stuckAt)")
+    }
+
+    let _ = "rm -rf \(folderName)".sh()
 }
 
 for point in faultPoints {
-    //s-a-0
     generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 0)
-    break;
+    generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 1)
 }
