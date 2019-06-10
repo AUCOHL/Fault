@@ -1,2 +1,0 @@
-#!/bin/sh
-swift run Fault -n /Users/donn/Code/Fault/Tech/osu035/osu035_stdcells.v /Users/donn/Code/Fault/Netlists/RTL/PlusOne.v.netlist.v

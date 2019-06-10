@@ -1,19 +1,19 @@
 import Foundation
 import PythonKit
 import CommandLineKit
-import Defile
 
 // MARK: CommandLine Processing
 let cli = CommandLineKit.CommandLine()
 
 let tvAttemptsDefault = "20"
 
-//let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", required: true, helpMessage: "Path to the output file.")
-let netlist = StringOption(shortFlag: "n", longFlag: "netlistSimulationFile", required: true, helpMessage: ".v file describing the netlist.")
-let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of attempts to generate a test vector. (Default: \(tvAttemptsDefault))")
+let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output fil. (Default: stdout.)")
+let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
+let netlist = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", required: true, helpMessage: ".v file describing the cells (Required.)")
+let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of attempts to generate a test vector (Default: \(tvAttemptsDefault).)")
 let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints a help message.")
 
-cli.addOptions(netlist, testVectorAttempts, help)
+cli.addOptions(topModule, netlist, testVectorAttempts, help)
 
 do {
     try cli.parse()
@@ -40,7 +40,8 @@ guard let tvAttempts = Int(testVectorAttempts.value ?? tvAttemptsDefault) else {
 
 // MARK: Importing Python and Pyverilog
 let sys = Python.import("sys")
-sys.path.append(FileManager().currentDirectoryPath + "/Pyverilog")
+sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
+sys.path.append(FileManager().currentDirectoryPath + "/Submodules/pydotlib")
 
 let version = Python.import("pyverilog.utils.version")
 print("Using Pyverilog v\(version.VERSION)")
@@ -49,7 +50,27 @@ let parse = Python.import("pyverilog.vparser.parser").parse
 
 // MARK: Parsing and Processing
 let ast = parse([args[0]])[0]
-let definition = ast[dynamicMember: "description"].definitions[1]
+let description = ast[dynamicMember: "description"]
+var definitionOptional: PythonObject?
+
+for definition in description.definitions {
+    let type = Python.type(definition).__name__
+    if type == "ModuleDef" {
+        if let name = topModule.value {
+            if name == "\(definition.name)" {
+                definitionOptional = definition
+                break
+            }
+        } else {
+            definitionOptional = definition
+            break
+        }
+    }
+}
+
+guard let definition = definitionOptional else {
+    exit(EX_DATAERR)
+}
 
 print("Processing module \(definition.name)...")
 
@@ -95,10 +116,8 @@ for itemDeclaration in definition.items {
         }
     }
 }
-print("Found ports...")
-print(ports)
-print("Found fault points...")
-print(faultPoints)
+
+print("Found \(faultPoints.count) fault points.")
 
 // Separate Inputs and Outputs
 var inputs = [Port]()
@@ -122,7 +141,7 @@ if (outputs.count == 0) {
     exit(0)
 }
 
-func generateTestbench(for module: String, ports: [String: Port], faultPoint: String, stuckAt: Int) {
+func generateTestbench(for module: String, ports: [String: Port], faultPoint: String, stuckAt: Int) -> [String: UInt]? {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
     let date = Date()
@@ -132,8 +151,8 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
     var portHooks = ""
 
     for (name, port) in ports {
-        portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.to):\(port.from)] \(name);\n"
-        portHooks += ".\(name)(\(name)), "
+        portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.to):\(port.from)] \(name) ;\n"
+        portHooks += ".\(name) ( \(name) ) , "
     }
 
     let folderName = "faultTest\(UInt16.random(in: 0..<UInt16.max))"
@@ -148,8 +167,10 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
         var vector = [String: UInt]()
         for input in inputs {
             let num = UInt.random(in: 0...UInt.max)
-            vector[input.name] = num
-            inputAssignment += "        \(input.name) = \(num);\n"
+            let mask: UInt = (2 << (UInt(input.width) - 1)) - 1
+            let trueNum = num & mask
+            vector[input.name] = trueNum
+            inputAssignment += "        \(input.name) = \(trueNum) ;\n"
         }
 
         let vcdName = "\(folderName)/dump.vcd";
@@ -174,7 +195,7 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
             );
             
             `ifdef FAULT_WITH
-            initial force uut.\(faultPoint) = \(stuckAt);
+            initial force uut.\(faultPoint) = \(stuckAt) ;
             `endif
 
             initial begin
@@ -189,9 +210,9 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
         """;
 
         let tbName = "\(folderName)/tb.sv"
-        File.open(tbName, mode: .write) {
-            try! $0.print(bench)
-        }
+        let tbFile = Python.open(tbName, mode: "w+")
+        tbFile.write(bench)
+        tbFile.close()
 
         let aoutName = "\(folderName)/a.out"
 
@@ -225,16 +246,40 @@ func generateTestbench(for module: String, ports: [String: Port], faultPoint: St
         }
     }
 
-    if let testVector = finalVector {
-        print("Vector found for \(faultPoint) stuck at \(stuckAt):", testVector)
-    } else {
-        print("Vector not found for \(faultPoint) stuck at \(stuckAt)")
-    }
-
     let _ = "rm -rf \(folderName)".sh()
+
+    return finalVector
 }
 
-for point in faultPoints {
-    generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 0)
-    generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 1)
+print("Performing simulations...")
+
+var outputDictionary: [String: [String: [String: UInt]?]] = [:] // We need to go deeper
+
+for (i, point) in faultPoints.enumerated() {
+    var currentDictionary: [String: [String: UInt]?] = [:]
+    currentDictionary["s-a-0"] = generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 0)
+    currentDictionary["s-a-1"] = generateTestbench(for: "\(definition.name)", ports: ports, faultPoint: point, stuckAt: 1)
+    outputDictionary[point] = currentDictionary
+    print("Processed \(i + 1)/\(faultPoints.count)...")
+}
+
+extension String: Error {}
+
+do {
+    let encoder = JSONEncoder()
+    let data = try encoder.encode(outputDictionary)
+    guard let string = String(data: data, encoding: .utf8)
+    else {
+        throw "Could not create utf8 string."
+    }
+    if let outputName = filePath.value {
+        let outputFile = Python.open(outputName, "w+")
+        outputFile.write(string)
+        outputFile.close()
+    } else {
+        print(string)
+    }
+} catch {
+    print("Internal error: \(error)")
+    exit(EX_SOFTWARE)
 }

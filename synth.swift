@@ -37,6 +37,9 @@ memory; opt
 # convert to gate logic
 techmap; opt
 
+# expose dff
+expose -cut -evert-dff; opt
+
 # flatten
 flatten; opt
 

@@ -11,7 +11,7 @@
 * run `synth.swift <file>` on a valid Verilog file. This will generate a netlist using Yosys named `Netlist/<file>.netlist.v`.
 * run `swift run Fault -n Tech/osu035/osu035_stdcells.v Netlist/<file>.netlist.v`.
 
-The vectors being output are printed to stdout.
+Generated test vectors are printed to stdout.
 
 # License
 TBD.
