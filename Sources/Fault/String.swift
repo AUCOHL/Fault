@@ -10,3 +10,5 @@ extension String {
         return Int(task.terminationStatus)
     }
 }
+
+extension String: Error {}
