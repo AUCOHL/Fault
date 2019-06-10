@@ -15,7 +15,7 @@ func main() {
     let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of attempts to generate a test vector (Default: \(tvAttemptsDefault).)")
     let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints a help message.")
 
-    cli.addOptions(topModule, netlist, testVectorAttempts, help)
+    cli.addOptions(filePath, topModule, netlist, testVectorAttempts, help)
 
     do {
         try cli.parse()

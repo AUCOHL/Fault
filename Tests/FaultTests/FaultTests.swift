@@ -11,16 +11,16 @@ final class FaultTests: XCTestCase {
 
         let process = Process()
         process.executableURL = fooBinary
-        process.arguments = ["-c", cells, "-t", moduleName, fileName]
+        process.arguments = ["-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
+        // let pipe = Pipe()
+        // process.standardOutput = pipe
 
         try process.run()
         process.waitUntilExit()
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let _ = String(data: data, encoding: .utf8)
+        // let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        // let _ = String(data: data, encoding: .utf8)
 
         XCTAssertEqual(process.terminationStatus, 0)
     }
