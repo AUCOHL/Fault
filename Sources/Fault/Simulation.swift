@@ -70,7 +70,7 @@ class Simulation {
 
                 initial begin
                     $dumpfile("\(vcdName)");
-                    $dumpvars(0, FaultTestbench);
+                    $dumpvars(1, FaultTestbench);
             \(inputAssignment)
                     #100;
                     $finish;
