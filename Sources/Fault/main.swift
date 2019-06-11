@@ -7,7 +7,7 @@ func main() {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine()
 
-    let tvAttemptsDefault = "20"
+    let tvAttemptsDefault = "1000"
 
     let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output fil. (Default: stdout.)")
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
@@ -151,8 +151,8 @@ func main() {
         let module = "\(definition.name)" // Any interaction with Python cannot happen in an asynchronous thread yet.
         let currentDictionary = Future<[String: [String: UInt]?]> {
             var currentDictionary: [String: [String: UInt]?] = [:]
-            currentDictionary["s-a-0"] = Simulation.run(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, at: point, stuckAt: 0, tvAttempts: tvAttempts)
-            currentDictionary["s-a-1"] = Simulation.run(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, at: point, stuckAt: 1, tvAttempts: tvAttempts)
+            currentDictionary["s-a-0"] = Simulation.pseudoRandomVerilogGeneration(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 0, tvAttempts: tvAttempts)
+            currentDictionary["s-a-1"] = Simulation.pseudoRandomVerilogGeneration(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 1, tvAttempts: tvAttempts)
             return currentDictionary
         }
         promiseDictionary[point] = currentDictionary
