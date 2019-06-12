@@ -7,15 +7,16 @@ func main() {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine()
 
-    let tvAttemptsDefault = "1000"
+    let tvAttemptsDefault = "100"
 
     let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output fil. (Default: stdout.)")
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
-    let netlist = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", required: true, helpMessage: ".v file describing the cells (Required.)")
-    let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of attempts to generate a test vector (Default: \(tvAttemptsDefault).)")
+    let cells = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", required: true, helpMessage: ".v file describing the cells (Required.)")
+    let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
+    let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
     let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints a help message.")
 
-    cli.addOptions(filePath, topModule, netlist, testVectorAttempts, help)
+    cli.addOptions(filePath, topModule, cells, testVectorAttempts, perFault, help)
 
     do {
         try cli.parse()
@@ -76,14 +77,14 @@ func main() {
 
     print("Processing module \(definition.name)…")
 
-    var ports = [String: Port]()
+    var ports: [String: Port] = [:]
 
     for portDeclaration in  definition.portlist.ports {
         let port = Port(name: "\(portDeclaration.name)")
         ports["\(portDeclaration.name)"] = port
     }
 
-    var faultPoints = Set<String>()
+    var faultPoints: Set<String> = []
 
     for itemDeclaration in definition.items {
         let type = Python.type(itemDeclaration).__name__
@@ -119,11 +120,11 @@ func main() {
         }
     }
 
-    print("Found \(faultPoints.count) fault points.")
+    print("Found \(faultPoints.count) fault sites.")
 
     // Separate Inputs and Outputs
-    var inputs = [Port]()
-    var outputs = [Port]()
+    var inputs: [Port] = []
+    var outputs: [Port] = []
 
     for (_, port) in ports {
         if port.polarity == .input {
@@ -143,44 +144,29 @@ func main() {
         exit(0)
     }
 
-    print("Performing simulations (this will take a while)…")
-
-    var promiseDictionary: [String: Future<[String: [String: UInt]?]>] = [:] // We need to go deeper
-
-    for point in faultPoints {
-        let module = "\(definition.name)" // Any interaction with Python cannot happen in an asynchronous thread yet.
-        let currentDictionary = Future<[String: [String: UInt]?]> {
-            var currentDictionary: [String: [String: UInt]?] = [:]
-            currentDictionary["s-a-0"] = Simulation.pseudoRandomVerilogGeneration(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 0, tvAttempts: tvAttempts)
-            currentDictionary["s-a-1"] = Simulation.pseudoRandomVerilogGeneration(for: module, in: args[0], with: netlist.value!, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 1, tvAttempts: tvAttempts)
-            return currentDictionary
-        }
-        promiseDictionary[point] = currentDictionary
-    }
-
-    var outputDictionary: [String: [String: [String: UInt]?]] = [:]
-    for (name, promise) in promiseDictionary {
-        outputDictionary[name] = promise.value
-    }
-
     do {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(outputDictionary)
-        guard let string = String(data: data, encoding: .utf8)
-        else {
-            throw "Could not create utf8 string."
-        } 
+        var simulator: Simulation = PerVectorSimulation()
+        if perFault.value {
+            print("Using per-fault site simulation.")
+            simulator = PerFaultSimulation()
+        }
+
+        print("Performing simulations…")
+        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells.value!, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
+
+        print("Simulations concluded: Coverage \(result.coverage * 100)%")
         if let outputName = filePath.value {
-            File.open(outputName, mode: .write) {
-                try! $0.print(string)
+            try File.open(outputName, mode: .write) {
+                try $0.print(result.json)
             }
         } else {
-            print(string)
+            print(result.json)
         }
     } catch {
         print("Internal error: \(error)")
         exit(EX_SOFTWARE)
     }
+    
 }
 
 main()

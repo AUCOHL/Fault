@@ -2,7 +2,7 @@ import XCTest
 import class Foundation.Bundle
 
 final class FaultTests: XCTestCase {
-    func ensureEX_OK(moduleName: String, fileName: String, cells: String) throws {
+    func ensureEX_OK(moduleName: String, fileName: String, cells: String, perFault: Bool = false) throws {
         guard #available(macOS 10.13, *) else {
             return
         }
@@ -12,6 +12,10 @@ final class FaultTests: XCTestCase {
         let process = Process()
         process.executableURL = fooBinary
         process.arguments = ["-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
+
+        if perFault {
+          process.arguments!.append("--perFault")
+        }
 
         // let pipe = Pipe()
         // process.standardOutput = pipe
@@ -33,6 +37,14 @@ final class FaultTests: XCTestCase {
       try ensureEX_OK(moduleName: "SuccessiveApproximationControl", fileName: "Netlists/RTL/SAR.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
     }
 
+    func testCombinationalPF() throws {
+      try ensureEX_OK(moduleName: "PlusOne", fileName: "Netlists/RTL/PlusOne.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v", perFault: true)
+    }
+
+    func testSequentialPF() throws {
+      try ensureEX_OK(moduleName: "SuccessiveApproximationControl", fileName: "Netlists/RTL/SAR.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v", perFault: true)
+    }
+
     /// Returns path to the built products directory.
     var productsDirectory: URL {
       #if os(macOS)
@@ -47,6 +59,8 @@ final class FaultTests: XCTestCase {
 
     static var allTests = [
         ("testCombinational", testCombinational),
-        ("testSequential", testSequential)
+        ("testSequential", testSequential),
+        ("testCombinationalPF", testCombinationalPF),
+        ("testSequentialPF", testSequentialPF)
     ]
 }

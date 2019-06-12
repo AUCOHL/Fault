@@ -6,7 +6,7 @@
         "repositoryURL": "https://github.com/pvieito/CommandLineKit",
         "state": {
           "branch": "master",
-          "revision": "698faa52e6de9ecf6aac8429dfaf0effa5be2257",
+          "revision": "5de2f669b0a8eb6d1db0c9592332a5584384c1df",
           "version": null
         }
       },
@@ -15,7 +15,7 @@
         "repositoryURL": "https://github.com/donn/Defile.git",
         "state": {
           "branch": "master",
-          "revision": "93a240f718741f232088b2cf2c22bc75db1270ec",
+          "revision": "a66e27059eb158c4ef6c49fd6f899be30bb99002",
           "version": null
         }
       },
@@ -24,7 +24,7 @@
         "repositoryURL": "https://github.com/pvieito/LoggerKit.git",
         "state": {
           "branch": "master",
-          "revision": "32d3eedcf4b7014cf89757f8a5f06beaff1eb5ff",
+          "revision": "9d09a46f54c87e2545eeb4801078ea1ea7f997f5",
           "version": null
         }
       },
@@ -33,7 +33,7 @@
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
           "branch": "master",
-          "revision": "29e05a7f7174d9aa64f1b3713fee9f5161b84a51",
+          "revision": "45d9a983920f9015ae6fdfd9f96bbe13b5b3ecdb",
           "version": null
         }
       }

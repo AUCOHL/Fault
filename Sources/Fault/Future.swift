@@ -7,9 +7,10 @@ public class Future<Type> {
 
     init(executor: @escaping () -> Type) {
         mutex = pthread_mutex_t()
-        pthread_mutex_init(&mutex, nil)
 
+        pthread_mutex_init(&mutex, nil)
         pthread_mutex_lock(&mutex)
+        
         DispatchQueue.global(qos: .utility).async {
             self.store = executor()
             pthread_mutex_unlock(&self.mutex)
