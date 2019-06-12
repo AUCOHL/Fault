@@ -169,8 +169,8 @@ class PerVectorSimulation: Simulation {
         for _ in 0..<tvAttempts {
             var testVector: TestVector = []
             for input in inputs {
-                let mask: UInt = (1 << UInt(input.width)) - 1
-                testVector.append(Test(value: UInt.random(in: 0...UInt.max) & mask, bits: input.width))
+                let max: UInt = (1 << UInt(input.width)) - 1
+                testVector.append(Test(value: UInt.random(in: 0...max), bits: input.width))
             }
             testVectors.append(testVector)
         }

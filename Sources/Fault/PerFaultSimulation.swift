@@ -182,11 +182,10 @@ class PerFaultSimulation: Simulation {
 
             var vector = [String: UInt]()
             for input in inputs {
-                let num = UInt.random(in: 0...UInt.max)
-                let mask: UInt = (2 << (UInt(input.width) - 1)) - 1
-                let trueNum = num & mask
-                vector[input.name] = trueNum
-                inputAssignment += "        \(input.name) = \(trueNum) ;\n"
+                let max: UInt = (1 << UInt(input.width)) - 1
+                let num = UInt.random(in: 0...max)
+                vector[input.name] = num
+                inputAssignment += "        \(input.name) = \(num) ;\n"
             }
 
             let vcdName = "\(folderName)/dump.vcd";
