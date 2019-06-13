@@ -12,13 +12,22 @@ extension String {
     }
 }
 
-if CommandLine.arguments.count != 2 {
-    print("Usage: ./synth.swift <file>")
+let env = ProcessInfo.processInfo.environment
+let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
+
+print(defaultLiberty)
+
+if CommandLine.arguments.count != 4 && !(defaultLiberty && CommandLine.arguments.count == 3) {
+    print("Usage: ./synth.swift <rtl> <output> <liberty-file>")
+    if defaultLiberty {
+        print("If a liberty file is not provided, osu035 will be used.")
+    }
     exit(EX_USAGE)
 }
 
 let file = CommandLine.arguments[1]
-let output = "Netlists/" + file + ".netlist.v"
+let output = CommandLine.arguments[2]
+let liberty = CommandLine.arguments.count == 3 ? "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : CommandLine.arguments[3]
 let script = """
 read_verilog \(file)
 
@@ -44,10 +53,10 @@ expose -cut -evert-dff; opt
 flatten; opt
 
 # mapping flip-flops to mycells.lib
-dfflibmap -liberty Tech/osu035/osu035_stdcells.lib
+dfflibmap -liberty \(liberty)
 
 # mapping logic to mycells.lib
-abc -liberty Tech/osu035/osu035_stdcells.lib
+abc -liberty \(liberty)
 
 write_verilog \(output)
 """

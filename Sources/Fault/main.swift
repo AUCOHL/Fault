@@ -9,20 +9,38 @@ func main() {
 
     let tvAttemptsDefault = "100"
 
-    let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output fil. (Default: stdout.)")
+    let env = ProcessInfo.processInfo.environment
+
+    let version = BoolOption(shortFlag: "V", longFlag: "version", helpMessage: "Prints the current version and exits.")
+    let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output file. (Default: stdout.)")
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
-    let cells = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", required: true, helpMessage: ".v file describing the cells (Required.)")
+
+    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
+    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
+
     let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
     let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
-    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints a help message.")
+    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
+    
+    if env["FAULT_VER"] != nil {
+        cli.addOptions(version)
+    }
+    if env["FAULT_INSTALL_PATH"] != nil {
+        cli.addOptions(osu035)
+    }
 
-    cli.addOptions(filePath, topModule, cells, testVectorAttempts, perFault, help)
-
+    cli.addOptions(filePath, topModule, cellsOption, testVectorAttempts, perFault, help)
+    
     do {
         try cli.parse()
     } catch {
         cli.printUsage()
         exit(EX_USAGE)
+    }
+
+    if version.value {
+        print("Fault \(env["FAULT_VER"]!). ©Cloud V 2019. All rights reserved.")
+        exit(0)
     }
 
     if help.value {
@@ -41,13 +59,31 @@ func main() {
         exit(EX_USAGE)
     }
 
+    var cellsFile = cellsOption.value
+
+    if osu035.value {
+        if cellsFile != nil {
+            cli.printUsage()
+            exit(EX_USAGE)
+        }
+        cellsFile = env["FAULT_INSTALL_PATH"]! + "/FaultInstall/Tech/osu035/osu035_stdcells.v"
+    }
+
+    guard let cells = cellsFile else {
+        cli.printUsage()
+        exit(EX_USAGE)
+    }
+
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
     sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
-    sys.path.append(FileManager().currentDirectoryPath + "/Submodules/pydotlib")
+    
+    if let installPath = env["FAULT_INSTALL_PATH"] {
+        sys.path.append(installPath + "/FaultInstall/Pyverilog")
+    }
 
-    let version = Python.import("pyverilog.utils.version")
-    print("Using Pyverilog v\(version.VERSION)")
+    let pyverilogVersion = Python.import("pyverilog.utils.version")
+    print("Using Pyverilog v\(pyverilogVersion.VERSION)")
 
     let parse = Python.import("pyverilog.vparser.parser").parse
 
@@ -152,7 +188,7 @@ func main() {
         }
 
         print("Performing simulations…")
-        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells.value!, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
+        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
         if let outputName = filePath.value {
