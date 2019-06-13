@@ -12,24 +12,34 @@ func main() {
     let env = ProcessInfo.processInfo.environment
 
     let version = BoolOption(shortFlag: "V", longFlag: "version", helpMessage: "Prints the current version and exits.")
-    let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output file. (Default: stdout.)")
-    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
-
-    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
-    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
-
-    let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
-    let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
-    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
-    
     if env["FAULT_VER"] != nil {
         cli.addOptions(version)
     }
+    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
+    cli.addOptions(help)
+
+    let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output file. (Default: stdout.)")
+    cli.addOptions(filePath)
+
+    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
+    cli.addOptions(topModule)
+
+    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
+    cli.addOptions(cellsOption)
+
+    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")  
     if env["FAULT_INSTALL_PATH"] != nil {
         cli.addOptions(osu035)
     }
 
-    cli.addOptions(filePath, topModule, cellsOption, testVectorAttempts, perFault, help)
+    let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
+    cli.addOptions(testVectorAttempts)
+
+    let dry = BoolOption(longFlag: "dry", helpMessage: "Do not actually run the simulations.")
+    cli.addOptions(dry)
+
+    let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
+    cli.addOptions(perFault)
     
     do {
         try cli.parse()
@@ -180,27 +190,29 @@ func main() {
         exit(0)
     }
 
-    do {
-        var simulator: Simulation = PerVectorSimulation()
-        if perFault.value {
-            print("Using per-fault site simulation.")
-            simulator = PerFaultSimulation()
-        }
-
-        print("Performing simulations…")
-        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
-
-        print("Simulations concluded: Coverage \(result.coverage * 100)%")
-        if let outputName = filePath.value {
-            try File.open(outputName, mode: .write) {
-                try $0.print(result.json)
+    if !dry.value {   
+        do {
+            var simulator: Simulation = PerVectorSimulation()
+            if perFault.value {
+                print("Using per-fault site simulation.")
+                simulator = PerFaultSimulation()
             }
-        } else {
-            print(result.json)
+
+            print("Performing simulations…")
+            let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
+
+            print("Simulations concluded: Coverage \(result.coverage * 100)%")
+            if let outputName = filePath.value {
+                try File.open(outputName, mode: .write) {
+                    try $0.print(result.json)
+                }
+            } else {
+                print(result.json)
+            }
+        } catch {
+            print("Internal error: \(error)")
+            exit(EX_SOFTWARE)
         }
-    } catch {
-        print("Internal error: \(error)")
-        exit(EX_SOFTWARE)
     }
     
 }
