@@ -38,6 +38,9 @@ func main() {
     let dry = BoolOption(longFlag: "dry", helpMessage: "Do not actually run the simulations.")
     cli.addOptions(dry)
 
+    let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it.")
+    cli.addOptions(sampleRun)
+
     let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
     cli.addOptions(perFault)
     
@@ -148,11 +151,12 @@ func main() {
                     port.from = Int("\(declaration.width.msb)")!
                     port.to = Int("\(declaration.width.lsb)")!
                 }
-                if (declType == "Input") {
+                if declType == "Input" {
                     port.polarity = .input
                 } else {
                     port.polarity = .output
                 }
+                faultPoints.insert("\(declaration.name)")
             }
         }
 
@@ -160,8 +164,7 @@ func main() {
         if type == "InstanceList" {
             let instance = itemDeclaration.instances[0]
             for hook in instance.portlist {
-                let name = "\(hook.argname)"
-                faultPoints.insert(name)
+                faultPoints.insert("\(instance.name).\(hook.portname)")
             }
         }
     }
@@ -181,11 +184,11 @@ func main() {
         }
     }
 
-    if (inputs.count == 0) {
+    if inputs.count == 0 {
         print("Module has no inputs.")
         exit(0)
     }
-    if (outputs.count == 0) {
+    if outputs.count == 0 {
         print("Module has no outputs.")
         exit(0)
     }
@@ -199,7 +202,7 @@ func main() {
             }
 
             print("Performing simulations…")
-            let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts)
+            let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
             print("Simulations concluded: Coverage \(result.coverage * 100)%")
             if let outputName = filePath.value {

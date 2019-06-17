@@ -7,6 +7,7 @@ protocol Simulation {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        tvAttempts: Int
+        tvAttempts: Int,
+        sampleRun: Bool 
     ) throws -> (json: String, coverage: Float)
 }

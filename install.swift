@@ -61,7 +61,7 @@ if !opt {
     exit(EX_USAGE)
 }
 
-if (action == .install) {
+if action == .install {
     print("Checking dependencies...")
 
     let iverilog = "iverilog -V".shOutput()

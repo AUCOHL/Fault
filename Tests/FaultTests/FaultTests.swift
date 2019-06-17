@@ -11,7 +11,7 @@ final class FaultTests: XCTestCase {
 
         let process = Process()
         process.executableURL = fooBinary
-        process.arguments = ["-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
+        process.arguments = ["--sampleRun", "-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
 
         if perFault {
           process.arguments!.append("--perFault")

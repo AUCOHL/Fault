@@ -29,7 +29,8 @@ class PerVectorSimulation: Simulation {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        stuckAt: Int
+        stuckAt: Int,
+        cleanUp: Bool
     ) throws -> [String] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -147,7 +148,9 @@ class PerVectorSimulation: Simulation {
             exit(vvpTask.terminationStatus)
         }
 
-        let _ = "rm -rf \(folderName)".sh()
+        if cleanUp {
+            let _ = "rm -rf \(folderName)".sh()
+        }
 
         return vvpResult.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
@@ -160,7 +163,8 @@ class PerVectorSimulation: Simulation {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        tvAttempts: Int
+        tvAttempts: Int,
+        sampleRun: Bool
     ) throws -> (json: String, coverage: Float) {
 
         var futureList: [Future<Coverage>] = []
@@ -178,9 +182,9 @@ class PerVectorSimulation: Simulation {
         for vector in testVectors {
             let future = Future<Coverage> {
                 do {
-                    let sa0 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0)
+                    let sa0 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun)
 
-                    let sa1 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1)
+                    let sa1 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun)
 
                     return Coverage(sa0: sa0, sa1: sa1)
                 } catch {
@@ -190,6 +194,9 @@ class PerVectorSimulation: Simulation {
                 }
             }
             futureList.append(future)
+            if sampleRun {
+                break
+            }
         }
 
         var sa0Covered: Set<String> = []

@@ -12,7 +12,8 @@ class PerFaultSimulation: Simulation {
         outputs: [Port],
         at faultPoint: String,
         stuckAt: Int,
-        tvAttempts: Int
+        tvAttempts: Int,
+        cleanUp: Bool
     ) throws -> [String: UInt]? {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -156,7 +157,8 @@ class PerFaultSimulation: Simulation {
         inputs: [Port],
         at faultPoint: String,
         stuckAt: Int,
-        tvAttempts: Int
+        tvAttempts: Int,
+        cleanUp: Bool
     ) throws -> [String: UInt]? {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -253,7 +255,7 @@ class PerFaultSimulation: Simulation {
             }
 
             let difference = "diff \(vcdName) \(vcdGMName) > /dev/null".sh() == 1
-            if (difference) {
+            if difference {
                 finalVector = vector
                 break
             } else {
@@ -261,7 +263,9 @@ class PerFaultSimulation: Simulation {
             }
         }
 
-        let _ = "rm -rf \(folderName)".sh()
+        if cleanUp {
+            let _ = "rm -rf \(folderName)".sh()
+        }
 
         return finalVector
     }
@@ -274,7 +278,8 @@ class PerFaultSimulation: Simulation {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        tvAttempts: Int
+        tvAttempts: Int,
+        sampleRun: Bool
     ) throws -> (json: String, coverage: Float) {
         var promiseDictionary: [String: Future<[String: [String: UInt]?]>] = [:] // We need to go deeper
 
@@ -282,18 +287,21 @@ class PerFaultSimulation: Simulation {
             let currentDictionary = Future<[String: [String: UInt]?]> {
                 var currentDictionary: [String: [String: UInt]?] = [:]
                 do {
-                    currentDictionary["s-a-0"] = try PerFaultSimulation.pseudoRandomVerilogGeneration(for: module, in: file, with: cells, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 0, tvAttempts: tvAttempts)
+                    currentDictionary["s-a-0"] = try PerFaultSimulation.pseudoRandomVerilogGeneration(for: module, in: file, with: cells, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 0, tvAttempts: tvAttempts, cleanUp: !sampleRun)
                 } catch {
                     print("File I/O failure in \(point) s-a-0")
                 }
                 do {
-                    currentDictionary["s-a-1"] = try PerFaultSimulation.pseudoRandomVerilogGeneration(for: module, in: file, with: cells, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 1, tvAttempts: tvAttempts)
+                    currentDictionary["s-a-1"] = try PerFaultSimulation.pseudoRandomVerilogGeneration(for: module, in: file, with: cells, ports: ports, inputs: inputs, outputs: outputs, at: point, stuckAt: 1, tvAttempts: tvAttempts, cleanUp: !sampleRun)
                 } catch {
                     print("File I/O failure in \(point) s-a-1")
                 }
                 return currentDictionary
             }
             promiseDictionary[point] = currentDictionary
+            if sampleRun {
+                break
+            }
         }
 
         var sa0Covered: Float = 0
