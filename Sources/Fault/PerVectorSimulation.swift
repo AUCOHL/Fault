@@ -43,8 +43,8 @@ class PerVectorSimulation: Simulation {
 
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.to):\(port.from)] \(name) ;\n"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.to):\(port.from)] \(name).gm ;\n"
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name).gm ;\n"
             portHooks += ".\(name) ( \(name) ) , "
             portHooksGM += ".\(name) ( \(name).gm ) , "
         }

@@ -14,7 +14,7 @@ final class FaultTests: XCTestCase {
         process.arguments = ["--sampleRun", "-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
 
         if perFault {
-          process.arguments!.append("--perFault")
+          process.arguments!.append("--simulatePerFault")
         }
 
         // let pipe = Pipe()

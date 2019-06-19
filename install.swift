@@ -122,12 +122,6 @@ if action == .install {
     export FAULT_INSTALL_PATH="\(path)"
     export FAULT_VER="\(gitVersion)"
 
-    if test $1 = 'synth'; then
-        shift;
-        swift $FAULT_INSTALL_PATH/FaultInstall/synth.swift $@;
-        exit $?
-    fi
-
     "\(path)/FaultInstall/Fault" $@
     rm -f parser.out parsetab.py
     rm -rf __pycache__
@@ -136,8 +130,7 @@ if action == .install {
     let _ = "echo '\(launchScript)' > '\(path)/fault'".sh()
     let _ = "chmod +x '\(path)/fault'".sh()
 
-    let _ = "cp .build/release/Fault '\(path)/FaultInstall/Fault'".sh()
-    let _ = "cp synth.swift '\(path)/FaultInstall/synth.swift'".sh()
+    let _ = "cp .build/release/Fault '\(path)/FaultInstall/fault'".sh()
     let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".sh()
     let _ = "cp -r Submodules/Pyverilog '\(path)/FaultInstall/Pyverilog'".sh()
 

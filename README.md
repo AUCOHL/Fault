@@ -26,9 +26,18 @@ Then install the Swift programming language: instructions are on [swift.org](htt
 ## First time
 Type `git submodule update --init --recursive` in the terminal to initialize submodules.
 
+Then simply invoke `swift install.swift`.
+
 ## Running
-* run `synth.swift <liberty-file> <rtl> <output>` on a valid Verilog file. This will generate a netlist using Yosys.
-* run `swift run Fault -n <cell-model> <netlist>`.
+* `fault <options> <file>`. Write `fault --help` for more options.
+
+Fault has some assumptions about input files:
+* All files are flat netlists.
+* There is only one module: if there are multiple, the module in use is undefined unless the option `--top` is specified.
+* All D-flipflop modules instantiated start with "DFF".
+
+* You can invoke `fault synth <options> <file>` to synthesize RTL into a Fault-compatible netlist. Write `fault synth --help` for options.
+
 
 Generated test vectors are printed to stdout by default, but you can use `-o <file>` (or simply redirect the output).
 

@@ -1,28 +1,29 @@
 import Foundation
-import PythonKit
 import CommandLineKit
+import PythonKit
 import Defile
 
-func main() {
+func main(arguments: [String]) {
     // MARK: CommandLine Processing
-    let cli = CommandLineKit.CommandLine()
+    let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let tvAttemptsDefault = "100"
-
     let env = ProcessInfo.processInfo.environment
 
     let version = BoolOption(shortFlag: "V", longFlag: "version", helpMessage: "Prints the current version and exits.")
     if env["FAULT_VER"] != nil {
         cli.addOptions(version)
     }
+
     let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
     cli.addOptions(help)
 
-    let filePath = StringOption(shortFlag: "o", longFlag: "outputFile", helpMessage: "Path to the JSON output file. (Default: stdout.)")
+    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: stdout.)")
     cli.addOptions(filePath)
 
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
     cli.addOptions(topModule)
+
 
     let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
     cli.addOptions(cellsOption)
@@ -35,14 +36,15 @@ func main() {
     let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
     cli.addOptions(testVectorAttempts)
 
-    let dry = BoolOption(longFlag: "dry", helpMessage: "Do not actually run the simulations.")
-    cli.addOptions(dry)
+    
+    let perVector = BoolOption(longFlag: "simulatePerVector", helpMessage: "Default operation mode. Generates a number of test vectors and tests along all fault sites. Cannot be combined with simulatePerFault.")
+    cli.addOptions(perVector)
 
-    let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it.")
-    cli.addOptions(sampleRun)
-
-    let perFault = BoolOption(longFlag: "perFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors.")
+    let perFault = BoolOption(longFlag: "simulatePerFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors. Cannot be combined with simulatePerVector.")
     cli.addOptions(perFault)
+
+    let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it. Has no effect under registerChain.")
+    cli.addOptions(sampleRun)
     
     do {
         try cli.parse()
@@ -53,12 +55,13 @@ func main() {
 
     if version.value {
         print("Fault \(env["FAULT_VER"]!). ©Cloud V 2019. All rights reserved.")
-        exit(0)
+        exit(EX_OK)
     }
 
     if help.value {
         cli.printUsage()
-        exit(0)
+        print("To take a look at synthesis options, try 'fault synth --help'")
+        exit(EX_OK)
     }
 
     let args = cli.unparsedArguments
@@ -83,6 +86,12 @@ func main() {
     }
 
     guard let cells = cellsFile else {
+        cli.printUsage()
+        exit(EX_USAGE)
+    }
+
+    let mutualExclusivity = (perFault.value ? 1 : 0) + (perVector.value ? 1 : 0)
+    if mutualExclusivity > 1 {
         cli.printUsage()
         exit(EX_USAGE)
     }
@@ -170,8 +179,9 @@ func main() {
     }
 
     print("Found \(faultPoints.count) fault sites.")
+    
 
-    // Separate Inputs and Outputs
+    // MARK: Separate Inputs and Outputs
     var inputs: [Port] = []
     var outputs: [Port] = []
 
@@ -186,38 +196,39 @@ func main() {
 
     if inputs.count == 0 {
         print("Module has no inputs.")
-        exit(0)
+        exit(EX_OK)
     }
     if outputs.count == 0 {
         print("Module has no outputs.")
-        exit(0)
+        exit(EX_OK)
     }
 
-    if !dry.value {   
-        do {
-            var simulator: Simulation = PerVectorSimulation()
-            if perFault.value {
-                print("Using per-fault site simulation.")
-                simulator = PerFaultSimulation()
-            }
+    // MARK: Simulation
+    do {
+        let simulator: Simulation = perFault.value ? PerFaultSimulation() : PerVectorSimulation()
 
-            print("Performing simulations…")
-            let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
+        print("Performing simulations…")
+        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
-            print("Simulations concluded: Coverage \(result.coverage * 100)%")
-            if let outputName = filePath.value {
-                try File.open(outputName, mode: .write) {
-                    try $0.print(result.json)
-                }
-            } else {
-                print(result.json)
+        print("Simulations concluded: Coverage \(result.coverage * 100)%")
+        if let outputName = filePath.value {
+            try File.open(outputName, mode: .write) {
+                try $0.print(result.json)
             }
-        } catch {
-            print("Internal error: \(error)")
-            exit(EX_SOFTWARE)
+        } else {
+            print(result.json)
         }
+    } catch {
+        print("Internal error: \(error)")
+        exit(EX_SOFTWARE)
     }
-    
 }
 
-main()
+var arguments = Swift.CommandLine.arguments
+if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "synth" {
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    synth(arguments: arguments)
+} else {
+    main(arguments: arguments)
+}
