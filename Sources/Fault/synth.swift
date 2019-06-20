@@ -3,7 +3,23 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-fileprivate func createScript(for module: String, in file: String, cutting: Bool = false, liberty libertyFile: String, output: String) -> String {
+enum Gate: String {
+    case and = "AND"
+    case nand = "NAND"
+    case or = "OR"
+    case nor = "NOR"
+    case xnor = "XNOR"
+    case andnot = "ANDNOT"
+    case ornot = "ORNOT"
+    case mux = "MUX"
+    case aoi3 = "AOI3"
+    case oai3 = "OAI3"
+    case aoi4 = "AOI4"
+    case oai4 = "OAI4"
+}
+
+fileprivate func createScript(for module: String, in file: String, cutting: Bool = false, liberty libertyFile: String, output: String, optimize: Bool = true) -> String {
+    let opt = optimize ? "opt" : ""
     return """
     read_verilog \(file)
 
@@ -11,22 +27,22 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     hierarchy -top \(module)
 
     # translate processes (always blocks)
-    proc; opt
+    proc; \(opt)
 
     # detect and optimize FSM encodings
-    fsm; opt
+    fsm; \(opt)
 
     # implement memories (arrays)
-    memory; opt
+    memory; \(opt)
 
     # convert to gate logic
-    techmap; opt
+    techmap; \(opt)
 
     # expose dff
-    \(cutting ? "expose -cut -evert-dff; opt" : "")
+    \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
 
     # flatten
-    flatten; opt
+    flatten; \(opt)
 
     # mapping flip-flops to mycells.lib
     dfflibmap -liberty \(libertyFile)
@@ -34,7 +50,10 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     # mapping logic to mycells.lib
     abc -liberty \(libertyFile)
 
-    write_verilog \(output)
+    # cleanup
+    opt_clean -purge
+
+    write_verilog -noattr -noexpr \(output)
     """
 }
 
@@ -61,8 +80,13 @@ func synth(arguments: [String]) {
     let registerChain = BoolOption(longFlag: "registerChain", helpMessage: "Chain together D flip-flops.")
     cli.addOptions(registerChain)
     
-    let resynthesize = BoolOption(longFlag: "resynthesize", helpMessage: "Resynthesize after register chaining. Has no effect unless registerChain is selected.")
+    let resynthesize = StringOption(longFlag: "resynthWith", helpMessage: "Liberty file to resynthesize with after register chaining. Has no effect unless registerChain is selected.")
     cli.addOptions(resynthesize)
+
+    let resynthesizeWithOSU035 = BoolOption(longFlag: "osu035resyn", helpMessage: "Resynthesize after register chaining with a cut down version of osu035.")
+    if defaultLiberty {
+        cli.addOptions(resynthesizeWithOSU035)
+    }
 
     
     do {
@@ -88,6 +112,7 @@ func synth(arguments: [String]) {
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
     let intermediate0 = "\(output).intermediate0.v"
     let intermediate1 = "\(output).intermediate1.v"
+    let intermediate2 = "\(output).intermediate2.v"
     
     // I am so sorry.
     let libertyFile = defaultLiberty ?
@@ -157,6 +182,8 @@ func synth(arguments: [String]) {
     ports.append(Node.Port(outputName, Python.None, Python.None))
     definition.portlist.ports = Python.tuple(ports)
 
+    var counter = 0
+
     for itemDeclaration in definition.items {
         let type = Python.type(itemDeclaration).__name__
 
@@ -164,6 +191,7 @@ func synth(arguments: [String]) {
         if type == "InstanceList" {
             let instance = itemDeclaration.instances[0]
             if "\(instance.module)".starts(with: "DFF") {
+                counter += 1
                 for hook in instance.portlist {
                     if hook.portname == "D" {
                         let ternary = Node.Cond(testingIdentifier, previousOutput, hook.argname)
@@ -189,20 +217,42 @@ func synth(arguments: [String]) {
     )
     statements.append(finalAssignment)
     definition.items = Python.tuple(statements)
+
+    let metadata = Metadata(dffCount: counter, testEnableIdentifier: testingName, testInputIdentifier: inputName, testOutputIdentifier: outputName)
+    guard let metadataString = metadata.toJSON() else {
+        print("Could not generate metadata string.")
+        exit(EX_SOFTWARE)
+    }
     
     do {
-        if (resynthesize.value) {
+        let resynthesisLiberty = resynthesizeWithOSU035.value ? "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : resynthesize.value
+        if let secondLiberty = resynthesisLiberty  {
             try File.open(intermediate1, mode: .write) {
                 try $0.print(Generator.visit(ast))
             }
 
-            let script = createScript(for: module.value!, in: intermediate1, liberty: libertyFile, output: output)
+            let script = createScript(for: module.value!, in: intermediate1, liberty: secondLiberty, output: intermediate2, optimize: false)
 
             let result = "echo '\(script)' | yosys".sh()
 
-            exit(Int32(result))
+            if result != EX_OK {
+                exit(Int32(result))
+            }
+
+            try File.open(intermediate2, mode: .read) { intermediate in
+                try File.open(output, mode: .write) {
+                    try $0.print(String.boilerplate)
+                    try $0.print("/* FAULT METADATA: \(metadataString) */")
+                    try $0.print(intermediate.string!)
+                    exit(EX_OK)
+                }
+            }
+
         } else {
+            
             try File.open(output, mode: .write) {
+                try $0.print(String.boilerplate)
+                try $0.print("/* FAULT METADATA: \(metadataString) */")
                 try $0.print(Generator.visit(ast))
             }
 

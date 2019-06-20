@@ -110,7 +110,9 @@ func main(arguments: [String]) {
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // MARK: Parsing and Processing
-    let ast = parse([args[0]])[0]
+    let parseResult = parse([args[0]])
+    print("\(parseResult[1])")
+    let ast = parseResult[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
 
