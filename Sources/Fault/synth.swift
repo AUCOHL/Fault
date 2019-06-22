@@ -57,7 +57,7 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     """
 }
 
-func synth(arguments: [String]) {
+func synth(arguments: [String]) -> Int32 {
     let env = ProcessInfo.processInfo.environment
     let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
 
@@ -71,11 +71,12 @@ func synth(arguments: [String]) {
     
     let cut = BoolOption(shortFlag: "c", longFlag: "cut", helpMessage: "Cut away flipflops to turn them into inputs. This makes ATPG faster but changes the structure of the circuit decidedly.")
     cli.addOptions(cut)
+
     let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: !defaultLiberty, helpMessage: "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")")
     cli.addOptions(liberty)
 
-    let module = StringOption(shortFlag: "t", longFlag: "top", required: !defaultLiberty, helpMessage: "Top module (Required.)")
-    cli.addOptions(module)
+    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Default: first module found.)")
+    cli.addOptions(topModule)
 
     let registerChain = BoolOption(longFlag: "registerChain", helpMessage: "Chain together D flip-flops.")
     cli.addOptions(registerChain)
@@ -93,44 +94,31 @@ func synth(arguments: [String]) {
         try cli.parse()
     } catch {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     if help.value {
         cli.printUsage()
-        exit(EX_OK)
+        return EX_OK
     }
 
     let args = cli.unparsedArguments
     if args.count != 1 {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
-    
+       
 
     let file = args[0]
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
     let intermediate0 = "\(output).intermediate0.v"
     let intermediate1 = "\(output).intermediate1.v"
     let intermediate2 = "\(output).intermediate2.v"
-    
-    // I am so sorry.
-    let libertyFile = defaultLiberty ?
-        liberty.value ??
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
-        liberty.value!
 
-    let script = createScript(for: module.value!, in: file, cutting: cut.value, liberty: libertyFile, output: registerChain.value ? intermediate0: output)
-
-    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
-    let result = "echo '\(script)' | yosys".sh()
-
-    if result != EX_OK {
-        exit(Int32(result))
-    }
-
-    if !registerChain.value {
-        exit(EX_OK)
+    defer {
+        let _ = "rm -rf '\(output).intermediate0.v'".sh()
+        let _ = "rm -rf '\(output).intermediate1.v'".sh()
+        let _ = "rm -rf '\(output).intermediate2.v'".sh()
     }
 
     // MARK: Importing Python and Pyverilog
@@ -150,19 +138,47 @@ func synth(arguments: [String]) {
 
     let Generator = Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
 
-    // MARK: Process ast
+    // Get topModule name
+    let module = topModule.value ?? {
+        let ast = parse([file])[0]
+        let description = ast[dynamicMember: "description"]
+        return "\(description.definitions[0].name)"
+    }()
+    
+    // I am so sorry.
+    let libertyFile = defaultLiberty ?
+        liberty.value ??
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
+        liberty.value!
+
+    let script = createScript(for: module, in: file, cutting: cut.value, liberty: libertyFile, output: registerChain.value ? intermediate0: output)
+
+    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
+    let result = "echo '\(script)' | yosys".sh()
+
+    if result != EX_OK {
+        return Int32(result)
+    }
+
+    if !registerChain.value {
+        return EX_OK
+    }    
+
+    // MARK: Process ast for intermediate 0
     let ast = parse([intermediate0])[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
     for definition in description.definitions {
         let type = Python.type(definition).__name__
         if type == "ModuleDef" {
-            definitionOptional = definition
-            break
+            if "\(definition.name)" == module {
+                definitionOptional = definition
+                break
+            }
         }
     }
     guard let definition = definitionOptional else {
-        exit(EX_DATAERR)
+        return EX_DATAERR
     }
     
     // MARK: Register Chain Serialization
@@ -221,22 +237,22 @@ func synth(arguments: [String]) {
     let metadata = Metadata(dffCount: counter, testEnableIdentifier: testingName, testInputIdentifier: inputName, testOutputIdentifier: outputName)
     guard let metadataString = metadata.toJSON() else {
         print("Could not generate metadata string.")
-        exit(EX_SOFTWARE)
+        return EX_SOFTWARE
     }
     
     do {
-        let resynthesisLiberty = resynthesizeWithOSU035.value ? "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : resynthesize.value
+        let resynthesisLiberty = resynthesizeWithOSU035.value ? "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_muxonly.lib" : resynthesize.value
         if let secondLiberty = resynthesisLiberty  {
             try File.open(intermediate1, mode: .write) {
                 try $0.print(Generator.visit(ast))
             }
 
-            let script = createScript(for: module.value!, in: intermediate1, liberty: secondLiberty, output: intermediate2, optimize: false)
+            let script = createScript(for: module, in: intermediate1, liberty: secondLiberty, output: intermediate2, optimize: false)
 
             let result = "echo '\(script)' | yosys".sh()
 
             if result != EX_OK {
-                exit(Int32(result))
+                return Int32(result)
             }
 
             try File.open(intermediate2, mode: .read) { intermediate in
@@ -244,22 +260,20 @@ func synth(arguments: [String]) {
                     try $0.print(String.boilerplate)
                     try $0.print("/* FAULT METADATA: \(metadataString) */")
                     try $0.print(intermediate.string!)
-                    exit(EX_OK)
                 }
             }
 
-        } else {
-            
+        } else {            
             try File.open(output, mode: .write) {
                 try $0.print(String.boilerplate)
                 try $0.print("/* FAULT METADATA: \(metadataString) */")
                 try $0.print(Generator.visit(ast))
             }
-
-            exit(EX_OK)
         }
     } catch {
         print("Internal software error: \(error)")
-        exit(EX_SOFTWARE)
+        return EX_SOFTWARE
     }
+            
+    return EX_OK
 }
