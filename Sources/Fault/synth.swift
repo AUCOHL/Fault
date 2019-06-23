@@ -3,7 +3,23 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-fileprivate func createScript(for module: String, in file: String, cutting: Bool = false, liberty libertyFile: String, output: String) -> String {
+enum Gate: String {
+    case and = "AND"
+    case nand = "NAND"
+    case or = "OR"
+    case nor = "NOR"
+    case xnor = "XNOR"
+    case andnot = "ANDNOT"
+    case ornot = "ORNOT"
+    case mux = "MUX"
+    case aoi3 = "AOI3"
+    case oai3 = "OAI3"
+    case aoi4 = "AOI4"
+    case oai4 = "OAI4"
+}
+
+fileprivate func createScript(for module: String, in file: String, cutting: Bool = false, liberty libertyFile: String, output: String, optimize: Bool = true) -> String {
+    let opt = optimize ? "opt" : ""
     return """
     read_verilog \(file)
 
@@ -11,22 +27,22 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     hierarchy -top \(module)
 
     # translate processes (always blocks)
-    proc; opt
+    proc; \(opt)
 
     # detect and optimize FSM encodings
-    fsm; opt
+    fsm; \(opt)
 
     # implement memories (arrays)
-    memory; opt
+    memory; \(opt)
 
     # convert to gate logic
-    techmap; opt
+    techmap; \(opt)
 
     # expose dff
-    \(cutting ? "expose -cut -evert-dff; opt" : "")
+    \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
 
     # flatten
-    flatten; opt
+    flatten; \(opt)
 
     # mapping flip-flops to mycells.lib
     dfflibmap -liberty \(libertyFile)
@@ -37,11 +53,14 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     # print gate count
     stat
 
-    write_verilog \(output)
+    # cleanup
+    opt_clean -purge
+
+    write_verilog -noattr -noexpr \(output)
     """
 }
 
-func synth(arguments: [String]) {
+func synth(arguments: [String]) -> Int32 {
     let env = ProcessInfo.processInfo.environment
     let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
 
@@ -55,60 +74,54 @@ func synth(arguments: [String]) {
 
     let cut = BoolOption(shortFlag: "c", longFlag: "cut", helpMessage: "Cut away flipflops to turn them into inputs. This makes ATPG faster but changes the structure of the circuit decidedly.")
     cli.addOptions(cut)
+
     let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: !defaultLiberty, helpMessage: "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")")
     cli.addOptions(liberty)
 
-    let module = StringOption(shortFlag: "t", longFlag: "top", required: !defaultLiberty, helpMessage: "Top module (Required.)")
-    cli.addOptions(module)
+    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Default: first module found.)")
+    cli.addOptions(topModule)
 
     let registerChain = BoolOption(longFlag: "registerChain", helpMessage: "Chain together D flip-flops.")
     cli.addOptions(registerChain)
-
-    let resynthesize = BoolOption(longFlag: "resynthesize", helpMessage: "Resynthesize after register chaining. Has no effect unless registerChain is selected.")
+    
+    let resynthesize = StringOption(longFlag: "resynthWith", helpMessage: "Liberty file to resynthesize with after register chaining. Has no effect unless registerChain is selected.")
     cli.addOptions(resynthesize)
 
+    let resynthesizeWithOSU035 = BoolOption(longFlag: "osu035resyn", helpMessage: "Resynthesize after register chaining with a cut down version of osu035.")
+    if defaultLiberty {
+        cli.addOptions(resynthesizeWithOSU035)
+    }
 
+    
     do {
         try cli.parse()
     } catch {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     if help.value {
         cli.printUsage()
-        exit(EX_OK)
+        return EX_OK
     }
 
     let args = cli.unparsedArguments
     if args.count != 1 {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
-
+       
 
     let file = args[0]
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
     let intermediate0 = "\(output).intermediate0.v"
     let intermediate1 = "\(output).intermediate1.v"
+    let intermediate2 = "\(output).intermediate2.v"
 
-    // I am so sorry.
-    let libertyFile = defaultLiberty ?
-        liberty.value ??
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
-        liberty.value!
-
-    let script = createScript(for: module.value!, in: file, cutting: cut.value, liberty: libertyFile, output: registerChain.value ? intermediate0: output)
-
-    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
-    let result = "echo '\(script)' | yosys".sh()
-
-    if result != EX_OK {
-        exit(Int32(result))
-    }
-
-    if !registerChain.value {
-        exit(EX_OK)
+    defer {
+        let _ = "rm -rf '\(output).intermediate0.v'".sh()
+        let _ = "rm -rf '\(output).intermediate1.v'".sh()
+        let _ = "rm -rf '\(output).intermediate2.v'".sh()
     }
 
     // MARK: Importing Python and Pyverilog
@@ -128,19 +141,47 @@ func synth(arguments: [String]) {
 
     let Generator = Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
 
-    // MARK: Process ast
+    // Get topModule name
+    let module = topModule.value ?? {
+        let ast = parse([file])[0]
+        let description = ast[dynamicMember: "description"]
+        return "\(description.definitions[0].name)"
+    }()
+    
+    // I am so sorry.
+    let libertyFile = defaultLiberty ?
+        liberty.value ??
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
+        liberty.value!
+
+    let script = createScript(for: module, in: file, cutting: cut.value, liberty: libertyFile, output: registerChain.value ? intermediate0: output)
+
+    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
+    let result = "echo '\(script)' | yosys".sh()
+
+    if result != EX_OK {
+        return Int32(result)
+    }
+
+    if !registerChain.value {
+        return EX_OK
+    }    
+
+    // MARK: Process ast for intermediate 0
     let ast = parse([intermediate0])[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
     for definition in description.definitions {
         let type = Python.type(definition).__name__
         if type == "ModuleDef" {
-            definitionOptional = definition
-            break
+            if "\(definition.name)" == module {
+                definitionOptional = definition
+                break
+            }
         }
     }
     guard let definition = definitionOptional else {
-        exit(EX_DATAERR)
+        return EX_DATAERR
     }
 
     // MARK: Register Chain Serialization
@@ -160,6 +201,8 @@ func synth(arguments: [String]) {
     ports.append(Node.Port(outputName, Python.None, Python.None))
     definition.portlist.ports = Python.tuple(ports)
 
+    var counter = 0
+
     for itemDeclaration in definition.items {
         let type = Python.type(itemDeclaration).__name__
 
@@ -167,6 +210,7 @@ func synth(arguments: [String]) {
         if type == "InstanceList" {
             let instance = itemDeclaration.instances[0]
             if "\(instance.module)".starts(with: "DFF") {
+                counter += 1
                 for hook in instance.portlist {
                     if hook.portname == "D" {
                         let ternary = Node.Cond(testingIdentifier, previousOutput, hook.argname)
@@ -193,26 +237,46 @@ func synth(arguments: [String]) {
     statements.append(finalAssignment)
     definition.items = Python.tuple(statements)
 
+    let metadata = Metadata(dffCount: counter, testEnableIdentifier: testingName, testInputIdentifier: inputName, testOutputIdentifier: outputName)
+    guard let metadataString = metadata.toJSON() else {
+        print("Could not generate metadata string.")
+        return EX_SOFTWARE
+    }
+    
     do {
-        if (resynthesize.value) {
+        let resynthesisLiberty = resynthesizeWithOSU035.value ? "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_muxonly.lib" : resynthesize.value
+        if let secondLiberty = resynthesisLiberty  {
             try File.open(intermediate1, mode: .write) {
                 try $0.print(Generator.visit(ast))
             }
 
-            let script = createScript(for: module.value!, in: intermediate1, liberty: libertyFile, output: output)
+            let script = createScript(for: module, in: intermediate1, liberty: secondLiberty, output: intermediate2, optimize: false)
 
             let result = "echo '\(script)' | yosys".sh()
 
-            exit(Int32(result))
-        } else {
-            try File.open(output, mode: .write) {
-                try $0.print(Generator.visit(ast))
+            if result != EX_OK {
+                return Int32(result)
             }
 
-            exit(EX_OK)
+            try File.open(intermediate2, mode: .read) { intermediate in
+                try File.open(output, mode: .write) {
+                    try $0.print(String.boilerplate)
+                    try $0.print("/* FAULT METADATA: \(metadataString) */")
+                    try $0.print(intermediate.string!)
+                }
+            }
+
+        } else {            
+            try File.open(output, mode: .write) {
+                try $0.print(String.boilerplate)
+                try $0.print("/* FAULT METADATA: \(metadataString) */")
+                try $0.print(Generator.visit(ast))
+            }
         }
     } catch {
         print("Internal software error: \(error)")
-        exit(EX_SOFTWARE)
+        return EX_SOFTWARE
     }
+            
+    return EX_OK
 }

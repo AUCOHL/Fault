@@ -5,7 +5,7 @@ import Defile
 import CoreFoundation
 
 
-func main(arguments: [String]) {
+func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
@@ -52,29 +52,29 @@ func main(arguments: [String]) {
         try cli.parse()
     } catch {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     if version.value {
         print("Fault \(env["FAULT_VER"]!). ©Cloud V 2019. All rights reserved.")
-        exit(EX_OK)
+        return EX_OK
     }
 
     if help.value {
         cli.printUsage()
         print("To take a look at synthesis options, try 'fault synth --help'")
-        exit(EX_OK)
+        return EX_OK
     }
 
     let args = cli.unparsedArguments
     if args.count != 1 {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     guard let tvAttempts = Int(testVectorAttempts.value ?? tvAttemptsDefault) else {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     var cellsFile = cellsOption.value
@@ -82,20 +82,20 @@ func main(arguments: [String]) {
     if osu035.value {
         if cellsFile != nil {
             cli.printUsage()
-            exit(EX_USAGE)
+            return EX_USAGE
         }
         cellsFile = env["FAULT_INSTALL_PATH"]! + "/FaultInstall/Tech/osu035/osu035_stdcells.v"
     }
 
     guard let cells = cellsFile else {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     let mutualExclusivity = (perFault.value ? 1 : 0) + (perVector.value ? 1 : 0)
     if mutualExclusivity > 1 {
         cli.printUsage()
-        exit(EX_USAGE)
+        return EX_USAGE
     }
 
     // MARK: Importing Python and Pyverilog
@@ -112,7 +112,9 @@ func main(arguments: [String]) {
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // MARK: Parsing and Processing
-    let ast = parse([args[0]])[0]
+    let parseResult = parse([args[0]])
+    print("\(parseResult[1])")
+    let ast = parseResult[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
 
@@ -132,7 +134,7 @@ func main(arguments: [String]) {
     }
 
     guard let definition = definitionOptional else {
-        exit(EX_DATAERR)
+        return EX_DATAERR
     }
 
     print("Processing module \(definition.name)…")
@@ -156,7 +158,7 @@ func main(arguments: [String]) {
             if declType == "Input" || declType == "Output" {
                 guard let port = ports["\(declaration.name)"] else {
                     print("Parse error: Unknown port.")
-                    exit(EX_DATAERR)
+                    return EX_DATAERR
                 }
                 if declaration.width != Python.None {
                     port.from = Int("\(declaration.width.msb)")!
@@ -198,11 +200,11 @@ func main(arguments: [String]) {
 
     if inputs.count == 0 {
         print("Module has no inputs.")
-        exit(EX_OK)
+        return EX_OK
     }
     if outputs.count == 0 {
         print("Module has no outputs.")
-        exit(EX_OK)
+        return EX_OK
     }
 
     // MARK: Simulation
@@ -228,15 +230,17 @@ func main(arguments: [String]) {
         }
     } catch {
         print("Internal error: \(error)")
-        exit(EX_SOFTWARE)
+        return EX_SOFTWARE
     }
+
+    return EX_OK
 }
 
 var arguments = Swift.CommandLine.arguments
 if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "synth" {
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
-    synth(arguments: arguments)
+    exit(synth(arguments: arguments))
 } else {
-    main(arguments: arguments)
+    exit(main(arguments: arguments))
 }

@@ -38,8 +38,12 @@ Fault has some assumptions about input files:
 
 * You can invoke `fault synth <options> <file>` to synthesize RTL into a Fault-compatible netlist. Write `fault synth --help` for options.
 
-
 Generated test vectors are printed to stdout by default, but you can use `-o <file>` (or simply redirect the output).
+
+### Running locally
+TBD
+
+`swift run Fault synth --liberty Tech/osu035/osu035_stdcells.lib --registerChain --resynthWith Tech/osu035/osu035_muxonly.lib --top serAdder RTL/serAdder.v`
 
 # License
 After this repository becomes public, the GNU General Public License v3 (or later, at your option). See 'License'.
