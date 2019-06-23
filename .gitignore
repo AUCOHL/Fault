@@ -10,3 +10,7 @@ Netlists
 *.vcd
 /*.py
 /*.sv
+/*.v
+/*.log
+
+*.json
