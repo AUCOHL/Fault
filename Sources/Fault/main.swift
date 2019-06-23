@@ -2,6 +2,8 @@ import Foundation
 import CommandLineKit
 import PythonKit
 import Defile
+import CoreFoundation
+
 
 func main(arguments: [String]) {
     // MARK: CommandLine Processing
@@ -28,7 +30,7 @@ func main(arguments: [String]) {
     let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
     cli.addOptions(cellsOption)
 
-    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")  
+    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
     if env["FAULT_INSTALL_PATH"] != nil {
         cli.addOptions(osu035)
     }
@@ -36,7 +38,7 @@ func main(arguments: [String]) {
     let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
     cli.addOptions(testVectorAttempts)
 
-    
+
     let perVector = BoolOption(longFlag: "simulatePerVector", helpMessage: "Default operation mode. Generates a number of test vectors and tests along all fault sites. Cannot be combined with simulatePerFault.")
     cli.addOptions(perVector)
 
@@ -45,7 +47,7 @@ func main(arguments: [String]) {
 
     let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it. Has no effect under registerChain.")
     cli.addOptions(sampleRun)
-    
+
     do {
         try cli.parse()
     } catch {
@@ -99,7 +101,7 @@ func main(arguments: [String]) {
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
     sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
-    
+
     if let installPath = env["FAULT_INSTALL_PATH"] {
         sys.path.append(installPath + "/FaultInstall/Pyverilog")
     }
@@ -179,7 +181,7 @@ func main(arguments: [String]) {
     }
 
     print("Found \(faultPoints.count) fault sites.")
-    
+
 
     // MARK: Separate Inputs and Outputs
     var inputs: [Port] = []
@@ -205,12 +207,18 @@ func main(arguments: [String]) {
 
     // MARK: Simulation
     do {
+
+        let startTime = CFAbsoluteTimeGetCurrent()
         let simulator: Simulation = perFault.value ? PerFaultSimulation() : PerVectorSimulation()
 
         print("Performing simulations…")
         let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
+        let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+        print("Time elapsed : \(timeElapsed) s.")
+
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
+
         if let outputName = filePath.value {
             try File.open(outputName, mode: .write) {
                 try $0.print(result.json)

@@ -34,6 +34,9 @@ fileprivate func createScript(for module: String, in file: String, cutting: Bool
     # mapping logic to mycells.lib
     abc -liberty \(libertyFile)
 
+    # print gate count
+    stat
+
     write_verilog \(output)
     """
 }
@@ -49,7 +52,7 @@ func synth(arguments: [String]) {
 
     let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output file. (Default: Netlists/ + input + .netlist.v)")
     cli.addOptions(filePath)
-    
+
     let cut = BoolOption(shortFlag: "c", longFlag: "cut", helpMessage: "Cut away flipflops to turn them into inputs. This makes ATPG faster but changes the structure of the circuit decidedly.")
     cli.addOptions(cut)
     let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: !defaultLiberty, helpMessage: "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")")
@@ -60,11 +63,11 @@ func synth(arguments: [String]) {
 
     let registerChain = BoolOption(longFlag: "registerChain", helpMessage: "Chain together D flip-flops.")
     cli.addOptions(registerChain)
-    
+
     let resynthesize = BoolOption(longFlag: "resynthesize", helpMessage: "Resynthesize after register chaining. Has no effect unless registerChain is selected.")
     cli.addOptions(resynthesize)
 
-    
+
     do {
         try cli.parse()
     } catch {
@@ -82,13 +85,13 @@ func synth(arguments: [String]) {
         cli.printUsage()
         exit(EX_USAGE)
     }
-    
+
 
     let file = args[0]
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
     let intermediate0 = "\(output).intermediate0.v"
     let intermediate1 = "\(output).intermediate1.v"
-    
+
     // I am so sorry.
     let libertyFile = defaultLiberty ?
         liberty.value ??
@@ -111,7 +114,7 @@ func synth(arguments: [String]) {
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
     sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
-    
+
     if let installPath = env["FAULT_INSTALL_PATH"] {
         sys.path.append(installPath + "/FaultInstall/Pyverilog")
     }
@@ -139,9 +142,9 @@ func synth(arguments: [String]) {
     guard let definition = definitionOptional else {
         exit(EX_DATAERR)
     }
-    
+
     // MARK: Register Chain Serialization
-    
+
     let testingName = "__testing__"
     let testingIdentifier = Node.Identifier(testingName)
     let inputName = "__input__"
@@ -189,7 +192,7 @@ func synth(arguments: [String]) {
     )
     statements.append(finalAssignment)
     definition.items = Python.tuple(statements)
-    
+
     do {
         if (resynthesize.value) {
             try File.open(intermediate1, mode: .write) {
