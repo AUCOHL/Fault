@@ -8,15 +8,17 @@ class Port {
     var polarity: Polarity?
     var from: Int
     var to: Int
+    var ordinal: Int
 
     var width: Int {
         return from < to ? to - from + 1 : from - to + 1
     }
 
-    init(name: String) {
+    init(name: String, at ordinal: Int) {
         self.name = name
         self.from = 0
         self.to = 0
+        self.ordinal = ordinal
     }
 }
 

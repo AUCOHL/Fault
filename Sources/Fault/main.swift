@@ -140,9 +140,11 @@ func main(arguments: [String]) -> Int32 {
     print("Processing module \(definition.name)…")
 
     var ports: [String: Port] = [:]
+    var inputs: [Port] = []
+    var outputs: [Port] = []
 
-    for portDeclaration in  definition.portlist.ports {
-        let port = Port(name: "\(portDeclaration.name)")
+    for (i, portDeclaration) in definition.portlist.ports.enumerated() {
+        let port = Port(name: "\(portDeclaration.name)", at: i)
         ports["\(portDeclaration.name)"] = port
     }
 
@@ -166,8 +168,10 @@ func main(arguments: [String]) -> Int32 {
                 }
                 if declType == "Input" {
                     port.polarity = .input
+                    inputs.append(port)
                 } else {
                     port.polarity = .output
+                    outputs.append(port)
                 }
                 faultPoints.insert("\(declaration.name)")
             }
@@ -184,20 +188,6 @@ func main(arguments: [String]) -> Int32 {
 
     print("Found \(faultPoints.count) fault sites.")
 
-
-    // MARK: Separate Inputs and Outputs
-    var inputs: [Port] = []
-    var outputs: [Port] = []
-
-    for (_, port) in ports {
-        if port.polarity == .input {
-            inputs.append(port)
-        }
-        if port.polarity == .output {
-            outputs.append(port)
-        }
-    }
-
     if inputs.count == 0 {
         print("Module has no inputs.")
         return EX_OK
@@ -207,6 +197,9 @@ func main(arguments: [String]) -> Int32 {
         return EX_OK
     }
 
+    inputs.sort { $0.ordinal < $1.ordinal }
+    outputs.sort { $0.ordinal < $1.ordinal }
+    
     // MARK: Simulation
     do {
 
