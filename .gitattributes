@@ -1,2 +1,3 @@
 Tech/* linguist-detectable=false
-RTL/ linguist-detectable=false
+*.v linguist-detectable=false
+*.sv linguist-detectable=false

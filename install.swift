@@ -90,7 +90,7 @@ if action == .install {
     } else {
         let components = yosys.output.components(separatedBy: " ")
         if components[1].compare("0.8", options: .numeric) == .orderedAscending {
-            print("Warning: Yosys may be out of date. (Recommended ver: 3.7)")
+            print("Warning: Yosys may be out of date. (Recommended ver: 0.8)")
         }
     }
 

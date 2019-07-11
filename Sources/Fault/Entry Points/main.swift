@@ -20,14 +20,10 @@ func main(arguments: [String]) -> Int32 {
     let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
     cli.addOptions(help)
 
-    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: stdout.)")
+    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: tty/Standard Output)")
     cli.addOptions(filePath)
 
-    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Module to be processed. (Default: first module found.)")
-    cli.addOptions(topModule)
-
-
-    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellSimulationFile", helpMessage: ".v file describing the cells (Required for simulation.)")
+    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellModel", helpMessage: ".v file describing the cells (Required for simulation.)")
     cli.addOptions(cellsOption)
 
     let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
@@ -37,13 +33,6 @@ func main(arguments: [String]) -> Int32 {
 
     let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
     cli.addOptions(testVectorAttempts)
-
-
-    let perVector = BoolOption(longFlag: "simulatePerVector", helpMessage: "Default operation mode. Generates a number of test vectors and tests along all fault sites. Cannot be combined with simulatePerFault.")
-    cli.addOptions(perVector)
-
-    let perFault = BoolOption(longFlag: "simulatePerFault", helpMessage: "Generates a test vector per fault instead of the other way around. Has greater coverage, but more test vectors. Cannot be combined with simulatePerVector.")
-    cli.addOptions(perFault)
 
     let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it. Has no effect under registerChain.")
     cli.addOptions(sampleRun)
@@ -63,6 +52,7 @@ func main(arguments: [String]) -> Int32 {
     if help.value {
         cli.printUsage()
         print("To take a look at synthesis options, try 'fault synth --help'")
+        print("To take a look at scan chain options, try 'fault scanc --help'")
         return EX_OK
     }
 
@@ -92,12 +82,6 @@ func main(arguments: [String]) -> Int32 {
         return EX_USAGE
     }
 
-    let mutualExclusivity = (perFault.value ? 1 : 0) + (perVector.value ? 1 : 0)
-    if mutualExclusivity > 1 {
-        cli.printUsage()
-        return EX_USAGE
-    }
-
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
     sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
@@ -107,13 +91,12 @@ func main(arguments: [String]) -> Int32 {
     }
 
     let pyverilogVersion = Python.import("pyverilog.utils.version")
-    print("Using Pyverilog v\(pyverilogVersion.VERSION)")
+    print("Using Pyverilog v\(pyverilogVersion.VERSION).")
 
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // MARK: Parsing and Processing
     let parseResult = parse([args[0]])
-    print("\(parseResult[1])")
     let ast = parseResult[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
@@ -121,19 +104,13 @@ func main(arguments: [String]) -> Int32 {
     for definition in description.definitions {
         let type = Python.type(definition).__name__
         if type == "ModuleDef" {
-            if let name = topModule.value {
-                if name == "\(definition.name)" {
-                    definitionOptional = definition
-                    break
-                }
-            } else {
-                definitionOptional = definition
-                break
-            }
+            definitionOptional = definition
+            break
         }
     }
 
     guard let definition = definitionOptional else {
+        fputs("No module found.\n", stderr)
         return EX_DATAERR
     }
 
@@ -149,6 +126,7 @@ func main(arguments: [String]) -> Int32 {
     }
 
     var faultPoints: Set<String> = []
+    var gateCount = 0
 
     for itemDeclaration in definition.items {
         let type = Python.type(itemDeclaration).__name__
@@ -179,6 +157,7 @@ func main(arguments: [String]) -> Int32 {
 
         // Process gates
         if type == "InstanceList" {
+            gateCount += 1
             let instance = itemDeclaration.instances[0]
             for hook in instance.portlist {
                 faultPoints.insert("\(instance.name).\(hook.portname)")
@@ -186,7 +165,7 @@ func main(arguments: [String]) -> Int32 {
         }
     }
 
-    print("Found \(faultPoints.count) fault sites.")
+    print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")
 
     if inputs.count == 0 {
         print("Module has no inputs.")
@@ -202,15 +181,14 @@ func main(arguments: [String]) -> Int32 {
     
     // MARK: Simulation
     do {
-
         let startTime = CFAbsoluteTimeGetCurrent()
-        let simulator: Simulation = perFault.value ? PerFaultSimulation() : PerVectorSimulation()
+        let simulator: Simulation = PerVectorSimulation()
 
         print("Performing simulations…")
         let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
-        print("Time elapsed : \(timeElapsed) s.")
+        print("Time elapsed: \(timeElapsed)s.")
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
 
@@ -222,7 +200,7 @@ func main(arguments: [String]) -> Int32 {
             print(result.json)
         }
     } catch {
-        print("Internal error: \(error)")
+        fputs("Internal error: \(error)", stderr)
         return EX_SOFTWARE
     }
 
@@ -234,6 +212,10 @@ if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
     exit(synth(arguments: arguments))
+} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "chain" {
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    exit(scanChainCreate(arguments: arguments))
 } else {
     exit(main(arguments: arguments))
 }

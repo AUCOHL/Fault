@@ -1,25 +1,10 @@
 import Foundation
 import Defile
+import PythonKit
 
-class PerVectorSimulation: Simulation {
-    struct Test: Encodable {
-        var value: UInt
-        var bits: Int
-        init(value: UInt, bits: Int) {
-            self.value = value
-            self.bits = bits
-        }
-    }
-    typealias TestVector = [Test]
-    struct Coverage: Encodable {
-        var sa0: [String]
-        var sa1: [String]
-        init(sa0: [String], sa1: [String]) {
-            self.sa0 = sa0
-            self.sa1 = sa1
-        }
-    }
-    
+let TempDir = Python.import("tempfile");
+
+class PerVectorSimulation: Simulation {    
     static func pseudoRandomVerilogGeneration(
         using testVector: TestVector,
         for faultPoints: Set<String>,
@@ -30,7 +15,8 @@ class PerVectorSimulation: Simulation {
         inputs: [Port],
         outputs: [Port],
         stuckAt: Int,
-        cleanUp: Bool
+        cleanUp: Bool,
+        filePrefix: String = "."
     ) throws -> [String] {
         var portWires = ""
         var portHooks = ""
@@ -44,7 +30,7 @@ class PerVectorSimulation: Simulation {
             portHooksGM += ".\(name) ( \(name).gm ) , "
         }
 
-        let folderName = "thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p \(folderName)".sh()
 
         var inputAssignment = ""
@@ -170,12 +156,14 @@ class PerVectorSimulation: Simulation {
             testVectors.append(testVector)
         }
 
+        let tempDir = "\(TempDir.gettempdir())"
+
         for vector in testVectors {
             let future = Future<Coverage> {
                 do {
-                    let sa0 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun)
+                    let sa0 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun, filePrefix: tempDir)
 
-                    let sa1 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun)
+                    let sa1 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun, filePrefix: tempDir)
 
                     return Coverage(sa0: sa0, sa1: sa1)
                 } catch {
@@ -194,17 +182,6 @@ class PerVectorSimulation: Simulation {
         sa0Covered.reserveCapacity(faultPoints.count)
         var sa1Covered: Set<String> = []
         sa1Covered.reserveCapacity(faultPoints.count)
-
-
-        struct TVCPair: Encodable {
-            var vector: TestVector
-            var coverage: Coverage
-
-            init(vector: TestVector, coverage: Coverage) {
-                self.vector = vector
-                self.coverage = coverage
-            }
-        }
         var coverageList: [TVCPair] = []
 
         for (i, future) in futureList.enumerated() {
