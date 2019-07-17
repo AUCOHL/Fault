@@ -26,11 +26,11 @@ final class FaultTests: XCTestCase {
     }
 
     func testCombinational() throws {
-      try ensureEX_OK(moduleName: "PlusOne", fileName: "Netlists/RTL/PlusOne.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
+      try ensureEX_OK(moduleName: "PlusOne", fileName: "Netlists/Tests/RTL/PlusOne.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
     }
 
     func testSequential() throws {
-      try ensureEX_OK(moduleName: "SuccessiveApproximationControl", fileName: "Netlists/RTL/SAR.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
+      try ensureEX_OK(moduleName: "SuccessiveApproximationControl", fileName: "Netlists/Tests/RTL/SAR.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
     }
 
     /// Returns path to the built products directory.

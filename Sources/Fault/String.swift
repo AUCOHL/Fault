@@ -9,6 +9,10 @@ extension String {
         task.waitUntilExit()
         return Int(task.terminationStatus)
     }
+
+    func uniqueName(_ number: Int) -> String {
+        return "__" + self + "_" + String(describing: number) + "__"
+    }
 }
 
 extension String: Error {}

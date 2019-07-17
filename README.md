@@ -1,5 +1,5 @@
-# Fault
-Fault is an automatic test pattern generator for netlists with cut-away flipflops.
+# 🧪 Fault
+Fault is an automatic test pattern generator for netlists that includes scan chain stitching.
 
 # Dependencies
 * Swift 5.0+
@@ -65,3 +65,8 @@ There will be an option or fourth program to verify the scan chain integrity.
 
 # License
 After this repository becomes public, the GNU General Public License v3 (or later, at your option). See 'License'.
+
+# References
+- Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
+- Shinya Takamaeda-Yamazaki: Pyverilog: A Python-based Hardware Design Processing Toolkit for Verilog HDL, 11th International Symposium on Applied Reconfigurable Computing (ARC 2015) (Poster), Lecture Notes in Computer Science, Vol.9040/2015, pp.451-460, April 2015.
+[Paper](http://link.springer.com/chapter/10.1007/978-3-319-16214-0_42)

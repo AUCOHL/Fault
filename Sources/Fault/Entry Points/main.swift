@@ -116,71 +116,43 @@ func main(arguments: [String]) -> Int32 {
 
     print("Processing module \(definition.name)…")
 
-    var ports: [String: Port] = [:]
-    var inputs: [Port] = []
-    var outputs: [Port] = []
-
-    for (i, portDeclaration) in definition.portlist.ports.enumerated() {
-        let port = Port(name: "\(portDeclaration.name)", at: i)
-        ports["\(portDeclaration.name)"] = port
-    }
-
-    var faultPoints: Set<String> = []
-    var gateCount = 0
-
-    for itemDeclaration in definition.items {
-        let type = Python.type(itemDeclaration).__name__
-
-        // Process port declarations further
-        if type == "Decl" {
-            let declaration = itemDeclaration.list[0]
-            let declType = Python.type(declaration).__name__
-            if declType == "Input" || declType == "Output" {
-                guard let port = ports["\(declaration.name)"] else {
-                    print("Parse error: Unknown port.")
-                    return EX_DATAERR
-                }
-                if declaration.width != Python.None {
-                    port.from = Int("\(declaration.width.msb)")!
-                    port.to = Int("\(declaration.width.lsb)")!
-                }
-                if declType == "Input" {
-                    port.polarity = .input
-                    inputs.append(port)
-                } else {
-                    port.polarity = .output
-                    outputs.append(port)
-                }
-                faultPoints.insert("\(declaration.name)")
-            }
-        }
-
-        // Process gates
-        if type == "InstanceList" {
-            gateCount += 1
-            let instance = itemDeclaration.instances[0]
-            for hook in instance.portlist {
-                faultPoints.insert("\(instance.name).\(hook.portname)")
-            }
-        }
-    }
-
-    print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")
-
-    if inputs.count == 0 {
-        print("Module has no inputs.")
-        return EX_OK
-    }
-    if outputs.count == 0 {
-        print("Module has no outputs.")
-        return EX_OK
-    }
-
-    inputs.sort { $0.ordinal < $1.ordinal }
-    outputs.sort { $0.ordinal < $1.ordinal }
-    
-    // MARK: Simulation
     do {
+        let (ports, inputs, outputs) = try Port.extract(from: definition)
+
+        if inputs.count == 0 {
+            print("Module has no inputs.")
+            return EX_OK
+        }
+        if outputs.count == 0 {
+            print("Module has no outputs.")
+            return EX_OK
+        }
+
+        // MARK: Discover fault points
+        var faultPoints: Set<String> = []
+        var gateCount = 0
+
+        for port in ports {
+            faultPoints.insert(port.value.name)
+        }
+
+        for itemDeclaration in definition.items {
+            let type = Python.type(itemDeclaration).__name__
+
+            // Process gates
+            if type == "InstanceList" {
+                gateCount += 1
+                let instance = itemDeclaration.instances[0]
+                for hook in instance.portlist {
+                    faultPoints.insert("\(instance.name).\(hook.portname)")
+                }
+            }
+        }
+
+        print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")
+
+    
+        // MARK: Simulation
         let startTime = CFAbsoluteTimeGetCurrent()
         let simulator: Simulation = PerVectorSimulation()
 
