@@ -39,7 +39,13 @@ func cut(arguments: [String]) -> Int32 {
         return EX_USAGE
     }
 
+    let fileManager = FileManager()
     let file = args[0]
+    if !fileManager.fileExists(atPath: file) {
+        fputs("File '\(file)'' not found.", stderr)
+        return EX_NOINPUT
+    }
+    
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog

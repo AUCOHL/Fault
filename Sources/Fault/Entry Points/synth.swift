@@ -15,9 +15,6 @@ func synth(arguments: [String]) -> Int32 {
     let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output netlist. (Default: Netlists/ + input + .netlist.v)")
     cli.addOptions(filePath)
 
-    let cutFilePath = StringOption(shortFlag: "c", longFlag: "cutOutput", helpMessage: "Path to the output cut netlist for use with Fault. (Default: Netlists/ + input + .cut.v)")
-    cli.addOptions(cutFilePath)
-
     let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: !defaultLiberty, helpMessage: "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")")
     cli.addOptions(liberty)
 
@@ -42,9 +39,13 @@ func synth(arguments: [String]) -> Int32 {
         return EX_USAGE
     }      
 
+    let fileManager = FileManager()
     let file = args[0]
+    if !fileManager.fileExists(atPath: file) {
+        fputs("File '\(file)'' not found.", stderr)
+        return EX_NOINPUT
+    }
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
-    let cutOutput = cutFilePath.value ?? "Netlists/\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")

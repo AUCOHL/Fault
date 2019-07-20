@@ -68,7 +68,7 @@ Chain will output information about the scan chain embedded in the output netlis
 
 For more options, you can invoke `(swift run Fault)|(fault) chain --help`.
 
-There will be an option or fourth program to verify the scan chain integrity.
+You can have chain automagically verify its own scanchain-- see the help for more options.
 
 # License
 After this repository becomes public, the GNU General Public License v3 (or later, at your option). See 'License'.

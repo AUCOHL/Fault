@@ -30,6 +30,31 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(ignored)
 
+    let verifyOpt = StringOption(
+        shortFlag: "v",
+        longFlag: "verifyWith",
+        helpMessage: "Verify scan chain using given cell file."
+    )
+    cli.addOptions(verifyOpt)
+
+    let clockOpt = StringOption(
+        longFlag: "clock",
+        helpMessage: "Clock signal to add to --ignoring and use in simulation."
+    )
+    cli.addOptions(clockOpt)
+
+    let resetOpt = StringOption(
+        longFlag: "reset",
+        helpMessage: "Reset signal to add to --ignoring and use in simulation. "
+    )
+    cli.addOptions(resetOpt)
+
+    let resetActiveLow = BoolOption(
+        longFlag: "activeLow",
+        helpMessage: "Reset signal is active low instead of active high."
+    )
+    cli.addOptions(resetActiveLow)
+
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
@@ -76,12 +101,25 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         return EX_USAGE
     }
 
+    let fileManager = FileManager()
     let file = args[0]
+    if !fileManager.fileExists(atPath: file) {
+        fputs("File '\(file)'' not found.", stderr)
+        return EX_NOINPUT
+    }
+
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
     let bsrLocation = output + ".bsr.v"
-    let ignoredInputs: Set<String>
+
+    var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+    if let clock = clockOpt.value {
+        ignoredInputs.insert(clock)
+    }
+    if let reset = resetOpt.value {
+        ignoredInputs.insert(reset)
+    }
 
     let libertyFile = defaultLiberty ?
         liberty.value ??
@@ -126,20 +164,34 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
+    // MARK: Internal signals
+    print("Chaining internal flip-flops…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__UNIT__UNDER__FINANGLING__"
+
+    var internalOrder: [ChainRegister] = []
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
-        // MARK: Register chaining original module
-        let testingName = names["shift"]!.option.value ?? names["shift"]!.default
+        let testingName = names["shift"]!.option.value
+            ?? names["shift"]!.default
         let testingIdentifier = Node.Identifier(testingName)
         let inputName = names["sin"]!.option.value ?? names["sin"]!.default
         let inputIdentifier = Node.Identifier(inputName)
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
         let outputIdentifier = Node.Identifier(outputName)
 
+        let rstBarName = names["rstBar"]!.option.value
+            ?? names["rstBar"]!.default
+        let clockBRName = names["clockBR"]!.option.value
+            ?? names["clockBR"]!.default
+        let updateBRName = names["updateBR"]!.option.value
+            ?? names["updateBR"]!.default
+        let modeControlName = names["modeControl"]!.option.value
+            ?? names["modeControl"]!.default
+
+        // MARK: Register chaining original module
         let internalCount: Int = {
             var previousOutput = inputIdentifier
 
@@ -159,6 +211,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     let instance = itemDeclaration.instances[0]
                     if String(describing: instance.module).starts(with: "DFF") {
                         counter += 1
+                        internalOrder.append(
+                            ChainRegister(
+                                name: String(describing: instance.name),
+                                kind: .dff
+                            )
+                        )
                         for hook in instance.portlist {
                             if hook.portname == "D" {
                                 let ternary = Node.Cond(
@@ -193,17 +251,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return counter
         }()
 
-        // MARK: New model
+        // MARK: Chaining boundary registers
+        print("Creating and chaining boundary flip-flops…")
+        var order: [ChainRegister] = []
         let boundaryCount: Int = try {
             let ports = Python.list(definition.portlist.ports)
-            let rstBarName = names["rstBar"]!.option.value
-                ?? names["rstBar"]!.default
-            let clockBRName = names["clockBR"]!.option.value
-                ?? names["clockBR"]!.default
-            let updateBRName = names["updateBR"]!.option.value
-                ?? names["updateBR"]!.default
-            let modeControlName = names["modeControl"]!.option.value
-                ?? names["modeControl"]!.default
 
             ports.append(Node.Port(rstBarName, Python.None, Python.None))
             ports.append(Node.Port(clockBRName, Python.None, Python.None))
@@ -282,6 +334,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     )
                     counter += 1
                 }
+
+                order.append(
+                    ChainRegister(
+                        name: String(describing: input.name),
+                        kind: .input,
+                        width: input.width
+                    )
+                )
             }
 
             portArguments.append(Node.PortArg(
@@ -295,6 +355,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ))
 
             counter += 1 // as a skip
+            order += internalOrder
 
             portArguments.append(Node.PortArg(
                 outputName,
@@ -336,6 +397,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     )
                     counter += 1
                 }
+
+                order.append(
+                    ChainRegister(
+                        name: String(describing: output.name),
+                        kind: .output,
+                        width: output.width
+                    )
+                )
             }
 
             let submoduleInstance = Node.Instance(
@@ -384,11 +453,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return counter - 1 // Accounting for skip
         }()
 
+        let dffCount = internalCount + boundaryCount
         let metadata = Metadata(
-            dffCount: internalCount + boundaryCount,
-            testEnableIdentifier: testingName, 
-            testInputIdentifier: inputName,
-            testOutputIdentifier: outputName
+            dffCount: dffCount,
+            order: order,
+            shift: testingName, 
+            sin: inputName,
+            sout: outputName
         )
         
         guard let metadataString = metadata.toJSON() else {
@@ -408,11 +479,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             output: output
         )
 
-        let result = "echo '\(script)' | yosys".sh()
+        let result = "echo '\(script)' | yosys 2>&1".shOutput()
 
-        if result != EX_OK {
+        if result.terminationStatus != EX_OK {
             fputs("A yosys error has occurred.\n", stderr)
-            return Int32(result)
+            let log = "fault_yosys_\(Int(Date().timeIntervalSince1970 * 1000)).log"
+            try File.open(log, mode: .write) {
+                try $0.print(result.output)
+            }
+            fputs("Wrote yosys output to \(log)\n", stderr)
+            return Int32(result.terminationStatus)
         }
 
         guard let content = File.read(output) else {
@@ -424,6 +500,51 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             try $0.print("/* FAULT METADATA: '\(metadataString)' */")
             try $0.print(content)
         }
+
+        // MARK: Verification
+        print("Verifying scan chain integrity…")
+        if let model = verifyOpt.value {
+            let ast = parse([output])[0]
+            let description = ast[dynamicMember: "description"]
+            var definitionOptional: PythonObject?
+            for definition in description.definitions {
+                let type = Python.type(definition).__name__
+                if type == "ModuleDef" {
+                    definitionOptional = definition
+                    break
+                }
+            }
+            guard let definition = definitionOptional else {
+                fputs("No module found.\n", stderr)
+                return EX_DATAERR
+            }
+            let (ports, inputs, outputs) = try Port.extract(from: definition)
+
+            let verified = try Simulator.simulate(
+                verifying: definitionName,
+                in: output,
+                with: model,
+                ports: ports,
+                inputs: inputs,
+                outputs: outputs,
+                dffCount: dffCount,
+                rstBar: rstBarName,
+                shiftBR: testingName,
+                clockBR: clockBRName,
+                and: clockOpt.value,
+                updateBR: updateBRName,
+                modeControl: modeControlName,
+                reset: resetOpt.value,
+                active: resetActiveLow.value ? .low : .high
+            )
+
+            if (verified) {
+                print("Scan chain verified successfully.")
+            } else {
+                print("Scan chain verification failed.")
+            }
+        }
+
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE

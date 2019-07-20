@@ -2,7 +2,7 @@ import Foundation
 import Defile
 import PythonKit
 
-let TempDir = Python.import("tempfile");
+let TempDir = Python.import("tempfile")
 
 class Simulator {    
     private static func pseudoRandomVerilogGeneration(
@@ -103,23 +103,13 @@ class Simulator {
 
         let aoutName = "\(folderName)/a.out"
 
-        let iverilogResult = "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+        let iverilogResult =
+            "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
 
-        let vvpTask = Process()
-        vvpTask.launchPath = "/usr/bin/env"
-        vvpTask.arguments = ["sh", "-c", "vvp \(aoutName)"]
-        
-        let pipe = Pipe()
-        vvpTask.standardOutput = pipe
-
-        vvpTask.launch()
-        vvpTask.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let vvpResult = String(String(data: data, encoding: .utf8)!.dropLast(1))
+        let vvpTask = "vvp \(aoutName)".shOutput()
 
         if vvpTask.terminationStatus != EX_OK {
             exit(vvpTask.terminationStatus)
@@ -129,7 +119,9 @@ class Simulator {
             let _ = "rm -rf \(folderName)".sh()
         }
 
-        return vvpResult.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return vvpTask.output.components(separatedBy: "\n").filter {
+            !$0.trimmingCharacters(in: .whitespaces).isEmpty
+        }
     }
 
     static func simulate(
@@ -151,7 +143,9 @@ class Simulator {
             var testVector: TestVector = []
             for input in inputs {
                 let max: UInt = (1 << UInt(input.width)) - 1
-                testVector.append(Test(value: UInt.random(in: 0...max), bits: input.width))
+                testVector.append(
+                    Test(value: UInt.random(in: 0...max), bits: input.width)
+                )
             }
             testVectors.append(testVector)
         }
@@ -161,9 +155,35 @@ class Simulator {
         for vector in testVectors {
             let future = Future<Coverage> {
                 do {
-                    let sa0 = try Simulator.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun, filePrefix: tempDir)
+                    let sa0 =
+                        try Simulator.pseudoRandomVerilogGeneration(
+                            using: vector,
+                            for: faultPoints,
+                            in: file,
+                            module: module,
+                            with: cells,
+                            ports: ports,
+                            inputs: inputs,
+                            outputs: outputs,
+                            stuckAt: 0,
+                            cleanUp: !sampleRun,
+                            filePrefix: tempDir
+                        )
 
-                    let sa1 = try Simulator.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun, filePrefix: tempDir)
+                    let sa1 =
+                        try Simulator.pseudoRandomVerilogGeneration(
+                            using: vector,
+                            for: faultPoints,
+                            in: file,
+                            module: module,
+                            with: cells,
+                            ports: ports,
+                            inputs: inputs,
+                            outputs: outputs,
+                            stuckAt: 1,
+                            cleanUp: !sampleRun,
+                            filePrefix: tempDir
+                        )
 
                     return Coverage(sa0: sa0, sa1: sa1)
                 } catch {
@@ -192,7 +212,9 @@ class Simulator {
             for cover in coverLists.sa1 {
                 sa1Covered.insert(cover)
             }
-            coverageList.append(TVCPair(vector: testVectors[i], coverage: coverLists))
+            coverageList.append(
+                TVCPair(vector: testVectors[i], coverage: coverLists)
+            )
         }
 
         let encoder = JSONEncoder()
@@ -202,7 +224,12 @@ class Simulator {
             throw "Could not create utf8 string."
         }
 
-        return (json: string, coverage: Float(sa0Covered.count + sa1Covered.count) / Float(2 * faultPoints.count))
+        return (
+            json: string,
+            coverage:
+                Float(sa0Covered.count + sa1Covered.count) /
+                Float(2 * faultPoints.count)
+        )
     }
 
     enum Active {
@@ -213,16 +240,148 @@ class Simulator {
     static func simulate(
         verifying module: String,
         in file: String,
-        dffCount: String,
+        with cells: String,
+        ports: [String: Port],
+        inputs: [Port],
+        outputs: [Port],
+        dffCount: Int,
         rstBar: String,
         shiftBR: String,
         clockBR: String,
-        and clock: String,
+        and clock: String? = nil,
         updateBR: String,
         modeControl: String,
         reset: String? = nil,
         active: Active = .low
-    ) -> Bool {
-        return false
+    ) throws -> Bool {
+        let tempDir = "\(TempDir.gettempdir())"
+        let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let _ = "mkdir -p '\(folderName)'".sh()
+        defer {
+            let _ = "rm -rf '\(folderName)'".sh()
+        }
+
+        let managedSignals: [String: String] = [
+            rstBar: "rstBar",
+            shiftBR: "shiftBR",
+            clockBR: "clockBR",
+            updateBR: "updateBR",
+            modeControl: "modeControl"
+        ]
+
+        var portWires = ""
+        var portHooks = ""
+        for (rawName, port) in ports {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+            if let managedSignal = managedSignals[name] {
+                portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(managedSignal) ;\n"
+                portHooks += ".\(name) ( \(managedSignal) ) , "
+            } else {
+                if let clockSignal = clock, rawName == clockSignal {
+                    portWires += "    wire[\(port.from):\(port.to)] \(name) ;\n"
+                } else if let resetSignal = reset, rawName == resetSignal {
+                    portWires += "    wire[\(port.from):\(port.to)] \(name) ;\n"
+                } else {
+                    portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+                }
+                portHooks += ".\(name) ( \(name) ) , "
+            }
+        }
+
+        var inputAssignment = ""
+        for input in inputs {
+            var name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
+            if let managedSignal = managedSignals[name] {
+                name = managedSignal
+            }
+            if let clockSignal = clock, input.name == clockSignal {
+            } else if let resetSignal = reset, input.name == resetSignal {
+            } else {
+                inputAssignment += "        \(name) = 0 ;\n"
+            }
+        }
+
+        var resetAssignment = ""
+        if let resetSignal = reset {
+            if active == .high {
+                resetAssignment = "assign \(resetSignal) = ~rstBar ;"
+            } else {
+                resetAssignment = "assign \(resetSignal) = rstBar ;"
+            }
+        }
+
+        var clockAssignment = ""
+        if let clockSignal = clock {
+            clockAssignment = "assign \(clockSignal) = clockBR;"
+        }
+
+        var serial = ""
+        for _ in 0..<dffCount {
+            serial += "\(Int.random(in: 0...1))"
+        }
+
+        let bench = """
+        \(String.boilerplate)
+        `include "\(cells)"
+        `include "\(file)"
+
+        module testbench;
+            \(portWires)
+
+            \(clockAssignment)
+            \(resetAssignment)
+
+            always #1 clockBR = ~clockBR;
+
+            \(module) uut(
+                \(portHooks.dropLast(2))
+            );
+
+            wire[\(dffCount - 1):0] serializable =
+                \(dffCount)'b\(serial);
+            reg[\(dffCount - 1):0] serial;
+            integer i;
+
+            initial begin
+            \(inputAssignment)
+                #10;
+                rstBar = 1;
+                shift = 1;
+                for (i = 0; i < \(dffCount); i = i + 1) begin
+                    sin = serializable[i];
+                    #2;
+                end
+                for (i = 0; i < \(dffCount); i = i + 1) begin
+                    serial[i] = sout;
+                    #2;
+                end
+                if (serial == serializable) begin
+                    $display("SUCCESS_STRING");
+                end
+                $finish;
+            end
+        endmodule
+        """
+
+        let tbName = "\(folderName)/tb.sv"
+        try File.open(tbName, mode: .write) {
+            try $0.print(bench)
+        }
+
+        let aoutName = "\(folderName)/a.out"
+
+        let iverilogResult =
+            "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+        if iverilogResult != EX_OK {
+            exit(Int32(iverilogResult))
+        }
+
+        let vvpTask = "vvp \(aoutName)".shOutput()
+
+        if vvpTask.terminationStatus != EX_OK {
+            throw "Failed to run vvp"
+        }
+
+        return vvpTask.output.contains("SUCCESS_STRING")
     }
 }

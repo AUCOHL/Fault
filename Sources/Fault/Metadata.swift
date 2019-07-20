@@ -1,15 +1,40 @@
 import Foundation
 
+struct ChainRegister: Codable {
+    enum Kind: String, Codable {
+        case input
+        case output
+        case dff
+    }
+    var name: String
+    var kind: Kind
+    var width: Int
+
+    init(name: String, kind: Kind, width: Int = 1) {
+        self.name = name
+        self.kind = kind
+        self.width = width
+    }
+}
+
 struct Metadata: Codable {
     var dffCount: Int
-    var testEnableIdentifier: String
-    var testInputIdentifier: String
-    var testOutputIdentifier: String
+    var order: [ChainRegister]
+    var shift: String
+    var sin: String
+    var sout: String
 
-    init(dffCount: Int, testEnableIdentifier: String, testInputIdentifier: String, testOutputIdentifier: String) {
+    init(
+        dffCount: Int,
+        order: [ChainRegister],
+        shift: String,
+        sin: String,
+        sout: String
+    ) {
         self.dffCount = dffCount
-        self.testEnableIdentifier = testEnableIdentifier
-        self.testInputIdentifier = testInputIdentifier
-        self.testOutputIdentifier = testOutputIdentifier
+        self.order = order
+        self.shift = shift
+        self.sin = sin
+        self.sout = sout
     }
 }
