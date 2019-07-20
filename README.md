@@ -35,7 +35,14 @@ Synth is a synthesis script included with Fault that generates both a netlist an
 
 To run it, `swift run Fault synth --top <your-top-module> --liberty <your-liberty-file> <your-file>`. When using the installed version, you can simply invoke `fault synth`, and you can optionally omit` --liberty` where osu035 will be used.
 
-For more options, write `fault synth --help`.
+For more options, you can invoke `(swift run Fault)|(fault) synth --help`.
+
+#### cut
+`swift run Fault cut <your-netlist>`
+
+This exposes the D-flipflops as ports for use with the main script.
+
+For more options, you can invoke `(swift run Fault)|(fault) cut --help`.
 
 #### main
 `swift run Fault --cellModel <your-cell-models> <your-file>`, `--cellModel` behaving similar to `--liberty` in synth when installed.
@@ -47,7 +54,7 @@ A set of assumptions are made about the input file:
 
 Generated test vectors are printed to stdout by default, but you can use `-o <file>` (or simply redirect the output).
 
-For more options, write `fault --help`.
+For more options, you can invoke `(swift run Fault)|(fault) --help`.
 
 ### chain
 `swift run Fault chain --liberty <your-liberty-file> <your-file>`, `--liberty` behaving identical synth.
@@ -59,7 +66,7 @@ A note about the liberty file in use in this step is that we recommend a modifie
 
 Chain will output information about the scan chain embedded in the output netlist as `/* FAULT METADATA: '<json>' */` after the boilerplate. This metadata includes things like port names, the DFF count and ***\[\[\[STILL NOT DONE\]\]\]*** the order of the registers in the scan chain.
 
-For more options, write `fault chain --help`.
+For more options, you can invoke `(swift run Fault)|(fault) chain --help`.
 
 There will be an option or fourth program to verify the scan chain integrity.
 

@@ -42,14 +42,14 @@ struct Synthesis {
         # convert to gate logic
         techmap; \(opt)
 
-        # expose dff
-        \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
-
         # flatten
         flatten; \(opt)
 
         # mapping flip-flops to mycells.lib
         dfflibmap -liberty \(libertyFile)
+
+        # expose dff
+        \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
 
         # mapping logic to mycells.lib
         abc -liberty \(libertyFile)

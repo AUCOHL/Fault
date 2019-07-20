@@ -40,13 +40,11 @@ func synth(arguments: [String]) -> Int32 {
     if args.count != 1 {
         cli.printUsage()
         return EX_USAGE
-    }
-       
+    }      
 
     let file = args[0]
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
     let cutOutput = cutFilePath.value ?? "Netlists/\(file).cut.v"
-
 
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
@@ -105,15 +103,6 @@ func synth(arguments: [String]) -> Int32 {
     if result != EX_OK {
         fputs("A yosys error has occurred.\n", stderr);
         return Int32(result)
-    }
-
-    let cutScript = Synthesis.script(for: module, in: file, cutting: true, liberty: libertyFile, output: cutOutput)
-    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
-    let cutResult = "echo '\(cutScript)' | yosys".sh()
-
-    if cutResult != EX_OK {
-        fputs("A yosys error has occurred.\n", stderr);
-        return Int32(cutResult)
     }
 
     return EX_OK

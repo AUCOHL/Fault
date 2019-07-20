@@ -191,16 +191,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let ports = Python.list(definition.portlist.ports)
             let rstBarName = names["rstBar"]!.option.value
                 ?? names["rstBar"]!.default
-            let rstBarIdentifier = Node.Identifier(rstBarName)
             let clockBRName = names["clockBR"]!.option.value
                 ?? names["clockBR"]!.default
-            let clockBRIdentifier = Node.Identifier(clockBRName)
             let updateBRName = names["updateBR"]!.option.value
                 ?? names["updateBR"]!.default
-            let updateBRIdentifier = Node.Identifier(updateBRName)
             let modeControlName = names["modeControl"]!.option.value
                 ?? names["modeControl"]!.default
-            let modeControlIdentifier = Node.Identifier(modeControlName)
 
             ports.append(Node.Port(rstBarName, Python.None, Python.None))
             ports.append(Node.Port(clockBRName, Python.None, Python.None))

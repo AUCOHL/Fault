@@ -20,7 +20,7 @@ func main(arguments: [String]) -> Int32 {
     let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
     cli.addOptions(help)
 
-    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: tty/Standard Output)")
+    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: input + .tv.json)")
     cli.addOptions(filePath)
 
     let cellsOption = StringOption(shortFlag: "c", longFlag: "cellModel", helpMessage: ".v file describing the cells (Required for simulation.)")
@@ -62,6 +62,9 @@ func main(arguments: [String]) -> Int32 {
         return EX_USAGE
     }
 
+    let file = args[0]
+    let output = filePath.value ?? "\(file).tv.json"
+
     guard let tvAttempts = Int(testVectorAttempts.value ?? tvAttemptsDefault) else {
         cli.printUsage()
         return EX_USAGE
@@ -96,7 +99,7 @@ func main(arguments: [String]) -> Int32 {
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // MARK: Parsing and Processing
-    let parseResult = parse([args[0]])
+    let parseResult = parse([file])
     let ast = parseResult[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
@@ -160,16 +163,13 @@ func main(arguments: [String]) -> Int32 {
         let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
-        print("Time elapsed: \(timeElapsed)s.")
+        print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
 
-        if let outputName = filePath.value {
-            try File.open(outputName, mode: .write) {
-                try $0.print(result.json)
-            }
-        } else {
-            print(result.json)
+
+        try File.open(output, mode: .write) {
+            try $0.print(result.json)
         }
     } catch {
         fputs("Internal error: \(error)", stderr)
@@ -188,6 +188,10 @@ if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
     exit(scanChainCreate(arguments: arguments))
+} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "cut" {
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    exit(cut(arguments: arguments))
 } else {
     exit(main(arguments: arguments))
 }
