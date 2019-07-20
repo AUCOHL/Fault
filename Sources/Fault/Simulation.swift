@@ -1,25 +1,11 @@
-protocol Simulation {
-    func simulate(
-        for faultPoints: Set<String>,
-        in file: String,
-        module: String,
-        with cells: String,
-        ports: [String: Port],
-        inputs: [Port],
-        outputs: [Port],
-        tvAttempts: Int,
-        sampleRun: Bool 
-    ) throws -> (json: String, coverage: Float)
-}
-
 import Foundation
 import Defile
 import PythonKit
 
 let TempDir = Python.import("tempfile");
 
-class PerVectorSimulation: Simulation {    
-    static func pseudoRandomVerilogGeneration(
+class Simulator {    
+    private static func pseudoRandomVerilogGeneration(
         using testVector: TestVector,
         for faultPoints: Set<String>,
         in file: String,
@@ -146,7 +132,7 @@ class PerVectorSimulation: Simulation {
         return vvpResult.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
-    func simulate(
+    static func simulate(
         for faultPoints: Set<String>,
         in file: String,
         module: String,
@@ -175,9 +161,9 @@ class PerVectorSimulation: Simulation {
         for vector in testVectors {
             let future = Future<Coverage> {
                 do {
-                    let sa0 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun, filePrefix: tempDir)
+                    let sa0 = try Simulator.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 0, cleanUp: !sampleRun, filePrefix: tempDir)
 
-                    let sa1 = try PerVectorSimulation.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun, filePrefix: tempDir)
+                    let sa1 = try Simulator.pseudoRandomVerilogGeneration(using: vector, for: faultPoints, in: file, module: module, with: cells, ports: ports, inputs: inputs, outputs: outputs, stuckAt: 1, cleanUp: !sampleRun, filePrefix: tempDir)
 
                     return Coverage(sa0: sa0, sa1: sa1)
                 } catch {
@@ -217,5 +203,26 @@ class PerVectorSimulation: Simulation {
         }
 
         return (json: string, coverage: Float(sa0Covered.count + sa1Covered.count) / Float(2 * faultPoints.count))
+    }
+
+    enum Active {
+        case low
+        case high
+    }
+
+    static func simulate(
+        verifying module: String,
+        in file: String,
+        dffCount: String,
+        rstBar: String,
+        shiftBR: String,
+        clockBR: String,
+        and clock: String,
+        updateBR: String,
+        modeControl: String,
+        reset: String? = nil,
+        active: Active = .low
+    ) -> Bool {
+        return false
     }
 }

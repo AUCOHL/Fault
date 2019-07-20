@@ -69,7 +69,8 @@ class BoundaryScanRegisterCreator {
             Node.PortArg("rstBar", rstBarIdentifier),
             Node.PortArg("shiftBR", shiftBRIdentifier),
             Node.PortArg("updateBR", updateBRIdentifier),
-            Node.PortArg("modeControl", modeControlIdentifier)
+            Node.PortArg("modeControl", modeControlIdentifier),
+            Node.PortArg("clockBR", clockBRIdentifier)
         ]
 
         let submoduleInstance = Node.Instance(

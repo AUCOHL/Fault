@@ -23,6 +23,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(filePath)
 
+    let ignored = StringOption(
+        shortFlag: "i",
+        longFlag: "ignoring",
+        helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
+    )
+    cli.addOptions(ignored)
+
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
@@ -73,6 +80,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
     let bsrLocation = output + ".bsr.v"
+    let ignoredInputs: Set<String>
+        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
 
     let libertyFile = defaultLiberty ?
         liberty.value ??
@@ -118,9 +127,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     }
 
     let definitionName = String(describing: definition.name)
-    let definitionIdentifer = Node.Identifier(definitionName)
     let alteredName = "__UNIT__UNDER__FINANGLING__"
-    let alteredIdentifier = Node.Identifier(alteredName)
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
@@ -233,6 +240,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             for input in inputs {
                 let inputStatement = Node.Input(input.name)
+                statements.append(inputStatement)
+
+                if ignoredInputs.contains(input.name) {
+                    portArguments.append(Node.PortArg(
+                        input.name,
+                        Node.Identifier(input.name)
+                    ))
+                    continue
+                }
+                
                 let doutName = String(describing: input.name) + "__dout"
                 let doutStatement = Node.Wire(doutName)
                 if input.width > 1 {
@@ -243,7 +260,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     inputStatement.width = width
                     doutStatement.width = width
                 }
-                statements.append(inputStatement)
                 statements.append(doutStatement)
 
                 portArguments.append(Node.PortArg(
@@ -269,6 +285,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             }
 
             portArguments.append(Node.PortArg(
+                testingName,
+                testingIdentifier
+            ))
+
+            portArguments.append(Node.PortArg(
                 inputName,
                 Node.Identifier(inputName.uniqueName(counter))
             ))
@@ -278,19 +299,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             portArguments.append(Node.PortArg(
                 outputName,
                 Node.Identifier(inputName.uniqueName(counter))
-            ))
-
-            let submoduleInstance = Node.Instance(
-                alteredName,
-                "__uuf__",
-                Python.tuple(portArguments),
-                Python.tuple()
-            )
-
-            statements.append(Node.InstanceList(
-                alteredName,
-                Python.tuple(),
-                Python.tuple([submoduleInstance])
             ))
 
             for output in outputs {
@@ -329,6 +337,19 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     counter += 1
                 }
             }
+
+            let submoduleInstance = Node.Instance(
+                alteredName,
+                "__uuf__",
+                Python.tuple(portArguments),
+                Python.tuple()
+            )
+
+            statements.append(Node.InstanceList(
+                alteredName,
+                Python.tuple(),
+                Python.tuple([submoduleInstance])
+            ))
 
             let finalAssignment = Node.Assign(
                 Node.Lvalue(outputIdentifier),

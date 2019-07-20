@@ -4,7 +4,6 @@ import PythonKit
 import Defile
 import CoreFoundation
 
-
 func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -135,8 +134,16 @@ func main(arguments: [String]) -> Int32 {
         var faultPoints: Set<String> = []
         var gateCount = 0
 
-        for port in ports {
-            faultPoints.insert(port.value.name)
+        for (_, port) in ports {
+            if port.width == 1 {
+                faultPoints.insert(port.name)
+            } else {
+                let minimum = min(port.from, port.to)
+                let maximum = max(port.from, port.to)
+                for i in minimum...maximum {
+                    faultPoints.insert("\(port.name)[\(i)]")
+                }
+            }
         }
 
         for itemDeclaration in definition.items {
@@ -153,14 +160,12 @@ func main(arguments: [String]) -> Int32 {
         }
 
         print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")
-
     
         // MARK: Simulation
         let startTime = CFAbsoluteTimeGetCurrent()
-        let simulator: Simulation = PerVectorSimulation()
 
         print("Performing simulations…")
-        let result = try simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
+        let result = try Simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
 
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
