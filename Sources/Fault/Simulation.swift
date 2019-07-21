@@ -4,7 +4,12 @@ import PythonKit
 
 let TempDir = Python.import("tempfile")
 
-class Simulator {    
+class Simulator {
+    enum Behavior {
+        case holdHigh
+        case holdLow
+    }
+
     private static func pseudoRandomVerilogGeneration(
         using testVector: TestVector,
         for faultPoints: Set<String>,
@@ -13,6 +18,8 @@ class Simulator {
         with cells: String, 
         ports: [String: Port],
         inputs: [Port],
+        ignoring ignoredInputs: Set<String>,
+        behavior: [Behavior],
         outputs: [Port],
         stuckAt: Int,
         cleanUp: Bool,
@@ -40,11 +47,18 @@ class Simulator {
         for (i, input) in inputs.enumerated() {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
 
-            inputAssignment += "        \(name) = \(testVector[i].value) ;\n"
+            inputAssignment += "        \(name) = \(testVector[i]) ;\n"
             inputAssignment += "        \(name).gm = \(name) ;\n"
 
             fmtString += "%d "
             inputList += "\(name) , "
+        }
+
+        for rawName in ignoredInputs {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+
+            inputAssignment += "        \(name) = 0 ;\n"
+            inputAssignment += "        \(name).gm = 0 ;\n"
         }
 
         fmtString = String(fmtString.dropLast(1))
@@ -131,23 +145,35 @@ class Simulator {
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
+        ignoring ignoredInputs: Set<String> = [],
+        behavior: [Behavior] = [],
         outputs: [Port],
         tvAttempts: Int,
         sampleRun: Bool
-    ) throws -> (json: String, coverage: Float) {
+    ) throws -> (coverageList: [TVCPair], coverage: Float) {
 
         var futureList: [Future<Coverage>] = []
         
+        var testVectorHash: Set<TestVector> = []
         var testVectors: [TestVector] = []
+
         for _ in 0..<tvAttempts {
             var testVector: TestVector = []
             for input in inputs {
                 let max: UInt = (1 << UInt(input.width)) - 1
                 testVector.append(
-                    Test(value: UInt.random(in: 0...max), bits: input.width)
+                    UInt.random(in: 0...max)
                 )
             }
+            if testVectorHash.contains(testVector) {
+                continue
+            }
+            testVectorHash.insert(testVector)
             testVectors.append(testVector)
+        }
+
+        if testVectors.count < tvAttempts {
+            print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
         }
 
         let tempDir = "\(TempDir.gettempdir())"
@@ -164,6 +190,8 @@ class Simulator {
                             with: cells,
                             ports: ports,
                             inputs: inputs,
+                            ignoring: ignoredInputs,
+                            behavior: behavior,
                             outputs: outputs,
                             stuckAt: 0,
                             cleanUp: !sampleRun,
@@ -179,6 +207,8 @@ class Simulator {
                             with: cells,
                             ports: ports,
                             inputs: inputs,
+                            ignoring: ignoredInputs,
+                            behavior: behavior,
                             outputs: outputs,
                             stuckAt: 1,
                             cleanUp: !sampleRun,
@@ -217,15 +247,8 @@ class Simulator {
             )
         }
 
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(coverageList)
-        guard let string = String(data: data, encoding: .utf8)
-        else {
-            throw "Could not create utf8 string."
-        }
-
         return (
-            json: string,
+            coverageList: coverageList,
             coverage:
                 Float(sa0Covered.count + sa1Covered.count) /
                 Float(2 * faultPoints.count)
@@ -379,7 +402,7 @@ class Simulator {
         let vvpTask = "vvp \(aoutName)".shOutput()
 
         if vvpTask.terminationStatus != EX_OK {
-            throw "Failed to run vvp"
+            throw "Failed to run vvp."
         }
 
         return vvpTask.output.contains("SUCCESS_STRING")

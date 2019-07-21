@@ -1,7 +1,7 @@
 import PythonKit
 
-class Port {
-    enum Polarity {
+class Port: Codable {
+    enum Polarity: String, Codable {
         case input
         case output
         case unknown

@@ -104,8 +104,34 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.", stderr)
+        fputs("File '\(file)'' not found.\n", stderr)
         return EX_NOINPUT
+    }
+
+    if let libertyTest = liberty.value {
+        if !fileManager.fileExists(atPath: libertyTest) {
+            fputs("Liberty file '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !libertyTest.hasSuffix(".lib") {
+            fputs(
+                "Warning: Liberty file provided does not end with .lib.",
+                stderr
+            )
+        }
+    }
+
+    if let modelTest = verifyOpt.value {
+        if !fileManager.fileExists(atPath: modelTest) {
+            fputs("Cell model file '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
+            fputs(
+                "Warning: Cell model file provided does not end with .v or .sv.\n",
+                stderr
+            )
+        }
     }
 
     let output = filePath.value ?? "\(file).chained.v"
@@ -459,7 +485,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             order: order,
             shift: testingName, 
             sin: inputName,
-            sout: outputName
+            sout: outputName,
+            rstBar: rstBarName,
+            clockBR: clockBRName,
+            updateBR: updateBRName,
+            modeControl: modeControlName
         )
         
         guard let metadataString = metadata.toJSON() else {
@@ -479,16 +509,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             output: output
         )
 
-        let result = "echo '\(script)' | yosys 2>&1".shOutput()
+        // MARK: Yosys
+        print("Resynthesizing with yosys…")
+        let result = "echo '\(script)' | yosys > /dev/null".sh()
 
-        if result.terminationStatus != EX_OK {
+        if result != EX_OK {
             fputs("A yosys error has occurred.\n", stderr)
-            let log = "fault_yosys_\(Int(Date().timeIntervalSince1970 * 1000)).log"
-            try File.open(log, mode: .write) {
-                try $0.print(result.output)
-            }
-            fputs("Wrote yosys output to \(log)\n", stderr)
-            return Int32(result.terminationStatus)
+            // let log = "fault_yosys_\(Int(Date().timeIntervalSince1970 * 1000)).log"
+            // try File.open(log, mode: .write) {
+            //     try $0.print(result.output)
+            // }
+            // fputs("Wrote yosys output to \(log)\n", stderr)
+            return Int32(result)
         }
 
         guard let content = File.read(output) else {
@@ -497,13 +529,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
         try File.open(output, mode: .write) {
             try $0.print(String.boilerplate)
-            try $0.print("/* FAULT METADATA: '\(metadataString)' */")
+            try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
             try $0.print(content)
         }
 
         // MARK: Verification
-        print("Verifying scan chain integrity…")
         if let model = verifyOpt.value {
+            print("Verifying scan chain integrity…")
             let ast = parse([output])[0]
             let description = ast[dynamicMember: "description"]
             var definitionOptional: PythonObject?
@@ -542,9 +574,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 print("Scan chain verified successfully.")
             } else {
                 print("Scan chain verification failed.")
+                print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
+                if !resetActiveLow.value {
+                    print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
+                }
+                print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
         }
-
+        print("Done.")
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE

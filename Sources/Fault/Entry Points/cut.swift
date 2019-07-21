@@ -42,10 +42,10 @@ func cut(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.", stderr)
+        fputs("File '\(file)'' not found.\n", stderr)
         return EX_NOINPUT
     }
-    
+
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
@@ -99,7 +99,7 @@ func cut(arguments: [String]) -> Int32 {
             let instance = item.instances[0]
             if String(describing: instance.module).starts(with: "DFF") {
                 let instanceName = String(describing: instance.name)
-                let outputName = "\\" + instanceName + ".out"
+                let outputName = "\\" + instanceName + ".q"
 
                 let inputIdentifier = Node.Identifier(instanceName)
                 let outputIdentifier = Node.Identifier(outputName)

@@ -23,18 +23,30 @@ struct Metadata: Codable {
     var shift: String
     var sin: String
     var sout: String
+    var rstBar: String
+    var clockBR: String
+    var updateBR: String
+    var modeControl: String
 
     init(
         dffCount: Int,
         order: [ChainRegister],
         shift: String,
         sin: String,
-        sout: String
+        sout: String,
+        rstBar: String,
+        clockBR: String,
+        updateBR: String,
+        modeControl: String
     ) {
         self.dffCount = dffCount
         self.order = order
         self.shift = shift
         self.sin = sin
         self.sout = sout
+        self.rstBar = rstBar
+        self.clockBR = clockBR
+        self.updateBR = updateBR
+        self.modeControl = modeControl
     }
 }

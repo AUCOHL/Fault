@@ -22,7 +22,7 @@ func main(arguments: [String]) -> Int32 {
     let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: input + .tv.json)")
     cli.addOptions(filePath)
 
-    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellModel", helpMessage: ".v file describing the cells (Required for simulation.)")
+    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellModel", helpMessage: ".v file describing the cells (Required.)")
     cli.addOptions(cellsOption)
 
     let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
@@ -35,6 +35,13 @@ func main(arguments: [String]) -> Int32 {
 
     let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it. Has no effect under registerChain.")
     cli.addOptions(sampleRun)
+
+    let ignored = StringOption(
+        shortFlag: "i",
+        longFlag: "ignoring",
+        helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
+    )
+    cli.addOptions(ignored)
 
     do {
         try cli.parse()
@@ -51,7 +58,9 @@ func main(arguments: [String]) -> Int32 {
     if help.value {
         cli.printUsage()
         print("To take a look at synthesis options, try 'fault synth --help'")
-        print("To take a look at scan chain options, try 'fault scanc --help'")
+        print("To take a look at cutting options, try 'fault cut --help'")
+        print("To take a look at scan chain options, try 'fault chain --help'")
+        print("To take a look at test vector assembly options, try 'fault asm --help'")
         return EX_OK
     }
 
@@ -64,8 +73,21 @@ func main(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.", stderr)
+        fputs("File '\(file)'' not found.\n", stderr)
         return EX_NOINPUT
+    }
+
+    if let modelTest = cellsOption.value {
+        if !fileManager.fileExists(atPath: modelTest) {
+            fputs("Cell model file '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
+            fputs(
+                "Warning: Cell model file provided does not end with .v or .sv.",
+                stderr
+            )
+        }
     }
     
     let output = filePath.value ?? "\(file).tv.json"
@@ -74,6 +96,14 @@ func main(arguments: [String]) -> Int32 {
         cli.printUsage()
         return EX_USAGE
     }
+
+    let ignoredInputs: Set<String>
+        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+    let behavior
+        = Array<Simulator.Behavior>(
+            repeating: .holdHigh,
+            count: ignoredInputs.count
+        )
 
     var cellsFile = cellsOption.value
 
@@ -127,6 +157,7 @@ func main(arguments: [String]) -> Int32 {
     do {
         let (ports, inputs, outputs) = try Port.extract(from: definition)
 
+
         if inputs.count == 0 {
             print("Module has no inputs.")
             return EX_OK
@@ -140,7 +171,14 @@ func main(arguments: [String]) -> Int32 {
         var faultPoints: Set<String> = []
         var gateCount = 0
 
+        let inputsMinusIgnored = inputs.filter {
+            !ignoredInputs.contains($0.name)
+        }
+
         for (_, port) in ports {
+            if ignoredInputs.contains(port.name) {
+                continue
+            }
             if port.width == 1 {
                 faultPoints.insert(port.name)
             } else {
@@ -151,7 +189,7 @@ func main(arguments: [String]) -> Int32 {
                 }
             }
         }
-
+        
         for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
 
@@ -171,16 +209,40 @@ func main(arguments: [String]) -> Int32 {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         print("Performing simulations…")
-        let result = try Simulator.simulate(for: faultPoints, in: args[0], module: "\(definition.name)", with: cells, ports: ports, inputs: inputs, outputs: outputs, tvAttempts: tvAttempts, sampleRun: sampleRun.value)
+        let result = try Simulator.simulate(
+            for: faultPoints,
+            in: args[0],
+            module: "\(definition.name)",
+            with: cells,
+            ports: ports,
+            inputs: inputsMinusIgnored,
+            ignoring: ignoredInputs,
+            behavior: behavior,
+            outputs: outputs,
+            tvAttempts: tvAttempts,
+            sampleRun: sampleRun.value
+        )
 
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
+        
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(
+            TVInfo(
+                inputs: inputsMinusIgnored,
+                coverageList: result.coverageList
+            )
+        )
 
+        guard let string = String(data: data, encoding: .utf8)
+        else {
+            throw "Could not create utf8 string."
+        }
 
         try File.open(output, mode: .write) {
-            try $0.print(result.json)
+            try $0.print(string)
         }
     } catch {
         fputs("Internal error: \(error)", stderr)
@@ -203,6 +265,10 @@ if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
     exit(cut(arguments: arguments))
-} else {
+} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "asm" {
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    exit(assemble(arguments: arguments))
+}  else {
     exit(main(arguments: arguments))
 }

@@ -42,10 +42,23 @@ func synth(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.", stderr)
+        fputs("File '\(file)'' not found.\n", stderr)
         return EX_NOINPUT
     }
     let output = filePath.value ?? "Netlists/\(file).netlist.v"
+
+    if let libertyTest = liberty.value {
+        if !fileManager.fileExists(atPath: libertyTest) {
+            fputs("Liberty file '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !libertyTest.hasSuffix(".lib") {
+            fputs(
+                "Warning: Liberty file provided does not end with .lib.",
+                stderr
+            )
+        }
+    }
 
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
