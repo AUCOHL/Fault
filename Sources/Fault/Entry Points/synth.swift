@@ -42,7 +42,7 @@ func synth(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.\n", stderr)
+        fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
     let output = filePath.value ?? "Netlists/\(file).netlist.v"

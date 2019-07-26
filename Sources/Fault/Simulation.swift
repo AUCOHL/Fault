@@ -2,12 +2,10 @@ import Foundation
 import Defile
 import PythonKit
 
-let TempDir = Python.import("tempfile")
-
 class Simulator {
-    enum Behavior {
-        case holdHigh
-        case holdLow
+    enum Behavior: Int {
+        case holdHigh = 1
+        case holdLow = 0
     }
 
     private static func pseudoRandomVerilogGeneration(
@@ -28,7 +26,6 @@ class Simulator {
         var portWires = ""
         var portHooks = ""
         var portHooksGM = ""
-
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
             portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
@@ -54,11 +51,11 @@ class Simulator {
             inputList += "\(name) , "
         }
 
-        for rawName in ignoredInputs {
+        for (i, rawName) in ignoredInputs.enumerated() {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
 
-            inputAssignment += "        \(name) = 0 ;\n"
-            inputAssignment += "        \(name).gm = 0 ;\n"
+            inputAssignment += "        \(name) = \(behavior[i].rawValue) ;\n"
+            inputAssignment += "        \(name).gm = \(behavior[i].rawValue) ;\n"
         }
 
         fmtString = String(fmtString.dropLast(1))
@@ -176,6 +173,8 @@ class Simulator {
             print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
         }
 
+
+        let TempDir = Python.import("tempfile")
         let tempDir = "\(TempDir.gettempdir())"
 
         for vector in testVectors {
@@ -277,7 +276,10 @@ class Simulator {
         reset: String? = nil,
         active: Active = .low
     ) throws -> Bool {
+
+        let TempDir = Python.import("tempfile")
         let tempDir = "\(TempDir.gettempdir())"
+
         let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
         defer {

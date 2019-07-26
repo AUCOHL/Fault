@@ -5,6 +5,7 @@
 /*.xcodeproj
 __pycache__
 Netlists
+/iverilog*/
 
 *.out
 *.vcd

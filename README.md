@@ -1,11 +1,11 @@
 # 🧪 Fault
-Fault is an automatic test pattern generator for netlists that includes scan chain stitching.
+Fault is an automatic test pattern generator for netlists that includes scan chain stitching, synthesis scripts and a number of other convenience features.
 
 # Dependencies
 * Swift 5.0+
-* Python 3.7+
-* Yosys 0.8+
-* Icarus Verilog 10.2+
+* Python 3.6+ with PIP
+* Yosys 0.7+
+* Icarus Verilog 10.1+
 
 ## Installing
 ### macOS
@@ -18,9 +18,20 @@ Use [Homebrew](https://brew.sh).
 ### Debian-based Linuces (e.g. Ubuntu)
 Using apt:
 
-`sudo apt install git clang python yosys iverilog`
+`sudo apt-get install git clang python3 python3-dev yosys`
 
 Then install the Swift programming language: instructions are on [swift.org](https://swift.org/download/#using-downloads).
+
+Notice how Icarus Verilog is excluded. This is because as of the time of writing, there is no version of Swift on a version of Ubuntu that has Icarus Verilog 10.2 or above. Which is ridiculous. You'll have to build it from source. First, grab these dev dependencies:
+
+`sudo apt-get install autoconf make gperf flex bison`
+
+Then just run these in a terminal instance.
+
+```bash
+EXEC_PREFIX=<wherever, i prefer /usr/local and it will be /usr/local by default but you do you>
+sudo ./iverilog_build.swift
+```
 
 # Usage
 ## First time
@@ -29,7 +40,7 @@ Type `git submodule update --init --recursive` in the terminal to initialize sub
 Then simply invoke `swift install.swift`. This will install it to `~/bin` by default, type `swift install.swift help me` for more options.
 
 ## Running
-### Subprograms
+### Subcommands
 #### synth
 Synth is a synthesis script included with Fault that generates both a netlist and a cut-away version.
 
@@ -64,11 +75,16 @@ Chain is another synthesis script that links registers together for scan inserti
 
 A note about the liberty file in use in this step is that we recommend a modified liberty file that keeps only a buffer, an and, and a multiplexer (and an inverter if necessary), as abc tends to overthink multiplexers.
 
-Chain will output information about the scan chain embedded in the output netlist as `/* FAULT METADATA: '<json>' */` after the boilerplate. This metadata includes things like port names, the DFF count and ***\[\[\[STILL NOT DONE\]\]\]*** the order of the registers in the scan chain.
+Chain will output information about the scan chain embedded in the output netlist as `/* FAULT METADATA: '<json>' */` after the boilerplate. This metadata includes things like port names, the DFF count and the order of the registers in the scan chain.
 
 For more options, you can invoke `(swift run Fault)|(fault) chain --help`.
 
-You can have chain automagically verify its own scanchain-- see the help for more options.
+You can have chain automagically verify its generated scanchain-- see the help for more options.
+
+### asm
+`swift run Fault asm <test vector json> <chained netlist>`, in any order, will assemble a .bin file for use with $readmemb.
+
+For more options, you can invoke `(swift run Fault)|(fault) asm --help`.
 
 # License
 After this repository becomes public, the GNU General Public License v3 (or later, at your option). See 'License'.

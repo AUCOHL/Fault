@@ -79,8 +79,8 @@ if action == .install {
         print("Warning: Python 3 does not seem to be installed.")
     } else {
         let components = python3.output.components(separatedBy: " ")
-        if components[1].compare("3.7", options: .numeric) == .orderedAscending {
-            print("Warning: Python 3 may be out of date. (Recommended ver: 3.7)")
+        if components[1].compare("3.6", options: .numeric) == .orderedAscending {
+            print("Warning: Python 3 may be out of date. (Recommended ver: 3.6)")
         }
     }
 
@@ -89,8 +89,8 @@ if action == .install {
         print("Warning: Yosys does not seem to be installed.")
     } else {
         let components = yosys.output.components(separatedBy: " ")
-        if components[1].compare("0.8", options: .numeric) == .orderedAscending {
-            print("Warning: Yosys may be out of date. (Recommended ver: 0.8)")
+        if components[1].compare("0.7", options: .numeric) == .orderedAscending {
+            print("Warning: Yosys may be out of date. (Recommended ver: 0.7)")
         }
     }
 
@@ -122,7 +122,7 @@ if action == .install {
     export FAULT_INSTALL_PATH="\(path)"
     export FAULT_VER="\(gitVersion)"
 
-    "\(path)/FaultInstall/Fault" $@
+    "\(path)/FaultInstall/fault" $@
     rm -f parser.out parsetab.py
     rm -rf __pycache__
     """

@@ -73,7 +73,7 @@ func main(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)'' not found.\n", stderr)
+        fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
 
@@ -122,8 +122,8 @@ func main(arguments: [String]) -> Int32 {
 
     // MARK: Importing Python and Pyverilog
     let sys = Python.import("sys")
-    sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
-
+    let path = FileManager().currentDirectoryPath + "/Submodules/Pyverilog"
+    sys.path.append(path)
     if let installPath = env["FAULT_INSTALL_PATH"] {
         sys.path.append(installPath + "/FaultInstall/Pyverilog")
     }
