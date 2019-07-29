@@ -145,112 +145,137 @@ class Simulator {
         ignoring ignoredInputs: Set<String> = [],
         behavior: [Behavior] = [],
         outputs: [Port],
-        tvAttempts: Int,
+        initialVectorCount: Int,
+        incrementingBy increment: Int,
+        minimumCoverage: Float,
+        ceiling: Int,
         sampleRun: Bool
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
-
-        var futureList: [Future<Coverage>] = []
         
         var testVectorHash: Set<TestVector> = []
-        var testVectors: [TestVector] = []
 
-        for _ in 0..<tvAttempts {
-            var testVector: TestVector = []
-            for input in inputs {
-                let max: UInt = (1 << UInt(input.width)) - 1
-                testVector.append(
-                    UInt.random(in: 0...max)
-                )
-            }
-            if testVectorHash.contains(testVector) {
-                continue
-            }
-            testVectorHash.insert(testVector)
-            testVectors.append(testVector)
-        }
-
-        if testVectors.count < tvAttempts {
-            print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
-        }
-
-
-        let TempDir = Python.import("tempfile")
-        let tempDir = "\(TempDir.gettempdir())"
-
-        for vector in testVectors {
-            let future = Future<Coverage> {
-                do {
-                    let sa0 =
-                        try Simulator.pseudoRandomVerilogGeneration(
-                            using: vector,
-                            for: faultPoints,
-                            in: file,
-                            module: module,
-                            with: cells,
-                            ports: ports,
-                            inputs: inputs,
-                            ignoring: ignoredInputs,
-                            behavior: behavior,
-                            outputs: outputs,
-                            stuckAt: 0,
-                            cleanUp: !sampleRun,
-                            filePrefix: tempDir
-                        )
-
-                    let sa1 =
-                        try Simulator.pseudoRandomVerilogGeneration(
-                            using: vector,
-                            for: faultPoints,
-                            in: file,
-                            module: module,
-                            with: cells,
-                            ports: ports,
-                            inputs: inputs,
-                            ignoring: ignoredInputs,
-                            behavior: behavior,
-                            outputs: outputs,
-                            stuckAt: 1,
-                            cleanUp: !sampleRun,
-                            filePrefix: tempDir
-                        )
-
-                    return Coverage(sa0: sa0, sa1: sa1)
-                } catch {
-                    print("IO Error @ vector \(vector)")
-                    return Coverage(sa0: [], sa1: [])
-
-                }
-            }
-            futureList.append(future)
-            if sampleRun {
-                break
-            }
-        }
+        var coverageList: [TVCPair] = []
+        var coverage: Float = 0.0
 
         var sa0Covered: Set<String> = []
         sa0Covered.reserveCapacity(faultPoints.count)
         var sa1Covered: Set<String> = []
         sa1Covered.reserveCapacity(faultPoints.count)
-        var coverageList: [TVCPair] = []
 
-        for (i, future) in futureList.enumerated() {
-            let coverLists = future.value
-            for cover in coverLists.sa0 {
-                sa0Covered.insert(cover)
+        var totalTVAttempts = 0
+        var tvAttempts = initialVectorCount
+
+        while coverage < minimumCoverage && totalTVAttempts < ceiling {
+            if totalTVAttempts > 0 {
+                print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
             }
-            for cover in coverLists.sa1 {
-                sa1Covered.insert(cover)
+
+            var futureList: [Future<Coverage>] = []
+            var testVectors: [TestVector] = []
+
+            for _ in 0..<tvAttempts {
+                var testVector: TestVector = []
+                for input in inputs {
+                    let max: UInt = (1 << UInt(input.width)) - 1
+                    testVector.append(
+                        UInt.random(in: 0...max)
+                    )
+                }
+                if testVectorHash.contains(testVector) {
+                    continue
+                }
+                testVectorHash.insert(testVector)
+                testVectors.append(testVector)
             }
-            coverageList.append(
-                TVCPair(vector: testVectors[i], coverage: coverLists)
-            )
+
+            if testVectors.count < tvAttempts {
+                print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
+            }
+
+            let TempDir = Python.import("tempfile")
+            let tempDir = "\(TempDir.gettempdir())"
+
+            for vector in testVectors {
+                let future = Future<Coverage> {
+                    do {
+                        let sa0 =
+                            try Simulator.pseudoRandomVerilogGeneration(
+                                using: vector,
+                                for: faultPoints,
+                                in: file,
+                                module: module,
+                                with: cells,
+                                ports: ports,
+                                inputs: inputs,
+                                ignoring: ignoredInputs,
+                                behavior: behavior,
+                                outputs: outputs,
+                                stuckAt: 0,
+                                cleanUp: !sampleRun,
+                                filePrefix: tempDir
+                            )
+
+                        let sa1 =
+                            try Simulator.pseudoRandomVerilogGeneration(
+                                using: vector,
+                                for: faultPoints,
+                                in: file,
+                                module: module,
+                                with: cells,
+                                ports: ports,
+                                inputs: inputs,
+                                ignoring: ignoredInputs,
+                                behavior: behavior,
+                                outputs: outputs,
+                                stuckAt: 1,
+                                cleanUp: !sampleRun,
+                                filePrefix: tempDir
+                            )
+
+                        return Coverage(sa0: sa0, sa1: sa1)
+                    } catch {
+                        print("IO Error @ vector \(vector)")
+                        return Coverage(sa0: [], sa1: [])
+
+                    }
+                }
+                futureList.append(future)
+                if sampleRun {
+                    break
+                }
+            }
+
+            for (i, future) in futureList.enumerated() {
+                let coverLists = future.value
+                for cover in coverLists.sa0 {
+                    sa0Covered.insert(cover)
+                }
+                for cover in coverLists.sa1 {
+                    sa1Covered.insert(cover)
+                }
+                coverageList.append(
+                    TVCPair(
+                        vector: testVectors[i],
+                        coverage: coverLists
+                    )
+                )
+            }
+
+            coverage =
+                Float(sa0Covered.count + sa1Covered.count) /
+                Float(2 * faultPoints.count)
+        
+            totalTVAttempts += tvAttempts
+            tvAttempts = increment
+        }
+
+        if coverage < minimumCoverage {
+            print("Hit ceiling. Settling for current coverage.")
         }
 
         return (
             coverageList: coverageList,
-            coverage:
-                Float(sa0Covered.count + sa1Covered.count) /
-                Float(2 * faultPoints.count)
+            coverage: coverage
         )
     }
 

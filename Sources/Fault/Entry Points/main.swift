@@ -8,32 +8,81 @@ func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
-    let tvAttemptsDefault = "100"
+    let defaultTVCount = "100"
+    let defaultTVIncrement = "50"
+    let defaultMinimumCoverage = "80"
+    let defaultCeiling = "1000"
     let env = ProcessInfo.processInfo.environment
 
-    let version = BoolOption(shortFlag: "V", longFlag: "version", helpMessage: "Prints the current version and exits.")
+    let version = BoolOption(
+        shortFlag: "V",
+        longFlag: "version",
+        helpMessage: "Prints the current version and exits."
+    )
     if env["FAULT_VER"] != nil {
         cli.addOptions(version)
     }
 
-    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
+    let help = BoolOption(
+        shortFlag: "h",
+        longFlag: "help",
+        helpMessage: "Prints this message and exits."
+    )
     cli.addOptions(help)
 
-    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output JSON file. (Default: input + .tv.json)")
+    let filePath = StringOption(
+        shortFlag: "o",
+        longFlag: "output",
+        helpMessage: "Path to the output JSON file. (Default: input + .tv.json)"
+    )
     cli.addOptions(filePath)
 
-    let cellsOption = StringOption(shortFlag: "c", longFlag: "cellModel", helpMessage: ".v file describing the cells (Required.)")
+    let cellsOption = StringOption(
+        shortFlag: "c",
+        longFlag: "cellModel",
+        helpMessage: ".v file describing the cells (Required.)"
+    )
     cli.addOptions(cellsOption)
 
-    let osu035 = BoolOption(longFlag: "osu035", helpMessage: "Use the Oklahoma State University standard cell library for -c.")
+    let osu035 = BoolOption(
+        longFlag: "osu035",
+        helpMessage: "Use the Oklahoma State University standard cell library for -c."
+    )
     if env["FAULT_INSTALL_PATH"] != nil {
         cli.addOptions(osu035)
     }
 
-    let testVectorAttempts = StringOption(shortFlag: "a", longFlag: "attempts", helpMessage: "Number of test vectors generated (Default: \(tvAttemptsDefault).)")
-    cli.addOptions(testVectorAttempts)
+    let testVectorCount = StringOption(
+        shortFlag: "v",
+        longFlag: "tvCount",
+        helpMessage: "Number of test vectors generated (Default: \(defaultTVCount).)"
+    )
+    cli.addOptions(testVectorCount)
 
-    let sampleRun = BoolOption(longFlag: "sampleRun", helpMessage: "Generate only one testbench for inspection, do not delete it. Has no effect under registerChain.")
+    let testVectorIncrement = StringOption(
+        shortFlag: "r",
+        longFlag: "increment",
+        helpMessage: "Increment in test vector count should sufficient coverage not be reached. (Default: \(defaultTVIncrement).)"
+    )
+    cli.addOptions(testVectorIncrement)
+
+    let minimumCoverage = StringOption(
+        shortFlag: "m",
+        longFlag: "minCoverage",
+        helpMessage: "Minimum number of fault sites covered per cent. Set this to 0 to prevent increments. (Default: \(defaultMinimumCoverage).)"
+    )
+    cli.addOptions(minimumCoverage)
+
+    let ceiling = StringOption(
+        longFlag: "ceiling",
+        helpMessage: "Ceiling for Test Vector increments: if this number is reached, no more increments will occur regardless the coverage. (Default: \(defaultCeiling).)"
+    )
+    cli.addOptions(ceiling)
+
+    let sampleRun = BoolOption(
+        longFlag: "sampleRun", 
+        helpMessage: "Generate only one testbench for inspection, do not delete it."
+    )
     cli.addOptions(sampleRun)
 
     let ignored = StringOption(
@@ -92,10 +141,17 @@ func main(arguments: [String]) -> Int32 {
     
     let output = filePath.value ?? "\(file).tv.json"
 
-    guard let tvAttempts = Int(testVectorAttempts.value ?? tvAttemptsDefault) else {
+    guard
+        let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
+        let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
+        let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
+        let tvCeiling = Int(ceiling.value ?? defaultCeiling)
+    else {
         cli.printUsage()
         return EX_USAGE
     }
+
+    let tvMinimumCoverage = Float(tvMinimumCoverageInt) / 100.0
 
     let ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
@@ -219,7 +275,10 @@ func main(arguments: [String]) -> Int32 {
             ignoring: ignoredInputs,
             behavior: behavior,
             outputs: outputs,
-            tvAttempts: tvAttempts,
+            initialVectorCount: tvAttempts,
+            incrementingBy: tvIncrement,
+            minimumCoverage: tvMinimumCoverage,
+            ceiling: tvCeiling,
             sampleRun: sampleRun.value
         )
 

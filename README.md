@@ -5,7 +5,7 @@ Fault is an automatic test pattern generator for netlists that includes scan cha
 * Swift 5.0+
 * Python 3.6+ with PIP
 * Yosys 0.7+
-* Icarus Verilog 10.1+
+* Icarus Verilog 10.2+
 
 ## Installing
 ### macOS
@@ -91,5 +91,6 @@ After this repository becomes public, the GNU General Public License v3 (or late
 
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
+[Book](https://ieeexplore.ieee.org/book/5266057)
 - Shinya Takamaeda-Yamazaki: Pyverilog: A Python-based Hardware Design Processing Toolkit for Verilog HDL, 11th International Symposium on Applied Reconfigurable Computing (ARC 2015) (Poster), Lecture Notes in Computer Science, Vol.9040/2015, pp.451-460, April 2015.
 [Paper](http://link.springer.com/chapter/10.1007/978-3-319-16214-0_42)
