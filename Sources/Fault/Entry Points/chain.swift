@@ -26,7 +26,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
+        helpMessage: "Inputs,to,ignore,separated,by,commas."
     )
     cli.addOptions(ignored)
 
@@ -39,13 +39,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let clockOpt = StringOption(
         longFlag: "clock",
+        required: true,
         helpMessage: "Clock signal to add to --ignoring and use in simulation."
     )
     cli.addOptions(clockOpt)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        helpMessage: "Reset signal to add to --ignoring and use in simulation. "
+        required: true,
+        helpMessage: "Reset signal to add to --ignoring and use in simulation."
     )
     cli.addOptions(resetOpt)
 
@@ -69,11 +71,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     for (name, value) in [
         ("sin", "serial data in"),
         ("sout", "serial data out"),
-        ("shift", "serial shifting enable"),
-        ("rstBar", "JTAG register reset"),
-        ("clockBR", "JTAG boundary shift register clock"),
-        ("updateBR", "JTAG boundary update register clock"),
-        ("modeControl", "JTAG mode input")
+        ("shift", "serial shifting enable")
     ] {
         let option = StringOption(
             longFlag: name,
@@ -208,15 +206,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
         let outputIdentifier = Node.Identifier(outputName)
 
-        let rstBarName = names["rstBar"]!.option.value
-            ?? names["rstBar"]!.default
-        let clockBRName = names["clockBR"]!.option.value
-            ?? names["clockBR"]!.default
-        let updateBRName = names["updateBR"]!.option.value
-            ?? names["updateBR"]!.default
-        let modeControlName = names["modeControl"]!.option.value
-            ?? names["modeControl"]!.default
-
         // MARK: Register chaining original module
         let internalCount: Int = {
             var previousOutput = inputIdentifier
@@ -283,28 +272,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let boundaryCount: Int = try {
             let ports = Python.list(definition.portlist.ports)
 
-            ports.append(Node.Port(rstBarName, Python.None, Python.None))
-            ports.append(Node.Port(clockBRName, Python.None, Python.None))
-            ports.append(Node.Port(updateBRName, Python.None, Python.None))
-            ports.append(Node.Port(modeControlName, Python.None, Python.None))
-
             var statements: [PythonObject] = []
             statements.append(Node.Input(inputName))
             statements.append(Node.Output(outputName))
             statements.append(Node.Input(testingName))
-            statements.append(Node.Input(rstBarName))
-            statements.append(Node.Input(clockBRName))
-            statements.append(Node.Input(updateBRName))
-            statements.append(Node.Input(modeControlName))
 
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
                 name: "BoundaryScanRegister",
-                rstBar: rstBarName,
-                shiftBR: testingName,
-                clockBR: clockBRName,
-                updateBR: updateBRName,
-                modeControl: modeControlName,
+                clock: clockOpt.value!,
+                reset: resetOpt.value!,
+                resetActive: resetActiveLow.value ? .low : .high,
+                testing: testingName,
                 using: Node
             )
 
@@ -355,7 +334,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             din: input.name,
                             dout: doutName,
                             sin: inputName.uniqueName(counter),
-                            sout: inputName.uniqueName(counter + 1)
+                            sout: inputName.uniqueName(counter + 1),
+                            input: true
                         )
                     )
                     counter += 1
@@ -418,7 +398,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             din: dinName,
                             dout: output.name,
                             sin:  inputName.uniqueName(counter),
-                            sout: inputName.uniqueName(counter + 1)
+                            sout: inputName.uniqueName(counter + 1),
+                            input: false
                         )
                     )
                     counter += 1
@@ -465,14 +446,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             )
 
             try File.open(bsrLocation, mode: .write) {
-                try $0.print(bsrCreator.definition)
+                try $0.print(bsrCreator.inputDefinition)
+                try $0.print(bsrCreator.outputDefinition)
             }
 
-            let boundaryScanRegister =
-                parse([bsrLocation])[0][dynamicMember: "description"].definitions[0]
+            let boundaryScanRegisters =
+                parse([bsrLocation])[0][dynamicMember: "description"].definitions
             
             let definitions = Python.list(description.definitions)
-            definitions.append(boundaryScanRegister)
+            definitions.extend(boundaryScanRegisters)
             definitions.append(supermodel)
             description.definitions = Python.tuple(definitions)
 
@@ -485,11 +467,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             order: order,
             shift: testingName, 
             sin: inputName,
-            sout: outputName,
-            rstBar: rstBarName,
-            clockBR: clockBRName,
-            updateBR: updateBRName,
-            modeControl: modeControlName
+            sout: outputName
         )
         
         guard let metadataString = metadata.toJSON() else {
@@ -560,14 +538,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 inputs: inputs,
                 outputs: outputs,
                 dffCount: dffCount,
-                rstBar: rstBarName,
-                shiftBR: testingName,
-                clockBR: clockBRName,
-                and: clockOpt.value,
-                updateBR: updateBRName,
-                modeControl: modeControlName,
-                reset: resetOpt.value,
-                active: resetActiveLow.value ? .low : .high
+                clock: clockOpt.value!,
+                reset: resetOpt.value!,
+                resetActive: resetActiveLow.value ? .low : .high,
+                testing: testingName
             )
 
             if (verified) {

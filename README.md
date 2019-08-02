@@ -68,21 +68,22 @@ Generated test vectors are printed to stdout by default, but you can use `-o <fi
 For more options, you can invoke `(swift run Fault)|(fault) --help`.
 
 ### chain
-`swift run Fault chain --liberty <your-liberty-file> <your-file>`, `--liberty` behaving identical synth.
+`swift run Fault chain --liberty <your-liberty-file> --clock <clockName> --reset <resetName> <--activeLow> <your-file>`, `--liberty` behaving identical to Synth.
 
 Chain is another synthesis script that links registers together for scan insertion. It takes all the assumptions made in the main program but the last, and one more:
 * All instantiated D flipflops start with "DFF".
 
-A note about the liberty file in use in this step is that we recommend a modified liberty file that keeps only a buffer, an and, and a multiplexer (and an inverter if necessary), as abc tends to overthink multiplexers.
+A note about the liberty file in use in this step is that we recommend a modified liberty file that keeps only a buffer, an and gate, and a multiplexer (and an inverter if necessary), as abc tends to overthink multiplexers.
 
 Chain will output information about the scan chain embedded in the output netlist as `/* FAULT METADATA: '<json>' */` after the boilerplate. This metadata includes things like port names, the DFF count and the order of the registers in the scan chain.
 
+You can have Chain automagically verify its generated scanchain-- see the help for more options, but the gist of it is `-v <your-cell-model>`.
+
 For more options, you can invoke `(swift run Fault)|(fault) chain --help`.
 
-You can have chain automagically verify its generated scanchain-- see the help for more options.
 
 ### asm
-`swift run Fault asm <test vector json> <chained netlist>`, in any order, will assemble a .bin file for use with $readmemb.
+`swift run Fault asm <test vector json> <chained netlist>`, in any order, will assemble a .bin file for use with `$readmemb`.
 
 For more options, you can invoke `(swift run Fault)|(fault) asm --help`.
 

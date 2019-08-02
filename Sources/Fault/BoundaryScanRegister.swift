@@ -3,47 +3,43 @@ import PythonKit
 
 class BoundaryScanRegisterCreator {
     var name: String
+    private var inputName: String
+    private var outputName: String
     var counter: Int = 0
     
-    var rstBar: String
-    var shiftBR: String
-    var clockBR: String
-    var updateBR: String
-    var modeControl: String
+    var clock: String
+    var reset: String
+    var resetActive: Simulator.Active
+    var testing: String
 
-    private var rstBarIdentifier: PythonObject
-    private var shiftBRIdentifier: PythonObject
-    private var clockBRIdentifier: PythonObject
-    private var updateBRIdentifier: PythonObject
-    private var modeControlIdentifier: PythonObject
+    private var clockIdentifier: PythonObject
+    private var resetIdentifier: PythonObject
+    private var testingIdentifier: PythonObject
 
     private var Node: PythonObject
 
     init(
         name: String,
-        rstBar: String,
-        shiftBR: String,
-        clockBR: String,
-        updateBR: String,
-        modeControl: String,
+        clock: String,
+        reset: String,
+        resetActive: Simulator.Active,
+        testing: String,
         using Node: PythonObject
     ) {
         self.name = name
+        self.inputName = "\(name)_input"
+        self.outputName = "\(name)_output"
 
-        self.rstBar = rstBar
-        self.rstBarIdentifier = Node.Identifier(rstBar)
+        self.clock = clock
+        self.clockIdentifier = Node.Identifier(clock)
 
-        self.shiftBR = shiftBR
-        self.shiftBRIdentifier = Node.Identifier(shiftBR)
-        
-        self.clockBR = clockBR
-        self.clockBRIdentifier = Node.Identifier(clockBR)
+        self.reset = reset
+        self.resetIdentifier = Node.Identifier(reset)
 
-        self.updateBR = updateBR
-        self.updateBRIdentifier = Node.Identifier(updateBR)
+        self.resetActive = resetActive
 
-        self.modeControl = modeControl
-        self.modeControlIdentifier = Node.Identifier(modeControl)
+        self.testing = testing
+        self.testingIdentifier = Node.Identifier(testing)
 
         self.Node = Node
     }
@@ -53,24 +49,25 @@ class BoundaryScanRegisterCreator {
         din: String,
         dout: String,
         sin: String,
-        sout: String
+        sout: String,
+        input: Bool
     ) -> PythonObject {
         let dinIdentifier = Node.Identifier(din)
         let doutIdentifier = Node.Identifier(dout)
         let sinIdentifier = Node.Identifier(sin)
         let soutIdentifier = Node.Identifier(sout)
         let ordinalConstant = Node.Constant(ordinal)
+
+        let name = input ? inputName : outputName
         
         let portArguments = [
             Node.PortArg("din", Node.Pointer(dinIdentifier, ordinalConstant)),
             Node.PortArg("dout", Node.Pointer(doutIdentifier, ordinalConstant)),
             Node.PortArg("sin", sinIdentifier),
             Node.PortArg("sout", soutIdentifier),
-            Node.PortArg("rstBar", rstBarIdentifier),
-            Node.PortArg("shiftBR", shiftBRIdentifier),
-            Node.PortArg("updateBR", updateBRIdentifier),
-            Node.PortArg("modeControl", modeControlIdentifier),
-            Node.PortArg("clockBR", clockBRIdentifier)
+            Node.PortArg("clock", clockIdentifier),
+            Node.PortArg("reset", resetIdentifier),
+            Node.PortArg("testing", testingIdentifier)
         ]
 
         let submoduleInstance = Node.Instance(
@@ -78,7 +75,7 @@ class BoundaryScanRegisterCreator {
             "__" + name + "_" + String(describing: counter) + "__",
             Python.tuple(portArguments),
             Python.tuple()
-        );
+        )
 
         counter += 1
 
@@ -89,47 +86,66 @@ class BoundaryScanRegisterCreator {
         )
     }
 
-    var definition: String {
+    var inputDefinition: String {
         return """
-        module \(name)(
-            rstBar,
+        module \(inputName) (
             din,
             dout,
             sin,
             sout,
-            shiftBR,
-            clockBR,
-            updateBR,
-            modeControl
+            clock,
+            reset,
+            testing
         );
-            input rstBar;
             input din; output dout;
             input sin; output sout;
-            input shiftBR, clockBR, updateBR, modeControl;
+            input clock, reset, testing;
 
-            reg shift;
+            reg store;
 
-            always @ (posedge clockBR or negedge rstBar) begin
-                if (!rstBar) begin
-                    shift <= 1'b0;
+            always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
+                if (\(resetActive == .high ? "" : "~") reset) begin
+                    store <= 1'b0;
                 end else begin
-                    shift <= (shiftBR) ? sin : din;
+                    store <= sin;
                 end
             end
 
-            assign sout = shift;
+            assign sout = store;
+            assign dout = testing ? store : din;
 
-            reg update;
+        endmodule
+            
+        """
+    }
 
-            always @ (posedge updateBR or negedge rstBar) begin
-                if (!rstBar) begin
-                    update <= 1'b0;
+    var outputDefinition: String {
+        return """
+        module \(outputName) (
+            din,
+            dout,
+            sin,
+            sout,
+            clock,
+            reset,
+            testing
+        );
+            input din; output dout;
+            input sin; output sout;
+            input clock, reset, testing;
+
+            reg store;
+
+            always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
+                if (\(resetActive == .high ? "" : "~") reset) begin
+                    store <= 1'b0;
                 end else begin
-                    update <= shift;
+                    store <= testing ? sin: din;
                 end
             end
 
-            assign dout = modeControl ? shift : update;
+            assign sout = store;
+            assign dout = din;
 
         endmodule
             

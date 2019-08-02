@@ -292,14 +292,10 @@ class Simulator {
         inputs: [Port],
         outputs: [Port],
         dffCount: Int,
-        rstBar: String,
-        shiftBR: String,
-        clockBR: String,
-        and clock: String? = nil,
-        updateBR: String,
-        modeControl: String,
-        reset: String? = nil,
-        active: Active = .low
+        clock: String,
+        reset: String,
+        resetActive: Active = .low,
+        testing: String
     ) throws -> Bool {
 
         let TempDir = Python.import("tempfile")
@@ -311,58 +307,22 @@ class Simulator {
             let _ = "rm -rf '\(folderName)'".sh()
         }
 
-        let managedSignals: [String: String] = [
-            rstBar: "rstBar",
-            shiftBR: "shiftBR",
-            clockBR: "clockBR",
-            updateBR: "updateBR",
-            modeControl: "modeControl"
-        ]
-
         var portWires = ""
         var portHooks = ""
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            if let managedSignal = managedSignals[name] {
-                portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(managedSignal) ;\n"
-                portHooks += ".\(name) ( \(managedSignal) ) , "
-            } else {
-                if let clockSignal = clock, rawName == clockSignal {
-                    portWires += "    wire[\(port.from):\(port.to)] \(name) ;\n"
-                } else if let resetSignal = reset, rawName == resetSignal {
-                    portWires += "    wire[\(port.from):\(port.to)] \(name) ;\n"
-                } else {
-                    portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
-                }
-                portHooks += ".\(name) ( \(name) ) , "
-            }
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portHooks += ".\(name) ( \(name) ) , "
         }
 
         var inputAssignment = ""
         for input in inputs {
-            var name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
-            if let managedSignal = managedSignals[name] {
-                name = managedSignal
-            }
-            if let clockSignal = clock, input.name == clockSignal {
-            } else if let resetSignal = reset, input.name == resetSignal {
+            let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
+            if input.name == reset {
+                inputAssignment += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
             } else {
                 inputAssignment += "        \(name) = 0 ;\n"
             }
-        }
-
-        var resetAssignment = ""
-        if let resetSignal = reset {
-            if active == .high {
-                resetAssignment = "assign \(resetSignal) = ~rstBar ;"
-            } else {
-                resetAssignment = "assign \(resetSignal) = rstBar ;"
-            }
-        }
-
-        var clockAssignment = ""
-        if let clockSignal = clock {
-            clockAssignment = "assign \(clockSignal) = clockBR;"
         }
 
         var serial = ""
@@ -376,12 +336,9 @@ class Simulator {
         `include "\(file)"
 
         module testbench;
-            \(portWires)
-
-            \(clockAssignment)
-            \(resetAssignment)
-
-            always #1 clockBR = ~clockBR;
+        \(portWires)
+            
+            always #1 \(clock) = ~\(clock);
 
             \(module) uut(
                 \(portHooks.dropLast(2))
@@ -393,10 +350,10 @@ class Simulator {
             integer i;
 
             initial begin
-            \(inputAssignment)
+        \(inputAssignment)
                 #10;
-                rstBar = 1;
-                shift = 1;
+                \(reset) = ~\(reset);
+                \(testing) = 1;
                 for (i = 0; i < \(dffCount); i = i + 1) begin
                     sin = serializable[i];
                     #2;
