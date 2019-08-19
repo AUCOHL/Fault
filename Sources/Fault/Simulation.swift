@@ -191,9 +191,7 @@ class Simulator {
             if testVectors.count < tvAttempts {
                 print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
             }
-
-            let TempDir = Python.import("tempfile")
-            let tempDir = "\(TempDir.gettempdir())"
+            let tempDir = "\(NSTemporaryDirectory())"
 
             for vector in testVectors {
                 let future = Future<Coverage> {
@@ -297,9 +295,7 @@ class Simulator {
         resetActive: Active = .low,
         testing: String
     ) throws -> Bool {
-
-        let TempDir = Python.import("tempfile")
-        let tempDir = "\(TempDir.gettempdir())"
+        let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
