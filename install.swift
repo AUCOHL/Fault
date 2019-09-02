@@ -37,7 +37,7 @@ enum Action {
 
 let env = ProcessInfo.processInfo.environment
 var action: Action = .install
-var path = "\(env["HOME"]!)/bin"
+var path = env["INSTALL_DIR"] ?? "\(env["HOME"]!)/bin"
 var opt = true
 
 if CommandLine.arguments.count == 1 {
