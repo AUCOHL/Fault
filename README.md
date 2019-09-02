@@ -88,7 +88,7 @@ For more options, you can invoke `(swift run Fault)|(fault) chain --help`.
 For more options, you can invoke `(swift run Fault)|(fault) asm --help`.
 
 # License
-After this repository becomes public, the GNU Affero General Public License v3 (or later, at your option). See 'License'.
+After this repository becomes public, the GNU General Public License v3 (or later, at your option). See 'License'.
 
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
