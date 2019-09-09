@@ -128,7 +128,7 @@ func main(arguments: [String]) -> Int32 {
 
     if let modelTest = cellsOption.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(file)' not found.\n", stderr)
+            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {

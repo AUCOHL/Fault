@@ -28,7 +28,7 @@ extension String {
     }
 }
 
-let gitVersion = "git describe --always --tags".shOutput().output.dropLast()
+let gitVersion = "git describe --always --tags".shOutput().output
 
 enum Action {
     case install

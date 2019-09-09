@@ -32,3 +32,8 @@ WORKDIR /share/Fault
 RUN git submodule update --init --recursive
 RUN INSTALL_DIR=/usr/bin swift install.swift
 WORKDIR /
+
+# Install jinja
+RUN apt-get install -y python-pip python3-pip
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install jinja2

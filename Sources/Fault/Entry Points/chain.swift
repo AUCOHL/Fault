@@ -108,7 +108,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
-            fputs("Liberty file '\(file)' not found.\n", stderr)
+            fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
         if !libertyTest.hasSuffix(".lib") {
@@ -121,7 +121,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     if let modelTest = verifyOpt.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(file)' not found.\n", stderr)
+            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
