@@ -27,9 +27,8 @@ RUN make install exec_prefix=/usr/local
 
 # Install Fault
 WORKDIR /share
-RUN git clone --depth 1 https://github.com/Cloud-V/Fault
+RUN git clone --depth 1 --recurse-submodules https://github.com/Cloud-V/Fault
 WORKDIR /share/Fault
-RUN git submodule update --init --recursive
 RUN INSTALL_DIR=/usr/bin swift install.swift
 WORKDIR /
 
