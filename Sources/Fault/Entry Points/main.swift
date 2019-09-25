@@ -328,6 +328,10 @@ if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
     exit(assemble(arguments: arguments))
+} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "compact" {
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    exit(compactTestVectors(arguments: arguments))
 }  else {
     exit(main(arguments: arguments))
 }
