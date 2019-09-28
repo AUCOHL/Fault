@@ -110,6 +110,7 @@ func main(arguments: [String]) -> Int32 {
         print("To take a look at cutting options, try 'fault cut --help'")
         print("To take a look at scan chain options, try 'fault chain --help'")
         print("To take a look at test vector assembly options, try 'fault asm --help'")
+        print("To take a look at test vector static compaction options, try 'fault compact --help'")
         return EX_OK
     }
 
