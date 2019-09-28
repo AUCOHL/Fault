@@ -1,8 +1,9 @@
 import Foundation
 import CommandLineKit
+import Defile
+import PythonKit
 
 func compactTestVectors(arguments: [String]) -> Int32 {
-    let env = ProcessInfo.processInfo.environment
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let help = BoolOption(
@@ -17,7 +18,6 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         longFlag: "output",
         helpMessage: "Path to the output file. (Default: input + .compacted.json)"
     )
-
     cli.addOptions(filePath)
 
     do {
@@ -42,37 +42,42 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     let file = args[0]
 
     if !fileManager.fileExists(atPath: file) {
-      //  fputs("File '\(fileJson)' not found.\n", stderr)
-       // return EX_NOINPUT
+       fputs("File '\(file)' not found.\n", stderr)
+       return EX_NOINPUT
     }
-
-    let output = filePath.value ?? "\(file).compacted.v"
-    print(output)
-    print(file)
-    // Read JSON File
-     do {
-         if let url = NSURL(string: file){
-//Bundle.main.url(forResource: "c17", withExtension: "json", subdirectory:"Netlists/RTL/ISCAS_Comb" ) {
-            let data = try Data(contentsOf: url)
-            let json = try JSONSerialization.jsonObject(with: data, options: [])
-            if let object = json as? [String: Any] {
-                // json is a dictionary
-                print(object)
-            } else if let object = json as? [Any] {
-                // json is an array
-                print(object)
-            } else {
-                fputs("File '\(file)' is invalid.\n", stderr)
-                return EX_NOINPUT
-            }
-        } else {
-            fputs("File '\(file)' not found.\n", stderr)
-            return EX_NOINPUT
-        }
-    } catch {
-        print(error.localizedDescription)
-    }
-
     
+    let output = filePath.value ?? "\(file).compacted.v"
+    // Parse JSON File
+     do {
+        let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
+        guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
+            fputs("File '\(file)' is invalid.\n", stderr)
+            return EX_DATAERR
+        }
+
+        let compactedTV = Compactor.compact(coverageList: tvInfo.coverageList)
+
+        let encoder = JSONEncoder()
+        let jsonData = try encoder.encode(
+            TVInfo(
+                inputs: tvInfo.inputs,
+                coverageList: compactedTV
+            )
+        )
+
+        guard let string = String(data: jsonData, encoding: .utf8)
+        else {
+            throw "Could not create utf8 string."
+        }
+
+        try File.open(output, mode: .write) {
+            try $0.print(string)
+        }
+
+    } catch {
+        fputs(error.localizedDescription, stderr)
+        return EX_NOINPUT
+    }
+
     return EX_OK
 }
