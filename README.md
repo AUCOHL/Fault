@@ -61,6 +61,13 @@ For more options, you can invoke `fault chain --help`.
 
 For more options, you can invoke `fault asm --help`.
 
+### compact
+`fault compact <test vector json>`
+
+This performs static compaction on the generated test vectors by reducing the test vectors count while keeping the same coverage.
+
+For more options, you can invoke `fault compact --help`.
+
 # License
 The GNU General Public License v3 (or later, at your option). See 'License'.
 

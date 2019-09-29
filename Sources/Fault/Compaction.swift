@@ -121,6 +121,7 @@ class Compactor {
         }
         if sa0 == sa0Final && sa1 == sa1Final {
             let ratio = (1 - (Float(filtered.count) / Float(chart.count))) * 100 
+            print("Initial TV Count: \(chart.count). Compacted TV Count: \(filtered.count). ")
             print("Compaction is successfuly concluded with a reduction percentage of : \(String(format: "%.2f", ratio))% .\n")
         }
         else {

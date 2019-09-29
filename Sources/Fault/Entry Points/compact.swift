@@ -46,7 +46,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
        return EX_NOINPUT
     }
     
-    let output = filePath.value ?? "\(file).compacted.v"
+    let output = filePath.value ?? "\(file).compacted.json"
     // Parse JSON File
      do {
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
