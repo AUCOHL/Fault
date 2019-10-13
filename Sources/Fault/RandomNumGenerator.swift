@@ -5,7 +5,21 @@ enum RandomGenerator: String {
     case LFSR
 }
 
-class LFSR: RandomNumberGenerator {
+protocol URNG { // Swift RNG protocol sucks
+    func generate(_ range: Range<UInt>) -> UInt
+    func generate(_ range: ClosedRange<UInt>) -> UInt
+}
+
+class SwiftRNG: URNG {
+    func generate(_ range: Range<UInt>) -> UInt {
+        return UInt.random(in: range)
+    }
+    func generate(_ range: ClosedRange<UInt>) -> UInt {
+        return UInt.random(in: Range(range))
+    }
+}
+
+class LFSR: URNG {
     static let taps: [UInt: Array<UInt>] = [
         // nbits : Feedback Polynomial
         2: [2, 1],
@@ -69,9 +83,34 @@ class LFSR: RandomNumberGenerator {
         return parityVal
     }
 
-    func next() -> UInt64{
+    func rand() -> UInt {
         let feedbackBit: UInt = LFSR.parity(number: self.seed & self.polynomialHex)
         self.seed = (self.seed >> 1) | (feedbackBit << (self.nbits - 1))
-        return UInt64(self.seed)
+        return self.seed
+    }
+
+    func generate(_ range: Range<UInt>) -> UInt {
+        return rand() % UInt(range.upperBound - range.lowerBound + 1) + UInt(range.lowerBound)
+    }
+
+    func generate(_ range: ClosedRange<UInt>) -> UInt {
+        return generate(Range(range))
+    }
+}
+
+class RandGenFactory{
+    private static var sharedRandFactory = RandGenFactory()
+
+    class func shared() -> RandGenFactory {
+        return sharedRandFactory
+    }
+
+    func getRandGen(type: RandomGenerator)->URNG{
+        switch type {
+            case .swift:
+                return SwiftRNG()
+            case .LFSR:
+                return LFSR(nbits: 64)
+        }
     }
 }
