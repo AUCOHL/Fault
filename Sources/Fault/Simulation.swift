@@ -149,6 +149,7 @@ class Simulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
+        randomGenerator: RandomGenerator,
         sampleRun: Bool
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
         
@@ -164,6 +165,8 @@ class Simulator {
 
         var totalTVAttempts = 0
         var tvAttempts = initialVectorCount
+        
+        let rng: URNG = RandGenFactory.shared().getRandGen(type:randomGenerator  ) // LFSR(nbits: 64)
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -172,13 +175,14 @@ class Simulator {
 
             var futureList: [Future<Coverage>] = []
             var testVectors: [TestVector] = []
+            
 
             for _ in 0..<tvAttempts {
                 var testVector: TestVector = []
                 for input in inputs {
                     let max: UInt = (1 << UInt(input.width)) - 1
                     testVector.append(
-                        UInt.random(in: 0...max)
+                       rng.generate(0...max)
                     )
                 }
                 if testVectorHash.contains(testVector) {

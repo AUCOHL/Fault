@@ -12,6 +12,7 @@ func main(arguments: [String]) -> Int32 {
     let defaultTVIncrement = "50"
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
+    let defaultRandGen = "swift"
     let env = ProcessInfo.processInfo.environment
 
     let version = BoolOption(
@@ -78,6 +79,13 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "Ceiling for Test Vector increments: if this number is reached, no more increments will occur regardless the coverage. (Default: \(defaultCeiling).)"
     )
     cli.addOptions(ceiling)
+    
+    let randGen = StringOption(
+        shortFlag: "g",
+        longFlag: "randGen",
+        helpMessage: "Type of the Random Number Generator, two supported LFSR and Swift. (Default: \(defaultRandGen).)"
+    )
+    cli.addOptions(randGen)
 
     let sampleRun = BoolOption(
         longFlag: "sampleRun", 
@@ -146,7 +154,8 @@ func main(arguments: [String]) -> Int32 {
         let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
-        let tvCeiling = Int(ceiling.value ?? defaultCeiling)
+        let tvCeiling = Int(ceiling.value ?? defaultCeiling),
+        let randomGenerator: RandomGenerator = RandomGenerator(rawValue: randGen.value ?? defaultRandGen)
     else {
         cli.printUsage()
         return EX_USAGE
@@ -280,6 +289,7 @@ func main(arguments: [String]) -> Int32 {
             incrementingBy: tvIncrement,
             minimumCoverage: tvMinimumCoverage,
             ceiling: tvCeiling,
+            randomGenerator: randomGenerator,
             sampleRun: sampleRun.value
         )
 
