@@ -1,6 +1,9 @@
 # 🧪 Fault
 Fault is an automatic test pattern generator for netlists that includes scan chain stitching, synthesis scripts and a number of other convenience features.
 
+## Note
+There is an unresolved issue on Linux where some larger designs lock up at ~500 test vectors generated. This does not appear to be an issue on macOS.
+
 # Quick Usage Instructions
 A Docker image is available for Fault:
 ```sh
