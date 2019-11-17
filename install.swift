@@ -98,7 +98,7 @@ if action == .install {
     print("Installing Fault (\(gitVersion))...")
 
     print("Compiling...")
-    let compilationResult = "swift build -c release".sh()
+    let compilationResult = "swift build".sh()
     if compilationResult != EX_OK {
         print("Compiling Fault failed.")
         exit(EX_DATAERR)
@@ -130,7 +130,7 @@ if action == .install {
     let _ = "echo '\(launchScript)' > '\(path)/fault'".sh()
     let _ = "chmod +x '\(path)/fault'".sh()
 
-    let _ = "cp .build/release/Fault '\(path)/FaultInstall/fault'".sh()
+    let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".sh()
     let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".sh()
     let _ = "cp -r Submodules/Pyverilog '\(path)/FaultInstall/Pyverilog'".sh()
 

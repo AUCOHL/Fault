@@ -173,7 +173,7 @@ class Simulator {
                 print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
             }
 
-            var futureList: [Future<Coverage>] = []
+            var futureList: [Future] = []
             var testVectors: [TestVector] = []
             
 
@@ -198,7 +198,7 @@ class Simulator {
             let tempDir = "\(NSTemporaryDirectory())"
 
             for vector in testVectors {
-                let future = Future<Coverage> {
+                let future = Future {
                     do {
                         let sa0 =
                             try Simulator.pseudoRandomVerilogGeneration(
@@ -248,7 +248,7 @@ class Simulator {
             }
 
             for (i, future) in futureList.enumerated() {
-                let coverLists = future.value
+                let coverLists = future.value as! Coverage
                 for cover in coverLists.sa0 {
                     sa0Covered.insert(cover)
                 }

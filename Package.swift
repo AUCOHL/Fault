@@ -17,9 +17,12 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "Fault",
-            dependencies: ["PythonKit", "CommandLineKit", "Defile"]),
+            dependencies: ["PythonKit", "CommandLineKit", "Defile", "CThreadPool"],
+            path: "Sources"
+        ),
         .testTarget(
             name: "FaultTests",
-            dependencies: ["Fault"]),
+            dependencies: ["Fault"]
+        )
     ]
 )

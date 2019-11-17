@@ -8,11 +8,10 @@ RUN apt-get install -y git curl
 
 # Install Python
 RUN rm -rf /usr/lib/python2.7/site-packages
-RUN apt-get install -y python2.7 python2.7-dev
-RUN apt-get install python3 python3-dev
+RUN apt-get install -y python python-dev python-pip
+RUN apt-get install -y python3 python3-dev python3-pip
 
 # Install jinja
-RUN apt-get install -y python-pip python3-pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install jinja2
 
