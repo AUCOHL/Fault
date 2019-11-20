@@ -14,6 +14,8 @@ func main(arguments: [String]) -> Int32 {
     let defaultCeiling = "1000"
     let defaultRandGen = "swift"
     let env = ProcessInfo.processInfo.environment
+    
+    let installed = env["FAULT_INSTALL_PATH"] != nil
 
     let version = BoolOption(
         shortFlag: "V",
@@ -41,15 +43,15 @@ func main(arguments: [String]) -> Int32 {
     let cellsOption = StringOption(
         shortFlag: "c",
         longFlag: "cellModel",
-        helpMessage: ".v file describing the cells (Required.)"
+        helpMessage: ".v file describing the cells \(installed ? "(Default: osu035)" : "(Required.)")"
     )
     cli.addOptions(cellsOption)
 
     let osu035 = BoolOption(
         longFlag: "osu035",
-        helpMessage: "Use the Oklahoma State University standard cell library for -c."
+        helpMessage: "Use the Oklahoma State University standard cell library for -c. (Legacy, now used by default.)"
     )
-    if env["FAULT_INSTALL_PATH"] != nil {
+    if installed {
         cli.addOptions(osu035)
     }
 
@@ -173,12 +175,14 @@ func main(arguments: [String]) -> Int32 {
 
     var cellsFile = cellsOption.value
 
-    if osu035.value {
-        if cellsFile != nil {
-            cli.printUsage()
-            return EX_USAGE
+    if installed {
+        if cellsFile == nil {
+            cellsFile = env["FAULT_INSTALL_PATH"]! + "/FaultInstall/Tech/osu035/osu035_stdcells.v"
         }
-        cellsFile = env["FAULT_INSTALL_PATH"]! + "/FaultInstall/Tech/osu035/osu035_stdcells.v"
+    }
+
+    if osu035.value {
+        print("[WARNING] --osu035 flag is deprecated and may be removed in a future vesion.")
     }
 
     guard let cells = cellsFile else {

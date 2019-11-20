@@ -1,9 +1,6 @@
 # 🧪 Fault
 Fault is an automatic test pattern generator for netlists that includes scan chain stitching, synthesis scripts and a number of other convenience features.
 
-## Note
-There is an unresolved issue on Linux where some larger designs lock up at ~500 test vectors generated. This does not appear to be an issue on macOS.
-
 # Quick Usage Instructions
 A Docker image is available for Fault:
 ```sh
@@ -89,6 +86,8 @@ The GNU General Public License v3 (or later, at your option). See 'License'.
 
 ### Installing
 #### macOS
+macOS 10.13 High Sierra or higher is required.
+
 Install the latest Xcode from the Mac App Store.
 
 Use [Homebrew](https://brew.sh).
@@ -116,7 +115,11 @@ sudo ./iverilog_build.swift
 ## Installation
 Type `git submodule update --init --recursive` in the terminal to initialize submodules.
 
-Then simply invoke `swift install.swift`. This will install it to `~/bin` by default, type `swift install.swift help me` for more options.
+Then simply invoke `swift install.swift`. This will install it to `~/bin` by default. You can customize this installation directory by executing `INSTALL_DIR=<path> swift install.swift`.
 
-## Usage without installing
-A special consideration is osu035 will not be used automatically. 
+You may need to add `~/bin` to path depending on your OS.
+
+To uninstall this, you can simply invoke `fault uninstall`.
+
+## Usage without installation
+Osu035 will not be used automatically and `fault uninstall`, `fault -V` will not function.

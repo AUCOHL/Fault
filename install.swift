@@ -2,23 +2,20 @@
 import Foundation
 
 extension String {
-    func sh() -> Int {
-        let task = Process()
-        task.launchPath = "/usr/bin/env"
-        task.arguments = ["sh", "-c", self]
-        task.launch()
-        task.waitUntilExit()
-        return Int(task.terminationStatus)
-    }
     func shOutput() -> (terminationStatus: Int32, output: String) {
         let task = Process()
-        task.launchPath = "/usr/bin/env"
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = ["sh", "-c", self]
 
         let pipe = Pipe()
         task.standardOutput = pipe
 
-        task.launch()
+        do {
+            try task.run()
+        } catch {
+            print("Could not launch task `\(self)': \(error)")
+            exit(EX_UNAVAILABLE)
+        }
         task.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -28,7 +25,8 @@ extension String {
     }
 }
 
-let gitVersion = "git describe --always --tags".shOutput().output
+let gitVersion = "git describe --always --tags".shOutput(
+    ).output.trimmingCharacters(in: .whitespacesAndNewlines)
 
 enum Action {
     case install
@@ -38,26 +36,9 @@ enum Action {
 let env = ProcessInfo.processInfo.environment
 var action: Action = .install
 var path = env["INSTALL_DIR"] ?? "\(env["HOME"]!)/bin"
-var opt = true
 
-if CommandLine.arguments.count == 1 {
-}
-else if CommandLine.arguments.count == 2 {
-    // second argument is path
-    path = CommandLine.arguments[1]
-}
-else if CommandLine.arguments.count == 3 {
-    // second argument is path, third argument is 'uninstall'
-    path = CommandLine.arguments[1]
-    if CommandLine.arguments[2] != "uninstall" {
-        opt = false
-    } else {
-        action = .uninstall
-    }
-}
-
-if !opt {
-    print("Usage: \(CommandLine.arguments[0]) <path (optional if installing)> <uninstall (optional)>")
+if CommandLine.arguments.count > 1 {
+    print("Usage: INSTALL_DIR=<path>(optional) \(CommandLine.arguments[0])")
     exit(EX_USAGE)
 }
 
@@ -98,19 +79,19 @@ if action == .install {
     print("Installing Fault (\(gitVersion))...")
 
     print("Compiling...")
-    let compilationResult = "swift build".sh()
+    let compilationResult = "swift build".shOutput().terminationStatus
     if compilationResult != EX_OK {
         print("Compiling Fault failed.")
         exit(EX_DATAERR)
     }
 
-    let folder = "mkdir -p '\(path)'".sh()
+    let folder = "mkdir -p '\(path)'".shOutput().terminationStatus
     if folder != EX_OK {
         print("Could not create folder.")
         exit(EX_CANTCREAT)
     }
 
-    let internalFolder = "mkdir -p '\(path)/FaultInstall'".sh()
+    let internalFolder = "mkdir -p '\(path)/FaultInstall'".shOutput().terminationStatus
     if internalFolder != EX_OK {
         print("Could not create folder.")
         exit(EX_CANTCREAT)
@@ -120,35 +101,34 @@ if action == .install {
     #!/bin/sh
 
     export FAULT_INSTALL_PATH="\(path)"
+    export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
     export FAULT_VER="\(gitVersion)"
 
-    "\(path)/FaultInstall/fault" $@
+    if [ "$1" == "uninstall" ]; then
+        echo "Uninstalling Fault…"
+        echo "Removing installation…"
+        set -x
+        rm -rf "$FAULT_INSTALL"
+        set +x
+        echo "Removing fault script…"
+        set -x
+        rm -f "$0"
+        set +x
+        echo "Done."
+        exit 0
+    fi
+
+    "$FAULT_INSTALL/fault" $@
     rm -f parser.out parsetab.py
     rm -rf __pycache__
     """
 
-    let _ = "echo '\(launchScript)' > '\(path)/fault'".sh()
-    let _ = "chmod +x '\(path)/fault'".sh()
+    let _ = "echo '\(launchScript)' > '\(path)/fault'".shOutput().terminationStatus
+    let _ = "chmod +x '\(path)/fault'".shOutput().terminationStatus
 
-    let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".sh()
-    let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".sh()
-    let _ = "cp -r Submodules/Pyverilog '\(path)/FaultInstall/Pyverilog'".sh()
+    let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
+    let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".shOutput().terminationStatus
+    let _ = "cp -r Submodules/Pyverilog '\(path)/FaultInstall/Pyverilog'".shOutput().terminationStatus
 
     print("Installed.")
-} else {
-    print("Uninstalling Fault (\(gitVersion))...")
-
-    let internalFolder = "rm -rf '\(path)/FaultInstall'".sh()
-    if internalFolder != EX_OK {
-        print("Could not delete folder.")
-        exit(EX_NOINPUT)
-    }
-
-    let shScript = "rm -f '\(path)/fault'".sh()
-    if shScript != EX_OK {
-        print("Could not delete script.")
-        exit(EX_NOINPUT)
-    }
-
-    print("Uninstalled.")
 }

@@ -1,30 +1,30 @@
 import Foundation
 
 extension String {
-    func sh() -> Int {
-        let task = Process()
-        task.launchPath = "/usr/bin/env"
-        task.arguments = ["sh", "-c", self]
-        task.launch()
-        task.waitUntilExit()
-        return Int(task.terminationStatus)
-    }
-    
     func shOutput() -> (terminationStatus: Int32, output: String) {
         let task = Process()
-        task.launchPath = "/usr/bin/env"
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = ["sh", "-c", self]
 
         let pipe = Pipe()
         task.standardOutput = pipe
 
-        task.launch()
+        do {
+            try task.run()
+        } catch {
+            print("Could not launch task `\(self)': \(error)")
+            exit(EX_UNAVAILABLE)
+        }
         task.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: data, encoding: .utf8)
 
         return (terminationStatus: task.terminationStatus, output: output!)
+    }
+
+    func sh() -> Int {
+        return Int(self.shOutput().terminationStatus)
     }
 
     func uniqueName(_ number: Int) -> String {
