@@ -104,7 +104,7 @@ if action == .install {
     export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
     export FAULT_VER="\(gitVersion)"
 
-    if [ "$1" == "uninstall" ]; then
+    if [ "vuninstall" == "v$1" ]; then
         echo "Uninstalling Fault…"
         echo "Removing installation…"
         set -x
