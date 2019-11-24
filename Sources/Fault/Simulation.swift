@@ -21,7 +21,9 @@ class Simulator {
         outputs: [Port],
         stuckAt: Int,
         cleanUp: Bool,
-        filePrefix: String = "."
+        filePrefix: String = ".",
+        using iverilogExecutable: String,
+        with vvpExecutable: String
     ) throws -> [String] {
         var portWires = ""
         var portHooks = ""
@@ -113,14 +115,18 @@ class Simulator {
         }
 
         let aoutName = "\(folderName)/a.out"
+        
+        let env = ProcessInfo.processInfo.environment
+        let iverilogExecutable = env["FAULT_IVERILOG"] ?? "iverilog"
+        let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 
         let iverilogResult =
-            "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
 
-        let vvpTask = "vvp \(aoutName)".shOutput()
+        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
 
         if vvpTask.terminationStatus != EX_OK {
             exit(vvpTask.terminationStatus)
@@ -150,7 +156,9 @@ class Simulator {
         minimumCoverage: Float,
         ceiling: Int,
         randomGenerator: RandomGenerator,
-        sampleRun: Bool
+        sampleRun: Bool,
+        using iverilogExecutable: String,
+        with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
         
         var testVectorHash: Set<TestVector> = []
@@ -214,7 +222,9 @@ class Simulator {
                                 outputs: outputs,
                                 stuckAt: 0,
                                 cleanUp: !sampleRun,
-                                filePrefix: tempDir
+                                filePrefix: tempDir,
+                                using: iverilogExecutable,
+                                with: vvpExecutable
                             )
 
                         let sa1 =
@@ -231,7 +241,9 @@ class Simulator {
                                 outputs: outputs,
                                 stuckAt: 1,
                                 cleanUp: !sampleRun,
-                                filePrefix: tempDir
+                                filePrefix: tempDir,
+                                using: iverilogExecutable,
+                                with: vvpExecutable
                             )
 
                         return Coverage(sa0: sa0, sa1: sa1)
@@ -297,7 +309,9 @@ class Simulator {
         clock: String,
         reset: String,
         resetActive: Active = .low,
-        testing: String
+        testing: String,
+        using iverilogExecutable: String,
+        with vvpExecutable: String
     ) throws -> Bool {
         let tempDir = "\(NSTemporaryDirectory())"
 
@@ -378,12 +392,12 @@ class Simulator {
         let aoutName = "\(folderName)/a.out"
 
         let iverilogResult =
-            "iverilog -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
 
-        let vvpTask = "vvp \(aoutName)".shOutput()
+        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
 
         if vvpTask.terminationStatus != EX_OK {
             throw "Failed to run vvp."

@@ -112,7 +112,7 @@ func synth(arguments: [String]) -> Int32 {
     let script = Synthesis.script(for: module, in: file, cutting: false, liberty: libertyFile, output: output)
 
     let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
-    let result = "echo '\(script)' | yosys".sh()
+    let result = "echo '\(script)' | '\(yosysExecutable)'".sh()
 
     if result != EX_OK {
         fputs("A yosys error has occurred.\n", stderr);

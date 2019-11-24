@@ -105,11 +105,10 @@ Notice how Icarus Verilog is excluded. This is because as of the time of writing
 
 `sudo apt-get install autoconf make gperf flex bison`
 
-Then just run these in a terminal instance.
+Then just run this in a terminal instance:
 
 ```bash
-EXEC_PREFIX=<wherever, i prefer /usr/local and it will be /usr/local by default but you do you>
-sudo ./iverilog_build.swift
+EXEC_PREFIX=</usr/local/bin> sudo ./iverilog_build.swift
 ```
 
 ## Installation

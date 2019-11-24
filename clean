@@ -1,7 +1,0 @@
-#!/bin/sh
-swift package clean
-rm -rf __pycache__
-rm -rf Fault.xcodeproj
-rm -rf Netlists
-rm *.out *.vcd
-rm parsetab.py

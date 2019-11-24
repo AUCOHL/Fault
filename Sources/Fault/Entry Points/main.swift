@@ -4,6 +4,12 @@ import PythonKit
 import Defile
 import CoreFoundation
 
+var env = ProcessInfo.processInfo.environment
+let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
+let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
+let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
+let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
+
 func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -13,7 +19,6 @@ func main(arguments: [String]) -> Int32 {
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
     let defaultRandGen = "swift"
-    let env = ProcessInfo.processInfo.environment
     
     let installed = env["FAULT_INSTALL_PATH"] != nil
 
@@ -294,7 +299,9 @@ func main(arguments: [String]) -> Int32 {
             minimumCoverage: tvMinimumCoverage,
             ceiling: tvCeiling,
             randomGenerator: randomGenerator,
-            sampleRun: sampleRun.value
+            sampleRun: sampleRun.value,
+            using: iverilogExecutable,
+            with: vvpExecutable
         )
 
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime

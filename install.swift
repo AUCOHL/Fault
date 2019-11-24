@@ -1,6 +1,12 @@
 #!/usr/bin/env swift
 import Foundation
 
+var env = ProcessInfo.processInfo.environment
+let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
+let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
+let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
+let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
+
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
         let task = Process()
@@ -26,14 +32,13 @@ extension String {
 }
 
 let gitVersion = "git describe --always --tags".shOutput(
-    ).output.trimmingCharacters(in: .whitespacesAndNewlines)
+).output.trimmingCharacters(in: .whitespacesAndNewlines)
 
 enum Action {
     case install
     case uninstall
 }
 
-let env = ProcessInfo.processInfo.environment
 var action: Action = .install
 var path = env["INSTALL_DIR"] ?? "\(env["HOME"]!)/bin"
 
@@ -45,7 +50,7 @@ if CommandLine.arguments.count > 1 {
 if action == .install {
     print("Checking dependencies...")
 
-    let iverilog = "iverilog -V".shOutput()
+    let iverilog = "'\(iverilogExecutable)' -B '\(iverilogBase)' -V".shOutput()
     if iverilog.terminationStatus != EX_OK {
         print("Warning: Icarus Verilog does not seem to be installed.")
     } else {
@@ -65,7 +70,7 @@ if action == .install {
         }
     }
 
-    let yosys = "yosys -V".shOutput()
+    let yosys = "'\(yosysExecutable)' -V".shOutput()
     if yosys.terminationStatus != EX_OK {
         print("Warning: Yosys does not seem to be installed.")
     } else {
@@ -104,7 +109,7 @@ if action == .install {
     export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
     export FAULT_VER="\(gitVersion)"
 
-    if [ "vuninstall" == "v$1" ]; then
+    if [ "uninstall" = "$1" ]; then
         echo "Uninstalling Fault…"
         echo "Removing installation…"
         set -x

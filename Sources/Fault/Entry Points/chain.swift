@@ -489,7 +489,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
         // MARK: Yosys
         print("Resynthesizing with yosys…")
-        let result = "echo '\(script)' | yosys > /dev/null".sh()
+        let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
         if result != EX_OK {
             fputs("A yosys error has occurred.\n", stderr)
@@ -541,7 +541,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clock: clockOpt.value!,
                 reset: resetOpt.value!,
                 resetActive: resetActiveLow.value ? .low : .high,
-                testing: testingName
+                testing: testingName,
+                using: iverilogExecutable,
+                with: vvpExecutable
             )
 
             if (verified) {
