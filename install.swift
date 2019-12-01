@@ -133,7 +133,6 @@ if action == .install {
 
     let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
     let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".shOutput().terminationStatus
-    let _ = "cp -r Submodules/Pyverilog '\(path)/FaultInstall/Pyverilog'".shOutput().terminationStatus
 
     print("Installed.")
 }

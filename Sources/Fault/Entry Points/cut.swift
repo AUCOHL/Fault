@@ -4,7 +4,6 @@ import PythonKit
 import Defile
 
 func cut(arguments: [String]) -> Int32 {
-    let env = ProcessInfo.processInfo.environment
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let help = BoolOption(
@@ -49,18 +48,7 @@ func cut(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
-    let sys = Python.import("sys")
-    sys.path.append(
-        FileManager().currentDirectoryPath + "/Submodules/Pyverilog"
-    )
-
-    if let installPath = env["FAULT_INSTALL_PATH"] {
-        sys.path.append(installPath + "/FaultInstall/Pyverilog")
-    }
-
-    let pyverilogVersion = Python.import("pyverilog.utils.version")
-    print("Using Pyverilog v\(pyverilogVersion.VERSION)")
-
+    
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     let Node = Python.import("pyverilog.vparser.ast")
@@ -125,8 +113,8 @@ func cut(arguments: [String]) -> Int32 {
                     return EX_DATAERR
                 }
 
-                ports.append(Node.Port(instanceName, Python.None, Python.None))
-                ports.append(Node.Port(outputName, Python.None, Python.None))
+                ports.append(Node.Port(instanceName, Python.None, Python.None, Python.None))
+                ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
 
                 declarations.append(Node.Input(instanceName))
                 declarations.append(Node.Output(outputName))

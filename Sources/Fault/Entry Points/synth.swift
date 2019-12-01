@@ -61,16 +61,7 @@ func synth(arguments: [String]) -> Int32 {
     }
 
     // MARK: Importing Python and Pyverilog
-    let sys = Python.import("sys")
-    sys.path.append(FileManager().currentDirectoryPath + "/Submodules/Pyverilog")
-
-    if let installPath = env["FAULT_INSTALL_PATH"] {
-        sys.path.append(installPath + "/FaultInstall/Pyverilog")
-    }
-
-    let pyverilogVersion = Python.import("pyverilog.utils.version")
-    print("Using Pyverilog v\(pyverilogVersion.VERSION)")
-
+    
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // Get topModule name

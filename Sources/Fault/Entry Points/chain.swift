@@ -31,9 +31,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     cli.addOptions(ignored)
 
     let verifyOpt = StringOption(
-        shortFlag: "v",
-        longFlag: "verifyWith",
-        helpMessage: "Verify scan chain using given cell file."
+        shortFlag: "c",
+        longFlag: "cellModel",
+        helpMessage: "Verify scan chain using given cell model."
     )
     cli.addOptions(verifyOpt)
 
@@ -80,6 +80,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         cli.addOptions(option)
         names[name] = (default: name, option: option)
     }
+
 
     do {
         try cli.parse()
@@ -152,18 +153,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
 
     // MARK: Importing Python and Pyverilog
-    let sys = Python.import("sys")
-    sys.path.append(
-        FileManager().currentDirectoryPath + "/Submodules/Pyverilog"
-    )
-
-    if let installPath = env["FAULT_INSTALL_PATH"] {
-        sys.path.append(installPath + "/FaultInstall/Pyverilog")
-    }
-
-    let pyverilogVersion = Python.import("pyverilog.utils.version")
-    print("Using Pyverilog v\(pyverilogVersion.VERSION)")
-
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     let Node = Python.import("pyverilog.vparser.ast")
@@ -211,9 +200,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             var previousOutput = inputIdentifier
 
             let ports = Python.list(definition.portlist.ports)
-            ports.append(Node.Port(testingName, Python.None, Python.None))
-            ports.append(Node.Port(inputName, Python.None, Python.None))
-            ports.append(Node.Port(outputName, Python.None, Python.None))
+            ports.append(Node.Port(testingName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
             definition.portlist.ports = Python.tuple(ports)
 
             var counter = 0

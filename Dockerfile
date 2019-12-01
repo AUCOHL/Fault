@@ -15,6 +15,9 @@ RUN apt-get install -y python3 python3-dev python3-pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install jinja2
 
+# Install pyverilog
+RUN python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/develop.zip
+
 # Install Yosys
 RUN apt-get install -y yosys
 
@@ -29,8 +32,10 @@ ENV FAULT_IVERILOG="/share/iverilog/bin/iverilog"
 ENV FAULT_VVP="/share/iverilog/bin/vvp"
 ENV FAULT_YOSYS="yosys"
 ENV FAULT_IVL_BASE="/share/iverilog/lib/ivl"
+
 # For Pyverilog:
 RUN ln -s $FAULT_IVL_BASE "/usr/local/lib/ivl" 
+
 WORKDIR /share
 COPY . /share/Fault
 WORKDIR /share/Fault

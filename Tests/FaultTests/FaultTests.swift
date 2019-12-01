@@ -1,36 +1,92 @@
 import XCTest
 import class Foundation.Bundle
 
+extension Process {
+  func startAndBlock() throws {
+    try self.launch()
+    self.waitUntilExit()
+  }
+}
+
 final class FaultTests: XCTestCase {
-    func ensureEX_OK(moduleName: String, fileName: String, cells: String, perFault: Bool = false) throws {
+    func testFull() throws {
         guard #available(macOS 10.13, *) else {
             return
         }
 
-        let fooBinary = productsDirectory.appendingPathComponent("Fault")
+        let binary = productsDirectory.appendingPathComponent("Fault")
 
-        let process = Process()
-        process.executableURL = fooBinary
-        process.arguments = ["-c", cells, "-t", moduleName, "-o", "/dev/null", fileName]
+        let newProcess = { ()-> Process in
+          let new = Process()
+          new.executableURL = binary
+          return new
+        }
 
-        // let pipe = Pipe()
-        // process.standardOutput = pipe
+        let liberty = "Tech/osu035/osu035_stdcells.lib"
+        let models = "Tech/osu035/osu035_stdcells.v"
 
-        try process.run()
-        process.waitUntilExit()
+        let fileName = "RTL/Seq/spm.v"
+        let topModule = "SPM"
+        let clock = "clk"
+        let reset = "rst"
+        
+        let fileSynth = "Netlists/" + fileName + ".netlist.v"
+        let fileCut = fileSynth + ".cut.v"
+        let fileJson = fileCut + ".tv.json"
+        let fileChained = fileSynth + ".chained.v"
 
-        // let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        // let _ = String(data: data, encoding: .utf8)
+        // 0. Synth
+        var process = newProcess()
+        process.arguments = ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName]
+        try process.startAndBlock()
+
 
         XCTAssertEqual(process.terminationStatus, 0)
-    }
+        print("1/5")
+        // 1. Cut
+        process = newProcess()
+        process.arguments = ["cut", "-o", fileCut, fileSynth]
+        try process.startAndBlock()
 
-    func testCombinational() throws {
-      try ensureEX_OK(moduleName: "PlusOne", fileName: "Netlists/Tests/RTL/PlusOne.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
-    }
 
-    func testSequential() throws {
-      try ensureEX_OK(moduleName: "SuccessiveApproximationControl", fileName: "Netlists/Tests/RTL/SAR.v.netlist.v", cells: "Tech/osu035/osu035_stdcells.v")
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        // 2. Simulate
+        process = newProcess()
+        process.arguments = ["-c", models, "-o", fileJson, fileCut]
+        try process.startAndBlock()
+        print("2/5")
+
+
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        // 3. Chain
+        process = newProcess()
+        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, fileSynth]
+        print(process.arguments!.joined(separator: " "))
+        try process.startAndBlock()
+        print("3/5")
+
+
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        // 4. Assemble
+        process = newProcess()
+        process.arguments = ["asm", "-o", "/dev/null", fileJson, fileChained]
+        try process.startAndBlock()
+        print("4/5")
+
+
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        // 5. Compact
+        process = newProcess()
+        process.arguments = ["compact", "-o", "/dev/null", fileJson]
+        try process.startAndBlock()
+        print("5/5")
+
+
+        XCTAssertEqual(process.terminationStatus, 0)
     }
 
     /// Returns path to the built products directory.
@@ -46,7 +102,6 @@ final class FaultTests: XCTestCase {
     }
 
     static var allTests = [
-        ("testCombinational", testCombinational),
-        ("testSequential", testSequential)
+        ("testFull", testFull)
     ]
 }
