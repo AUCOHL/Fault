@@ -1,36 +1,26 @@
 # 🧪 Fault
 Fault is an automatic test pattern generator for netlists that includes scan chain stitching, synthesis scripts and a number of other convenience features.
 
-# Quick Usage Instructions
-A Docker image is available for Fault:
-```sh
-docker run -tiv `pwd`:`pwd` -w `pwd` --rm cloudv/fault:latest fault -V
-```
+# Quick Setup/Walkthrough
+You may refer to the [wiki](https://github.com/Cloud-V/Fault/wiki) for quick setup instructions (and a small walkthrough!) if you're into that.
 
-For quick further runs, you can add this to your shell's profile:
-```sh
-alias fault='docker run -tiv `pwd`:`pwd` -w `pwd` --rm cloudv/fault:latest fault'
-```
-
-Then you can just invoke `fault -V`.
-
-## Running
-### Subcommands
-#### synth
+# Running
+## Subcommands
+### synth
 Synth is a synthesis script included with Fault that generates both a netlist and a cut-away version.
 
 To run it, `fault synth --top <your-top-module> --liberty <your-liberty-file> <your-file>`. You can optionally omit` --liberty` where osu035 will be used.
 
 For more options, you can invoke `fault synth --help`.
 
-#### cut
+### cut
 `fault cut <your-netlist>`
 
 This exposes the D-flipflops as ports for use with the main script.
 
 For more options, you can invoke `fault cut --help`.
 
-#### main
+### main
 `fault --cellModel <your-cell-models> <your-file>`, `--cellModel` behaving similar to `--liberty` in synth.
 
 A set of assumptions are made about the input file:
@@ -42,7 +32,7 @@ Generated test vectors are printed to stdout by default, but you can use `-o <fi
 
 For more options, you can invoke `fault --help`.
 
-### chain
+## chain
 `fault chain --liberty <your-liberty-file> --clock <clockName> --reset <resetName> <--activeLow> <your-file>`, `--liberty` behaving identical to Synth.
 
 Chain is another synthesis script that links registers together for scan insertion. It takes all the assumptions made in the main program but the last, and one more:
@@ -56,12 +46,12 @@ You can have Chain automagically verify its generated scanchain-- see the help f
 
 For more options, you can invoke `fault chain --help`.
 
-### asm
+## asm
 `fault asm <test vector json> <chained netlist>`, in any order, will assemble a .bin file for use with `$readmemb`.
 
 For more options, you can invoke `fault asm --help`.
 
-### compact
+## compact
 `fault compact <test vector json>`
 
 This performs static compaction on the generated test vectors by reducing the test vectors count while keeping the same coverage.
@@ -77,48 +67,5 @@ The GNU General Public License v3 (or later, at your option). See 'License'.
 - Shinya Takamaeda-Yamazaki: Pyverilog: A Python-based Hardware Design Processing Toolkit for Verilog HDL, 11th International Symposium on Applied Reconfigurable Computing (ARC 2015) (Poster), Lecture Notes in Computer Science, Vol.9040/2015, pp.451-460, April 2015.
 [Paper](http://link.springer.com/chapter/10.1007/978-3-319-16214-0_42)
 
-# Building from source/local installation
-## Dependencies
-* Swift 5.0+
-* Python 3.6+ with PIP
-* Yosys 0.7+
-* Icarus Verilog 10.2+
-
-### Installing
-#### macOS
-macOS 10.13 High Sierra or higher is required.
-
-Install the latest Xcode from the Mac App Store.
-
-Use [Homebrew](https://brew.sh).
-
-`brew install python yosys icarus-verilog`
-
-#### Debian-based Linuces (e.g. Ubuntu)
-Using apt:
-
-`sudo apt-get install git clang python3 python3-dev yosys`
-
-Then install the Swift programming language: instructions are on [swift.org](https://swift.org/download/#using-downloads).
-
-Notice how Icarus Verilog is excluded. This is because as of the time of writing, there is no version of Swift on a version of Ubuntu that has Icarus Verilog 10.2 or above. Which is ridiculous. You'll have to build it from source. First, grab these dev dependencies:
-
-`sudo apt-get install autoconf make gperf flex bison`
-
-Then just run this in a terminal instance:
-
-```bash
-EXEC_PREFIX=</usr/local/bin> sudo ./iverilog_build.swift
-```
-
-## Installation
-Type `git submodule update --init --recursive` in the terminal to initialize submodules.
-
-Then simply invoke `swift install.swift`. This will install it to `~/bin` by default. You can customize this installation directory by executing `INSTALL_DIR=<path> swift install.swift`.
-
-You may need to add `~/bin` to path depending on your OS.
-
-To uninstall this, you can simply invoke `fault uninstall`.
-
-## Usage without installation
-Osu035 will not be used automatically and `fault uninstall`, `fault -V` will not function.
+# Detailed installation instructions
+You can try [INSTALLING.md](INSTALLING.md) for full installation instructions.
