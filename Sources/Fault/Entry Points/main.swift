@@ -126,6 +126,7 @@ func main(arguments: [String]) -> Int32 {
         print("To take a look at scan chain options, try 'fault chain --help'")
         print("To take a look at test vector assembly options, try 'fault asm --help'")
         print("To take a look at test vector static compaction options, try 'fault compact --help'")
+        print("To take a look at JTAG port options, try 'fault tap --help'")
         return EX_OK
     }
 
@@ -344,6 +345,11 @@ if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
     exit(compactTestVectors(arguments: arguments))
-}  else {
+} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "tap"{
+    arguments[0] = "\(arguments[0]) \(arguments[1])"
+    arguments.remove(at: 1)
+    exit(JTAGCreate(arguments: arguments))
+}
+  else {
     exit(main(arguments: arguments))
 }
