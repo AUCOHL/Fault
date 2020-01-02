@@ -48,7 +48,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     
     let output = filePath.value ?? "\(file).compacted.json"
     // Parse JSON File
-     do {
+    do {
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
         guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
             fputs("File '\(file)' is invalid.\n", stderr)
@@ -65,8 +65,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
             )
         )
 
-        guard let string = String(data: jsonData, encoding: .utf8)
-        else {
+        guard let string = String(data: jsonData, encoding: .utf8) else {
             throw "Could not create utf8 string."
         }
 

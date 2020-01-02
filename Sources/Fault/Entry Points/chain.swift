@@ -534,7 +534,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
-
+            print("done")
             if (verified) {
                 print("Scan chain verified successfully.")
             } else {

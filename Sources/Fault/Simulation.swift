@@ -174,7 +174,7 @@ class Simulator {
         var totalTVAttempts = 0
         var tvAttempts = initialVectorCount
         
-        let rng: URNG = RandGenFactory.shared().getRandGen(type:randomGenerator  ) // LFSR(nbits: 64)
+        let rng: URNG = RandGenFactory.shared().getRandGen(type:randomGenerator) // LFSR(nbits: 64)
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -392,11 +392,195 @@ class Simulator {
         let aoutName = "\(folderName)/a.out"
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
-        if iverilogResult != EX_OK {
-            exit(Int32(iverilogResult))
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
+        
+        
+        if iverilogResult.terminationStatus != EX_OK {
+            fputs("An iverilog error has occurred: \n", stderr)
+            fputs(iverilogResult.output, stderr)
+            exit(Int32(iverilogResult.terminationStatus))
+        }
+        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
+
+        if vvpTask.terminationStatus != EX_OK {
+            throw "Failed to run vvp."
         }
 
+        return vvpTask.output.contains("SUCCESS_STRING")
+    }
+
+    static func simulate(
+        verifying module: String,
+        in file: String,
+        with cells: String,
+        ports: [String: Port],
+        inputs: [Port],
+        outputs: [Port],
+        dffCount: Int,
+        clock: String,
+        reset: String,
+        resetActive: Active = .low,
+        tms: String,
+        tdi: String,
+        tck: String,
+        tdo: String,
+        trst: String,
+        using iverilogExecutable: String,
+        with vvpExecutable: String
+    ) throws -> Bool {
+        let tempDir = "\(NSTemporaryDirectory())"
+
+        var folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let _ = "mkdir -p '\(folderName)'".sh()
+        // defer {
+        //     let _ = "rm -rf '\(folderName)'".sh()
+        // }
+
+        var portWires = ""
+        var portHooks = ""
+        for (rawName, port) in ports {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portHooks += ".\(name) ( \(name) ) , "
+        }
+
+        var inputInit = ""
+        var inputAssignment = ""
+
+        for input in inputs {
+            let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
+            if input.name == reset {
+                inputInit += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
+            } else if input.name == tms {
+                inputInit += "        \(name) = 1 ;\n"
+            }
+            else {
+                inputInit += "        \(name) = 0 ;\n"
+                if (input.name != tck && input.name != clock && input.name != trst){
+                    inputAssignment += "        \(name) = \(Int.random(in: 0...1)) ;\n"
+                }
+            }
+        }
+        var serial = ""
+        for _ in 0..<dffCount {
+            serial += "\(Int.random(in: 0...1))"
+        }
+
+        let bench = """
+        \(String.boilerplate)
+        `include "\(cells)"
+        `include "\(file)"
+
+        module testbench;
+        \(portWires)
+            
+            always #1 \(clock) = ~\(clock);
+            always #1 \(tck) = ~\(tck);
+
+            \(module) uut(
+                \(portHooks.dropLast(2))
+            );
+
+            integer i;
+
+            wire[3:0] extest = 4'b 0000;
+            wire[3:0] samplePreload = 4'b 0001;
+            wire[3:0] idcode = 4'b 0010;
+            wire[3:0] bypass = 4'b 1111;
+            
+            wire[3:0] ir_reg = 4'b 0101;
+            wire[\(dffCount - 1):0] serializable =
+                \(dffCount)'b\(serial);
+            reg[\(dffCount - 1):0] serial;
+
+            initial begin
+                $dumpfile("RTL/jtagTests/dut.vcd");
+                $dumpvars(0, testbench);
+        \(inputInit)
+                #10;
+                \(reset) = ~\(reset);
+                \(trst) = 1;        
+                #2;
+                /*
+                    Test Sample/Preload Instruction
+                */
+                \(tms) = 1;   // test logic reset state
+                #10;
+                \(tms) = 0;  // run-test idle state
+                #2;
+                \(tms) = 1;  // select-DR state
+                #2;
+                \(tms) = 1;  // select-IR state
+                #2;
+                \(tms) = 0;  // capture IR
+                #2;
+                \(tms) = 0;  // Shift IR state
+                #2
+
+                // shift new instruction on tdi line
+                for (i = 0; i < 4; i = i + 1) begin
+                    \(tdi) = samplePreload[i];
+                    if(i == 3) begin
+                        \(tms) = 1;   // exit-ir
+                    end
+                    #2;
+                end
+
+                \(tms) = 1; // update-ir 
+                #2;
+                \(tms) = 0; // run test-idle
+                #4;
+                if (uut.sample_preload_select_o != 1) begin
+                    $error("LOADING SAMPLE/PRELOAD INST FAILED");
+                    $finish;
+                end 
+                #2;
+
+                \(tms) = 1;   // test logic reset 
+                #10;
+                \(tms) = 0;   // run-test idle 
+                #2;
+                \(tms) = 1;  // select-DR 
+                #2;
+                \(tms) = 0;  // capture-DR 
+                \(inputAssignment)    
+                #4;
+                \(tms) = 0;  // shift-DR 
+                \(tdi) = 0;
+                #2;
+                for (i = 0; i < \(dffCount); i = i + 1) begin
+                    tdi = 0;
+                    #2;
+                end
+                for (i = 0; i < \(dffCount); i = i + 1) begin  // observe I/O pins 
+                    serial[i] = \(tdo);
+                    #2;
+                end
+                #1000;
+                $display("SUCCESS_STRING");
+                $finish;
+            end
+        endmodule
+        """
+        folderName = "RTL/jtagTests"
+
+        let tbName = "\(folderName)/tb.sv"
+
+        try File.open(tbName, mode: .write) {
+            try $0.print(bench)
+        }
+
+        let aoutName = "\(folderName)/a.out"
+
+        let iverilogResult =
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
+        
+
+        if iverilogResult.terminationStatus != EX_OK {
+            fputs("An iverilog error has occurred: \n", stderr)
+            fputs(iverilogResult.output, stderr)
+            exit(Int32(iverilogResult.terminationStatus))
+        }
         let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
 
         if vvpTask.terminationStatus != EX_OK {

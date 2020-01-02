@@ -2,9 +2,7 @@ import Foundation
 import PythonKit
 
 class JTAGCreator {
-
     var name: String
-
     private var Node: PythonObject
 
     init(
@@ -23,27 +21,23 @@ class JTAGCreator {
         tdo: String,
         trst: String
     )-> ( tapModule: PythonObject, wires: [PythonObject]) {
-        
-
         let tapPads = jtagInfo.pads
         let tapStates = jtagInfo.tapStates
         let selectSignals = jtagInfo.selectSignals 
         let tdiSignals = jtagInfo.tdiSignals
         
-        var wireDeclarations: [PythonObject] = [ 
+        let wireDeclarations: [PythonObject] = [ 
+            Node.Wire(tapPads.tdo),
             Node.Wire(tapPads.tdoEn),
-            Node.Wire(tapStates.shiftDataReg),
-            Node.Wire(tapStates.pauseDataReg),
-            Node.Wire(tapStates.updateDataReg),
-            Node.Wire(tapStates.captureDataReg),
-
+            Node.Wire(tapStates.shift),
+            Node.Wire(tapStates.pause),
+            Node.Wire(tapStates.update),
+            Node.Wire(tapStates.capture),
             Node.Wire(selectSignals.extest),
             Node.Wire(selectSignals.samplePreload),
             Node.Wire(selectSignals.mbist),
             Node.Wire(selectSignals.debug),
-
             Node.Wire(jtagInfo.tdoSignal),
-
             Node.Wire(tdiSignals.debug),
             Node.Wire(tdiSignals.bsChain),
             Node.Wire(tdiSignals.mbist)
@@ -51,30 +45,84 @@ class JTAGCreator {
 
         let portArguments = [
             // JTAG Pads
-            Node.PortArg(tapPads.tms, Node.Identifier(tms)),
-            Node.PortArg(tapPads.tck, Node.Identifier(tck)),
-            Node.PortArg(tapPads.trst, Node.Identifier(trst)),
-            Node.PortArg(tapPads.tdi, Node.Identifier(tdi)),
-            Node.PortArg(tapPads.tdo, Node.Identifier(tdo)),
-            Node.PortArg(tapPads.tdoEn, Node.Identifier("tdo_padoe_o")),
+            Node.PortArg(
+                tapPads.tms,
+                Node.Identifier(tms)
+            ),
+            Node.PortArg(
+                tapPads.tck,
+                Node.Identifier(tck)
+            ),
+            Node.PortArg(
+                tapPads.trst,
+                Node.Identifier(trst)
+            ),
+            Node.PortArg(
+                tapPads.tdi,
+                Node.Identifier(tdi)
+            ),
+            Node.PortArg(
+                tapPads.tdo,
+                Node.Identifier(tapPads.tdo)
+            ),
+            Node.PortArg(
+                tapPads.tdoEn,
+                Node.Identifier(tapPads.tdoEn)
+            ),
             // TAP States
-            Node.PortArg(tapStates.shiftDataReg, Node.Identifier("shift_dr_o")),
-            Node.PortArg(tapStates.pauseDataReg, Node.Identifier("pause_dr_o")),
-            Node.PortArg(tapStates.updateDataReg, Node.Identifier("update_dr_o")),
-            Node.PortArg(tapStates.captureDataReg, Node.Identifier("capture_dr_o")),
+            Node.PortArg(
+                tapStates.shift,
+                Node.Identifier(tapStates.shift)
+            ),
+            Node.PortArg(
+                tapStates.pause,
+                Node.Identifier(tapStates.pause)
+            ),
+            Node.PortArg(
+                tapStates.update,
+                Node.Identifier(tapStates.update)
+            ),
+            Node.PortArg(
+                tapStates.capture,
+                Node.Identifier(tapStates.capture)
+            ),
             // Select signals for boundary scan or mbist
-            Node.PortArg(selectSignals.extest, Node.Identifier("extest_select_o")),
-            Node.PortArg(selectSignals.samplePreload, Node.Identifier("sample_preload_select_o")),
-            Node.PortArg(selectSignals.mbist, Node.Identifier("mbist_select_o")),
-            Node.PortArg(selectSignals.debug, Node.Identifier("debug_select_o")),
+            Node.PortArg(
+                selectSignals.extest,
+                Node.Identifier(selectSignals.extest)
+            ),
+            Node.PortArg(
+                selectSignals.samplePreload,
+                Node.Identifier(selectSignals.samplePreload)
+            ),
+            Node.PortArg(
+                selectSignals.mbist,
+                Node.Identifier(selectSignals.mbist)
+            ),
+            Node.PortArg(
+                selectSignals.debug,
+                Node.Identifier(selectSignals.debug)
+            ),
             //  TDO signal that is connected to TDI of sub-modules.
-            Node.PortArg(jtagInfo.tdoSignal, Node.Identifier("tdo_o")),
+            Node.PortArg(
+                jtagInfo.tdoSignal,
+                Node.Identifier(jtagInfo.tdoSignal)
+            ),
             // TDI signals from sub-modules
-            Node.PortArg(tdiSignals.debug, Node.Identifier("debug_tdi_i")),
-            Node.PortArg(tdiSignals.bsChain, Node.Identifier("bs_chain_tdi_i")),
-            Node.PortArg(tdiSignals.mbist, Node.Identifier("mbist_tdi_i"))
+            Node.PortArg(
+                tdiSignals.debug,
+                Node.Identifier(tdiSignals.debug)
+            ),
+            Node.PortArg(
+                tdiSignals.bsChain,
+                Node.Identifier(tdiSignals.bsChain)
+            ),
+            Node.PortArg(
+                tdiSignals.mbist,
+                Node.Identifier(tdiSignals.mbist)
+            )
         ]
-        
+
         let submoduleInstance = Node.Instance(
             self.name,
             "__" + self.name + "__",
@@ -89,13 +137,9 @@ class JTAGCreator {
         )
         return (tapModule: tapModule, wires: wireDeclarations)
     }
-
-
-    //var tapDefinition: String
 }
 
 struct JTAGInfo: Codable {
-    
     var pads: JTAGPad; 
     var tapStates : JTAGState;
     var selectSignals : selectSignals;
@@ -108,7 +152,7 @@ struct JTAGInfo: Codable {
         selectSignals: selectSignals,
         tdoSignal : String,
         tdiSignals: tdiSignals
-    ){
+    ) {
         self.pads = pads
         self.tapStates = tapStates
         self.selectSignals = selectSignals
@@ -133,7 +177,7 @@ struct JTAGPad: Codable {
         trst: String,
         tck: String,
         tdoEn: String
-    ){
+    ) {
         self.tms = tms
         self.tdi = tdi
         self.tdo = tdo
@@ -144,21 +188,21 @@ struct JTAGPad: Codable {
 }
 
 struct JTAGState: Codable {
-    var shiftDataReg: String
-    var pauseDataReg: String
-    var updateDataReg: String
-    var captureDataReg: String
+    var shift: String
+    var pause: String
+    var update: String
+    var capture: String
 
     init(
-       shiftDataReg: String,
-       pauseDataReg: String,
-       updateDataReg: String,
-       captureDataReg: String 
-    ){
-        self.shiftDataReg = shiftDataReg
-        self.pauseDataReg = pauseDataReg
-        self.updateDataReg = updateDataReg
-        self.captureDataReg = captureDataReg
+       shift: String,
+       pause: String,
+       update: String,
+       capture: String 
+    ) {
+        self.shift = shift
+        self.pause = pause
+        self.update = update
+        self.capture = capture
     }
 }
 
@@ -173,7 +217,7 @@ struct selectSignals: Codable {
         samplePreload: String,
         mbist: String,
         debug: String
-    ){
+    ) {
         self.extest = extest
         self.samplePreload = samplePreload
         self.mbist =  mbist
@@ -190,7 +234,7 @@ struct tdiSignals: Codable {
         debug: String,
         bsChain: String,
         mbist: String
-    ){
+    ) {
         self.debug = debug
         self.bsChain = bsChain
         self.mbist = mbist
