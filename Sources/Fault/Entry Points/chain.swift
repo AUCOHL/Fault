@@ -71,7 +71,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     for (name, value) in [
         ("sin", "serial data in"),
         ("sout", "serial data out"),
-        ("shift", "serial shifting enable")
+        ("shift", "serial shifting enable"),
+        ("capture", "JTAG capture signal"),
+        ("update", "JTAG update signal")
     ] {
         let option = StringOption(
             longFlag: name,
@@ -194,6 +196,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let inputIdentifier = Node.Identifier(inputName)
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
         let outputIdentifier = Node.Identifier(outputName)
+        let captureName = names["capture"]!.option.value ?? names["capture"]!.default
+        let updateName = names["update"]!.option.value ?? names["update"]!.default
 
         // MARK: Register chaining original module
         let internalCount: Int = {
@@ -242,6 +246,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(Node.Input(inputName))
             statements.append(Node.Output(outputName))
             statements.append(Node.Input(testingName))
+
             statements.extend(Python.list(definition.items))
 
             let finalAssignment = Node.Assign(
@@ -260,11 +265,17 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         var order: [ChainRegister] = []
         let boundaryCount: Int = try {
             let ports = Python.list(definition.portlist.ports)
+            ports.append(Node.Port(captureName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(updateName, Python.None, Python.None, Python.None))
 
             var statements: [PythonObject] = []
             statements.append(Node.Input(inputName))
             statements.append(Node.Output(outputName))
             statements.append(Node.Input(testingName))
+            statements.append(Node.Input(clockOpt.value!))
+            statements.append(Node.Input(resetOpt.value!))
+            statements.append(Node.Input(captureName))
+            statements.append(Node.Input(updateName))
 
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
@@ -272,7 +283,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clock: clockOpt.value!,
                 reset: resetOpt.value!,
                 resetActive: resetActiveLow.value ? .low : .high,
-                testing: testingName,
+                shift: testingName,
+                capture: captureName,
+                update: updateName,
                 using: Node
             )
 
@@ -286,8 +299,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             for input in inputs {
                 let inputStatement = Node.Input(input.name)
-                statements.append(inputStatement)
 
+                if (input.name != clockOpt.value! && input.name != resetOpt.value!){
+                    statements.append(inputStatement)
+                }
                 if ignoredInputs.contains(input.name) {
                     portArguments.append(Node.PortArg(
                         input.name,
@@ -521,7 +536,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: output,
+                in: output, 
                 with: model,
                 ports: ports,
                 inputs: inputs,

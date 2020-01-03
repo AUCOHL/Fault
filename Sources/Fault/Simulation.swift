@@ -318,7 +318,7 @@ class Simulator {
         let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
         defer {
-            let _ = "rm -rf '\(folderName)'".sh()
+           let _ = "rm -rf '\(folderName)'".sh()
         }
 
         var portWires = ""
@@ -368,10 +368,12 @@ class Simulator {
                 #10;
                 \(reset) = ~\(reset);
                 \(testing) = 1;
+
                 for (i = 0; i < \(dffCount); i = i + 1) begin
                     sin = serializable[i];
                     #2;
                 end
+                #2;
                 for (i = 0; i < \(dffCount); i = i + 1) begin
                     serial[i] = sout;
                     #2;
