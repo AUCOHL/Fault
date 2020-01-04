@@ -11,9 +11,9 @@ class BoundaryScanRegisterCreator {
     var reset: String
     var resetActive: Simulator.Active
     
-    private var shiftIdentifier: PythonObject
     private var captureIdentifier: PythonObject
     private var updateIdentifier: PythonObject
+    private var shiftIdentifier: PythonObject
     private var clockIdentifier: PythonObject
     private var resetIdentifier: PythonObject
 
@@ -24,9 +24,9 @@ class BoundaryScanRegisterCreator {
         clock: String,
         reset: String,
         resetActive: Simulator.Active,
-        shift: String,
         capture: String,
         update: String,
+        shift: String,
         using Node: PythonObject
     ) {
         self.name = name
@@ -41,9 +41,9 @@ class BoundaryScanRegisterCreator {
 
         self.resetActive = resetActive
 
-        self.shiftIdentifier = Node.Identifier(shift)
         self.captureIdentifier = Node.Identifier(capture)
         self.updateIdentifier = Node.Identifier(update)
+        self.shiftIdentifier = Node.Identifier(shift)
 
         self.Node = Node
     }
@@ -98,10 +98,10 @@ class BoundaryScanRegisterCreator {
     var inputDefinition: String {
         return """
         module \(inputName) (
-            din,     // input pin
-            dout,   // to logic core
-            sin,   // from previous bs cell
-            sout, // to next bs cell
+            din,     
+            dout,   
+            sin,  
+            sout, 
             clock,
             reset,
             shiftDR,
@@ -111,8 +111,8 @@ class BoundaryScanRegisterCreator {
             input sin; output sout;
             input clock, reset, shiftDR, captureDR;
 
-            reg store;  // Latch
-            reg sout;  // To next BS cell
+            reg store;  
+            reg sout;  
             
             wire SelectedInput = captureDR ? din : sin;
 
@@ -142,11 +142,11 @@ class BoundaryScanRegisterCreator {
     var outputDefinition: String {
         return """
         module \(outputName) (
-            din,         // from core
-            dout,       // data out pin
-            sin,       // from previous bs cell
-            sout,     // to next bs cell
-            clock,    // test clock signal
+            din,         
+            dout,      
+            sin,       
+            sout,     
+            clock,   
             reset,
             shiftDR,
             captureDR,
@@ -158,8 +158,8 @@ class BoundaryScanRegisterCreator {
             input clock, reset, shiftDR, captureDR, updateDR;
             input extest;
 
-            reg sout; // to next bs cell
-            reg store;  // Latch
+            reg sout; 
+            reg store;  
             reg shifted;
 
             wire SelectedInput = captureDR ? din : sin;

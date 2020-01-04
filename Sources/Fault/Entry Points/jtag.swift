@@ -32,19 +32,19 @@ func JTAGCreate(arguments: [String]) -> Int32{
 
     let clockOpt = StringOption(
         longFlag: "clock",
-        helpMessage: "Clock signal to use in simulation"
+        helpMessage: "Clock signal of core logic to use in simulation"
     )
     cli.addOptions(clockOpt)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        helpMessage: "Reset signal to use in simulation."
+        helpMessage: "Reset signal of core logic to use in simulation."
     )
     cli.addOptions(resetOpt)
 
     let resetActiveLow = BoolOption(
         longFlag: "activeLow",
-        helpMessage: "Reset signal is active low instead of active high."
+        helpMessage: "Reset signal of core logic is active low instead of active high."
     )
     cli.addOptions(resetActiveLow)
 
@@ -60,14 +60,16 @@ func JTAGCreate(arguments: [String]) -> Int32{
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
-        ("sin", "serial data in"),
-        ("sout", "serial data out"),
-        ("shift", "shift enable"),
-        ("tms", "test mode select"),
-        ("tck", "test clock signal"),
-        ("tdi", "test data input"),
-        ("tdo", "test data output"),
-        ("trst", "test reset signal. (Always active low.)")
+        ("sin", "BS chain serial data in"),
+        ("sout", "BS chain serial data out"),
+        ("shift", "BS chain shift enable"),
+        ("capture", "BS chain capture enable"),
+        ("update", "BS chain update enable"),
+        ("tms", "JTAG test mode select"),
+        ("tck", "JTAG test clock signal"),
+        ("tdi", "JTAG test data input"),
+        ("tdo", "JTAG test data output"),
+        ("trst", "JTAG test reset signal. (Always active low.)")
     ] {
         let option = StringOption(
             longFlag: name,
@@ -135,7 +137,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
 
     let libertyFile = defaultLiberty ?
         liberty.value ??
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_muxonly.lib" :
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
         liberty.value!
 
     // MARK: Importing Python and Pyverilog
@@ -166,6 +168,8 @@ func JTAGCreate(arguments: [String]) -> Int32{
     let sinName = names["sin"]!.option.value ?? names["sin"]!.default
     let soutName = names["sout"]!.option.value ?? names["sout"]!.default
     let shiftName = names["shift"]!.option.value ?? names["shift"]!.default
+    let updateName = names["update"]!.option.value ?? names["update"]!.default
+    let captureName = names["capture"]!.option.value ?? names["capture"]!.default
     let tmsName = names["tms"]!.option.value ?? names["tms"]!.default
     let tdiName = names["tdi"]!.option.value ?? names["tdi"]!.default
     let tdoName = names["tdo"]!.option.value ?? names["tdo"]!.default
@@ -199,10 +203,15 @@ func JTAGCreate(arguments: [String]) -> Int32{
             return counter
         }()
 
+        let scanChainPorts = [
+            sinName,
+            soutName,
+            shiftName,
+            updateName,
+            captureName,
+        ]
         let topModulePorts = Python.list(ports.filter {
-            String($0.name) != sinName &&
-            String($0.name) != shiftName &&
-            String($0.name) != soutName
+            !scanChainPorts.contains(String($0.name)!)
         })
 
         topModulePorts.append(Node.Port(
@@ -226,7 +235,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
         let portArguments = Python.list()
 
         for input in inputs {
-            if(input.name != sinName && input.name != shiftName){
+            if(!scanChainPorts.contains(input.name)){
                 statements.append(Node.Input(input.name))
                 portArguments.append(Node.PortArg(
                     input.name,
@@ -244,7 +253,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
         }
 
         for output in outputs {
-            if(output.name != soutName){
+            if(!scanChainPorts.contains(output.name)){
                 statements.append(Node.Output(output.name))
             }
             portArguments.append(Node.PortArg(
@@ -281,11 +290,13 @@ func JTAGCreate(arguments: [String]) -> Int32{
         statements.extend(wireDeclarations)
         statements.extend([
             Node.Wire(soutName),
-            Node.Wire(shiftName)
+            Node.Wire(shiftName),
+            Node.Wire(captureName),
+            Node.Wire(updateName)
         ])
         statements.append(jtagModule.tapModule)
 
-        // reset negate to make it active high
+        // negate reset to make it active high
         statements.append(Node.Assign(
             Node.Lvalue(Node.Identifier(trstHighName)),
             Node.Rvalue(Node.Unot(Node.Identifier(trstName)))
@@ -300,48 +311,56 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Node.Rvalue(Node.Identifier(shiftName)),
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.shift))
         ))
-        // tdo tri-state buffer
-        let triArguments = [
-            Node.PortArg("in",Node.Identifier(jtagInfo.pads.tdo)),
-            Node.PortArg("oe",Node.Identifier(jtagInfo.pads.tdoEn)),
-            Node.PortArg("out",Node.Identifier(tdoName))
-        ]
-
-        let triModuleInstance = Node.Instance(
-            "Tristate",
-            "__triState__",
-            Python.tuple(triArguments),
-            Python.tuple()
-        )
-
-        statements.append(Node.InstanceList(
-            "Tristate",
-            Python.tuple(),
-            Python.tuple([triModuleInstance])
+        statements.append(Node.Assign(
+            Node.Rvalue(Node.Identifier(captureName)),
+            Node.Lvalue(Node.Identifier(jtagInfo.tapStates.capture))
         ))
+        statements.append(Node.Assign(
+            Node.Rvalue(Node.Identifier(updateName)),
+            Node.Lvalue(Node.Identifier(jtagInfo.tapStates.update))
+        ))
+        // tdo tri-state buffer
+        // let triArguments = [
+        //     Node.PortArg("in",Node.Identifier(jtagInfo.pads.tdo)),
+        //     Node.PortArg("oe",Node.Identifier(jtagInfo.pads.tdoEn)),
+        //     Node.PortArg("out",Node.Identifier(tdoName))
+        // ]
 
-
-        // let sens = Node.Sens(Node.Identifier(jtagInfo.pads.tdoEn), "level")
-        // let senslist = Node.SensList([ sens ])
-
-        // let tdoAssignTrue = Node.BlockingSubstitution(
-        //     Node.Lvalue(Node.Identifier(tdoName)),
-        //     Node.Rvalue(Node.Identifier(jtagInfo.pads.tdo))
+        // let triModuleInstance = Node.Instance(
+        //     "Tristate",
+        //     "__triState__",
+        //     Python.tuple(triArguments),
+        //     Python.tuple()
         // )
-        // let tdoAssignFalse = Node.BlockingSubstitution(
-        //     Node.Lvalue(Node.Identifier(tdoName)),
-        //     Node.Rvalue(Node.Identifier(tdoName))
-        // )
-        // let ifTdoEn = Node.IfStatement(
-        //     Node.Identifier(jtagInfo.pads.tdoEn),
-        //     Node.Block([ tdoAssignTrue ]),
-        //     Node.Block([ tdoAssignFalse ])
-        // ) 
-        // let ifStatement = Node.Block([ ifTdoEn ])
 
-        // let always = Node.Always(senslist, ifStatement)
+        // statements.append(Node.InstanceList(
+        //     "Tristate",
+        //     Python.tuple(),
+        //     Python.tuple([triModuleInstance])
+        // ))
 
-        // statements.append(always)
+
+        let sens = Node.Sens(Node.Identifier(jtagInfo.pads.tdoEn), "level")
+        let senslist = Node.SensList([ sens ])
+
+        let tdoAssignTrue = Node.BlockingSubstitution(
+            Node.Lvalue(Node.Identifier(tdoName)),
+            Node.Rvalue(Node.Identifier(jtagInfo.pads.tdo))
+        )
+        let tdoAssignFalse = Node.BlockingSubstitution(
+            Node.Lvalue(Node.Identifier(tdoName)),
+            Node.Rvalue(Node.IntConst("z"))
+        )
+        let ifTdoEn = Node.IfStatement(
+            Node.Identifier(jtagInfo.pads.tdoEn),
+            Node.Block([ tdoAssignTrue ]),
+            Node.Block([ tdoAssignFalse ])
+        ) 
+        let ifStatement = Node.Block([ ifTdoEn ])
+
+        let always = Node.Always(senslist, ifStatement)
+
+        statements.append(always)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -363,14 +382,14 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Python.tuple(statements)
         )
 
-        let triDefinition =
-            parse([triLocation])[0][dynamicMember: "description"].definitions
+        // let triDefinition =
+        //     parse([triLocation])[0][dynamicMember: "description"].definitions
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
         
         let definitions = Python.list(description.definitions)
         
-        definitions.extend(triDefinition)
+        //definitions.extend(triDefinition)
         definitions.extend(tapDefinition)
         definitions.append(supermodel)
         description.definitions = Python.tuple(definitions)
@@ -395,7 +414,6 @@ func JTAGCreate(arguments: [String]) -> Int32{
             fputs("A yosys error has occurred.\n", stderr)
             return Int32(result)
         }
-        
         print("Done.")
 
         // MARK: Verification
@@ -417,15 +435,18 @@ func JTAGCreate(arguments: [String]) -> Int32{
             }
                
             let (ports, inputs, outputs) = try Port.extract(from: definition)
-
+            let boundaryCount = inputs.count + outputs.count - 7
+            let internalCount = dffCount - boundaryCount * 2;
+           
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: intermediate,
+                in: output,
                 with: model,
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
-                dffCount: dffCount,
+                boundaryCount: boundaryCount,
+                internalCount: internalCount,
                 clock: clockOpt.value!,
                 reset: resetOpt.value!,
                 resetActive: resetActiveLow.value ? .low : .high,
@@ -437,7 +458,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
-            print("done")
+            print("Done.")
             if (verified) {
                 print("Tap port verified successfully.")
             } else {

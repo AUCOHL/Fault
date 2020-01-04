@@ -283,9 +283,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clock: clockOpt.value!,
                 reset: resetOpt.value!,
                 resetActive: resetActiveLow.value ? .low : .high,
-                shift: testingName,
                 capture: captureName,
                 update: updateName,
+                shift: testingName,
                 using: Node
             )
 

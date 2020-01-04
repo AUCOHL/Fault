@@ -418,7 +418,8 @@ class Simulator {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        dffCount: Int,
+        boundaryCount: Int,
+        internalCount: Int,
         clock: String,
         reset: String,
         resetActive: Active = .low,
@@ -432,11 +433,11 @@ class Simulator {
     ) throws -> Bool {
         let tempDir = "\(NSTemporaryDirectory())"
 
-        var folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
-        // defer {
-        //     let _ = "rm -rf '\(folderName)'".sh()
-        // }
+        defer {
+            let _ = "rm -rf '\(folderName)'".sh()
+        }
 
         var portWires = ""
         var portHooks = ""
@@ -448,6 +449,7 @@ class Simulator {
 
         var inputInit = ""
         var inputAssignment = ""
+        var serial = ""
 
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
@@ -458,15 +460,14 @@ class Simulator {
             }
             else {
                 inputInit += "        \(name) = 0 ;\n"
-                if (input.name != tck && input.name != clock && input.name != trst){
-                    inputAssignment += "        \(name) = \(Int.random(in: 0...1)) ;\n"
+                if (input.name != tck && input.name != clock && input.name != trst && input.name != tdi){
+                    let bit = Int.random(in: 0...1)
+                    inputAssignment += "        \(name) = \(bit) ;\n"
+                    serial += "\(bit)"
                 }
             }
         }
-        var serial = ""
-        for _ in 0..<dffCount {
-            serial += "\(Int.random(in: 0...1))"
-        }
+        let dffCount = internalCount + boundaryCount
 
         let bench = """
         \(String.boilerplate)
@@ -491,12 +492,12 @@ class Simulator {
             wire[3:0] bypass = 4'b 1111;
             
             wire[3:0] ir_reg = 4'b 0101;
-            wire[\(dffCount - 1):0] serializable =
-                \(dffCount)'b\(serial);
+            wire[\(boundaryCount - 1):0] serializable =
+                \(boundaryCount)'b\(serial);
             reg[\(dffCount - 1):0] serial;
-
+            
             initial begin
-                $dumpfile("RTL/jtagTests/dut.vcd");
+                $dumpfile("dut.vcd"); // DEBUG
                 $dumpvars(0, testbench);
         \(inputInit)
                 #10;
@@ -506,65 +507,60 @@ class Simulator {
                 /*
                     Test Sample/Preload Instruction
                 */
-                \(tms) = 1;   // test logic reset state
+                \(tms) = 1;     // test logic reset state
                 #10;
-                \(tms) = 0;  // run-test idle state
+                \(tms) = 0;     // run-test idle state
                 #2;
-                \(tms) = 1;  // select-DR state
+                \(tms) = 1;     // select-DR state
                 #2;
-                \(tms) = 1;  // select-IR state
+                \(tms) = 1;     // select-IR state
                 #2;
-                \(tms) = 0;  // capture IR
+                \(tms) = 0;     // capture IR
                 #2;
-                \(tms) = 0;  // Shift IR state
+                \(tms) = 0;     // Shift IR state
                 #2
 
                 // shift new instruction on tdi line
                 for (i = 0; i < 4; i = i + 1) begin
                     \(tdi) = samplePreload[i];
                     if(i == 3) begin
-                        \(tms) = 1;   // exit-ir
+                        \(tms) = 1;     // exit-ir
                     end
                     #2;
                 end
 
-                \(tms) = 1; // update-ir 
+                \(tms) = 1;     // update-ir 
                 #2;
-                \(tms) = 0; // run test-idle
-                #4;
-                if (uut.sample_preload_select_o != 1) begin
-                    $error("LOADING SAMPLE/PRELOAD INST FAILED");
-                    $finish;
-                end 
+                \(tms) = 0;     // run test-idle
+                #6;
+                \(tms) = 1;     // select-DR 
                 #2;
-
-                \(tms) = 1;   // test logic reset 
-                #10;
-                \(tms) = 0;   // run-test idle 
+                \(tms) = 0;     // capture-DR 
+        \(inputAssignment)
                 #2;
-                \(tms) = 1;  // select-DR 
-                #2;
-                \(tms) = 0;  // capture-DR 
-                \(inputAssignment)    
-                #4;
-                \(tms) = 0;  // shift-DR 
-                \(tdi) = 0;
-                #2;
+                \(tms) = 0;     // shift-DR 
+                #6;
                 for (i = 0; i < \(dffCount); i = i + 1) begin
-                    tdi = 0;
+                    \(tms) = 0;
+                    serial[i] = \(tdo); 
                     #2;
                 end
-                for (i = 0; i < \(dffCount); i = i + 1) begin  // observe I/O pins 
-                    serial[i] = \(tdo);
-                    #2;
+                if(serial[\(boundaryCount + 1):\(internalCount - 1)] != serializable) begin
+                    $error("EXECUTING SAMPLE INST FAILED");
+                    $finish;
                 end
-                #1000;
+                #100;
+                \(tms) = 1;     // Exit DR
+                #2;
+                \(tms) = 1;     // update DR
+                #2;
+                \(tms) = 0;     // Run test-idle
+                #2;
                 $display("SUCCESS_STRING");
                 $finish;
             end
         endmodule
         """
-        folderName = "RTL/jtagTests"
 
         let tbName = "\(folderName)/tb.sv"
 
