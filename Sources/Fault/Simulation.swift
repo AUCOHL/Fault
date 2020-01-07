@@ -450,7 +450,9 @@ class Simulator {
         var inputInit = ""
         var inputAssignment = ""
         var serial = ""
+        var storesAssignment = ""
 
+        var count = 0
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
@@ -464,11 +466,30 @@ class Simulator {
                     let bit = Int.random(in: 0...1)
                     inputAssignment += "        \(name) = \(bit) ;\n"
                     serial += "\(bit)"
+                    let assignStatement = "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_input_\(count)__.store "
+                    storesAssignment += "\(assignStatement);\n"
+                    count = count + 1
                 }
             }
         }
-        let dffCount = internalCount + boundaryCount
 
+        let inputBSCount = count
+        
+        for output in outputs {
+            if (output.name != tdo){
+                let assignStatement = "stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_output_\(count)__.store "
+                storesAssignment += "\(assignStatement);\n"
+                count = count + 1
+            }
+        }
+        
+        let outputBSCount = count - inputBSCount
+        let dffCount = internalCount + boundaryCount - 1
+
+        var tdiSerial = ""
+        for _ in 0..<dffCount {
+            tdiSerial += "\(Int.random(in: 0...1))"
+        }
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
@@ -485,6 +506,7 @@ class Simulator {
             );
 
             integer i;
+            reg [\(boundaryCount - 1): 0] stores;
 
             wire[3:0] extest = 4'b 0000;
             wire[3:0] samplePreload = 4'b 0001;
@@ -494,8 +516,10 @@ class Simulator {
             wire[3:0] ir_reg = 4'b 0101;
             wire[\(boundaryCount - 1):0] serializable =
                 \(boundaryCount)'b\(serial);
+            wire [\(dffCount - 1): 0] tdiSerial = 
+                \(dffCount)'b\(tdiSerial);
             reg[\(dffCount - 1):0] serial;
-            
+
             initial begin
                 $dumpfile("dut.vcd"); // DEBUG
                 $dumpvars(0, testbench);
@@ -528,11 +552,12 @@ class Simulator {
                     end
                     #2;
                 end
-
                 \(tms) = 1;     // update-ir 
                 #2;
                 \(tms) = 0;     // run test-idle
                 #6;
+
+                // SAMPLE
                 \(tms) = 1;     // select-DR 
                 #2;
                 \(tms) = 0;     // capture-DR 
@@ -546,7 +571,7 @@ class Simulator {
                     #2;
                 end
                 if(serial[\(boundaryCount + 1):\(internalCount - 1)] != serializable) begin
-                    $error("EXECUTING SAMPLE INST FAILED");
+                    $error("EXECUTING_SAMPLE_INST_FAILED");
                     $finish;
                 end
                 #100;
@@ -556,6 +581,44 @@ class Simulator {
                 #2;
                 \(tms) = 0;     // Run test-idle
                 #2;
+
+                // PRELOAD
+                \(tms) = 1;     // select DR
+                #2;
+                \(tms) = 0;     // capture DR
+                #2;
+                \(tms) = 0;     // shift DR
+                #2;
+                for (i = 0; i < \(dffCount); i = i + 1) begin
+                    \(tdi) = tdiSerial[i];
+                    if(i == \(dffCount - 1))
+                        \(tms) = 1;     // exit-dr
+                    #2;
+                end
+                \(tms) = 1;     // update DR
+                #2;
+                \(tms) = 0;     // run-test idle
+                #2;
+        \(storesAssignment)
+                for(i = 0; i< \(inputBSCount); i = i + 1) begin
+                    if(stores[i] != tdiSerial[i + \(dffCount - 1)]) begin
+                        $error("EXECUTING_PRELOAD_INST_FAILED");
+                        $finish;
+                    end
+                end 
+
+                for(i = 0; i< \(outputBSCount); i = i + 1) begin
+                    if(stores[\(boundaryCount) - i] != tdiSerial[i]) begin
+                        $error("EXECUTING_PRELOAD_INST_FAILED");
+                        $finish;
+                    end
+                end
+
+                /*
+                    Test EXTEST Instruction
+                */
+                
+                #100;
                 $display("SUCCESS_STRING");
                 $finish;
             end

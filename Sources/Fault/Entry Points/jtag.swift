@@ -320,47 +320,47 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.update))
         ))
         // tdo tri-state buffer
-        // let triArguments = [
-        //     Node.PortArg("in",Node.Identifier(jtagInfo.pads.tdo)),
-        //     Node.PortArg("oe",Node.Identifier(jtagInfo.pads.tdoEn)),
-        //     Node.PortArg("out",Node.Identifier(tdoName))
-        // ]
+        let triArguments = [
+            Node.PortArg("in",Node.Identifier(jtagInfo.pads.tdo)),
+            Node.PortArg("oe",Node.Identifier(jtagInfo.pads.tdoEn)),
+            Node.PortArg("out",Node.Identifier(tdoName))
+        ]
 
-        // let triModuleInstance = Node.Instance(
-        //     "Tristate",
-        //     "__triState__",
-        //     Python.tuple(triArguments),
-        //     Python.tuple()
+        let triModuleInstance = Node.Instance(
+            "Tristate",
+            "__triState__",
+            Python.tuple(triArguments),
+            Python.tuple()
+        )
+
+        statements.append(Node.InstanceList(
+            "Tristate",
+            Python.tuple(),
+            Python.tuple([triModuleInstance])
+        ))
+
+
+        // let sens = Node.Sens(Node.Identifier(jtagInfo.pads.tdoEn), "level")
+        // let senslist = Node.SensList([ sens ])
+
+        // let tdoAssignTrue = Node.BlockingSubstitution(
+        //     Node.Lvalue(Node.Identifier(tdoName)),
+        //     Node.Rvalue(Node.Identifier(jtagInfo.pads.tdo))
         // )
+        // let tdoAssignFalse = Node.BlockingSubstitution(
+        //     Node.Lvalue(Node.Identifier(tdoName)),
+        //     Node.Rvalue(Node.IntConst("z"))
+        // )
+        // let ifTdoEn = Node.IfStatement(
+        //     Node.Identifier(jtagInfo.pads.tdoEn),
+        //     Node.Block([ tdoAssignTrue ]),
+        //     Node.Block([ tdoAssignFalse ])
+        // ) 
+        // let ifStatement = Node.Block([ ifTdoEn ])
 
-        // statements.append(Node.InstanceList(
-        //     "Tristate",
-        //     Python.tuple(),
-        //     Python.tuple([triModuleInstance])
-        // ))
+        // let always = Node.Always(senslist, ifStatement)
 
-
-        let sens = Node.Sens(Node.Identifier(jtagInfo.pads.tdoEn), "level")
-        let senslist = Node.SensList([ sens ])
-
-        let tdoAssignTrue = Node.BlockingSubstitution(
-            Node.Lvalue(Node.Identifier(tdoName)),
-            Node.Rvalue(Node.Identifier(jtagInfo.pads.tdo))
-        )
-        let tdoAssignFalse = Node.BlockingSubstitution(
-            Node.Lvalue(Node.Identifier(tdoName)),
-            Node.Rvalue(Node.IntConst("z"))
-        )
-        let ifTdoEn = Node.IfStatement(
-            Node.Identifier(jtagInfo.pads.tdoEn),
-            Node.Block([ tdoAssignTrue ]),
-            Node.Block([ tdoAssignFalse ])
-        ) 
-        let ifStatement = Node.Block([ ifTdoEn ])
-
-        let always = Node.Always(senslist, ifStatement)
-
-        statements.append(always)
+        // statements.append(always)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -382,14 +382,14 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Python.tuple(statements)
         )
 
-        // let triDefinition =
-        //     parse([triLocation])[0][dynamicMember: "description"].definitions
+        let triDefinition =
+             parse([triLocation])[0][dynamicMember: "description"].definitions
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
         
         let definitions = Python.list(description.definitions)
         
-        //definitions.extend(triDefinition)
+        definitions.extend(triDefinition)
         definitions.extend(tapDefinition)
         definitions.append(supermodel)
         description.definitions = Python.tuple(definitions)
@@ -440,7 +440,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
            
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: output,
+                in: intermediate, // DEBUG
                 with: model,
                 ports: ports,
                 inputs: inputs,
