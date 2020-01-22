@@ -60,16 +60,19 @@ func JTAGCreate(arguments: [String]) -> Int32{
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
-        ("sin", "BS chain serial data in"),
-        ("sout", "BS chain serial data out"),
-        ("shift", "BS chain shift enable"),
-        ("capture", "BS chain capture enable"),
-        ("update", "BS chain update enable"),
+        ("sinInternal", "internal scan chain serial data in"),
+        ("soutInternal", "internal scan chain serial data out"),
+        ("sinBoundary", "boundary scan  chain serial data in"),
+        ("soutBoundary", "boundary scan chain serial data out"),
+        ("shift", "boundary scan chain shift enable"),
+        ("capture", "boundary scan chain capture enable"),
+        ("update", "boundary scan chain update enable"),
+        ("extest", "boundary scan chain extest"),
         ("tms", "JTAG test mode select"),
-        ("tck", "JTAG test clock signal"),
+        ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
         ("tdo", "JTAG test data output"),
-        ("trst", "JTAG test reset signal. (Always active low.)")
+        ("trst", "JTAG test reset (active low)")
     ] {
         let option = StringOption(
             longFlag: name,
@@ -78,7 +81,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
         cli.addOptions(option)
         names[name] = (default: name, option: option)
     }
-   
+    
     do {
         try cli.parse()
     } catch {
@@ -104,6 +107,14 @@ func JTAGCreate(arguments: [String]) -> Int32{
         return EX_NOINPUT
     }
 
+    var ignoredInputs = 0
+    if let _ = clockOpt.value {
+        ignoredInputs += 1
+    }
+    if let _ = resetOpt.value {
+        ignoredInputs += 1
+    }
+    
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
             fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
@@ -133,7 +144,6 @@ func JTAGCreate(arguments: [String]) -> Int32{
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
     let tapLocation = "RTL/JTAG/tap_top.v"
-    let triLocation = "RTL/JTAG/tri_state.v"
 
     let libertyFile = defaultLiberty ?
         liberty.value ??
@@ -165,17 +175,33 @@ func JTAGCreate(arguments: [String]) -> Int32{
         return EX_DATAERR
     }
 
-    let sinName = names["sin"]!.option.value ?? names["sin"]!.default
-    let soutName = names["sout"]!.option.value ?? names["sout"]!.default
-    let shiftName = names["shift"]!.option.value ?? names["shift"]!.default
-    let updateName = names["update"]!.option.value ?? names["update"]!.default
-    let captureName = names["capture"]!.option.value ?? names["capture"]!.default
-    let tmsName = names["tms"]!.option.value ?? names["tms"]!.default
-    let tdiName = names["tdi"]!.option.value ?? names["tdi"]!.default
-    let tdoName = names["tdo"]!.option.value ?? names["tdo"]!.default
-    let tckName = names["tck"]!.option.value ?? names["tck"]!.default
-    let trstName = names["trst"]!.option.value ?? names["trst"]!.default
-
+    let sinInternalName = names["sinInternal"]!.option.value 
+        ?? names["sinInternal"]!.default
+    let sinBoundaryName = names["sinBoundary"]!.option.value
+        ?? names["sinBoundary"]!.default
+    let soutBoundaryName = names["soutBoundary"]!.option.value
+        ?? names["soutBoundary"]!.default
+    let soutInternalName = names["soutInternal"]!.option.value
+        ?? names["soutInternal"]!.default
+    let shiftName = names["shift"]!.option.value
+        ?? names["shift"]!.default
+    let updateName = names["update"]!.option.value
+        ?? names["update"]!.default
+    let captureName = names["capture"]!.option.value
+        ?? names["capture"]!.default
+    let extestName = names["extest"]!.option.value
+        ?? names["extest"]!.default
+    let tmsName = names["tms"]!.option.value 
+        ?? names["tms"]!.default
+    let tdiName = names["tdi"]!.option.value 
+        ?? names["tdi"]!.default
+    let tdoName = names["tdo"]!.option.value 
+        ?? names["tdo"]!.default
+    let tckName = names["tck"]!.option.value 
+        ?? names["tck"]!.default
+    let trstName = names["trst"]!.option.value 
+        ?? names["trst"]!.default
+    
     // MARK: Internal signals
     print("Adding JTAG port…")
     let definitionName = String(describing: definition.name)
@@ -204,12 +230,27 @@ func JTAGCreate(arguments: [String]) -> Int32{
         }()
 
         let scanChainPorts = [
-            sinName,
-            soutName,
+            sinInternalName,
+            sinBoundaryName,
+            soutBoundaryName,
+            soutInternalName,
+            tckName,
             shiftName,
             updateName,
             captureName,
+            extestName
         ]
+
+        let boundaryCount = inputs.count + outputs.count - (scanChainPorts.count + ignoredInputs)
+        let internalCount = dffCount - boundaryCount * 2 - 1 * (outputs.count - 2)
+       
+        if clockOpt.value == nil {
+            if (internalCount > 0){
+                fputs("Error: Clock signal name for the internal logic isn't passed.\n", stderr)
+                return EX_NOINPUT
+            }
+        }
+
         let topModulePorts = Python.list(ports.filter {
             !scanChainPorts.contains(String($0.name)!)
         })
@@ -229,9 +270,9 @@ func JTAGCreate(arguments: [String]) -> Int32{
         statements.append(Node.Input(tmsName))
         statements.append(Node.Input(tckName))
         statements.append(Node.Input(tdiName))
-        statements.append(Node.Input(trstName))
         statements.append(Node.Output(tdoName))
-        
+        statements.append(Node.Input(trstName))
+
         let portArguments = Python.list()
 
         for input in inputs {
@@ -243,13 +284,14 @@ func JTAGCreate(arguments: [String]) -> Int32{
                 ))
             }
             else {
-                let portIdentifier = (input.name == sinName) ? tdiName : input.name
+                let portIdentifier =
+                    (input.name == sinInternalName || input.name == sinBoundaryName) ?
+                    tdiName : input.name
                 portArguments.append(Node.PortArg(
                     input.name,
                     Node.Identifier(portIdentifier)
                 ))
             }
-           
         }
 
         for output in outputs {
@@ -264,6 +306,10 @@ func JTAGCreate(arguments: [String]) -> Int32{
             
         // MARK: tap module  
         let file = "RTL/JTAG/tapConfig.json"
+        if !fileManager.fileExists(atPath: file) {
+            fputs("JTAG configuration file '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
         
         guard let jtagInfo = try? JSONDecoder().decode(JTAGInfo.self, from: data) else {
@@ -286,13 +332,14 @@ func JTAGCreate(arguments: [String]) -> Int32{
         var wireDeclarations = jtagModule.wires
         wireDeclarations.append(Node.Wire(trstHighName))
         
-        // add sout and shift wires
         statements.extend(wireDeclarations)
         statements.extend([
-            Node.Wire(soutName),
+            Node.Wire(soutBoundaryName),
+            Node.Wire(soutInternalName),
             Node.Wire(shiftName),
             Node.Wire(captureName),
-            Node.Wire(updateName)
+            Node.Wire(updateName),
+            Node.Wire(extestName)
         ])
         statements.append(jtagModule.tapModule)
 
@@ -304,9 +351,13 @@ func JTAGCreate(arguments: [String]) -> Int32{
         // sout and bschain_assign_statement
         statements.append(Node.Assign(
             Node.Lvalue(Node.Identifier(jtagInfo.tdiSignals.bsChain)),
-            Node.Rvalue(Node.Identifier(soutName))
+            Node.Rvalue(Node.Identifier(soutBoundaryName))
         ))
-        //shift enable assign 
+        statements.append(Node.Assign(
+            Node.Lvalue(Node.Identifier(jtagInfo.tdiSignals.scanIn)),
+            Node.Rvalue(Node.Identifier(soutInternalName))
+        ))
+        //JTAG state signals assign 
         statements.append(Node.Assign(
             Node.Rvalue(Node.Identifier(shiftName)),
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.shift))
@@ -319,48 +370,21 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Node.Rvalue(Node.Identifier(updateName)),
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.update))
         ))
-        // tdo tri-state buffer
-        let triArguments = [
-            Node.PortArg("in",Node.Identifier(jtagInfo.pads.tdo)),
-            Node.PortArg("oe",Node.Identifier(jtagInfo.pads.tdoEn)),
-            Node.PortArg("out",Node.Identifier(tdoName))
-        ]
-
-        let triModuleInstance = Node.Instance(
-            "Tristate",
-            "__triState__",
-            Python.tuple(triArguments),
-            Python.tuple()
-        )
-
-        statements.append(Node.InstanceList(
-            "Tristate",
-            Python.tuple(),
-            Python.tuple([triModuleInstance])
+        statements.append(Node.Assign(
+            Node.Rvalue(Node.Identifier(extestName)),
+            Node.Lvalue(Node.Identifier(jtagInfo.selectSignals.extest))
         ))
-
-
-        // let sens = Node.Sens(Node.Identifier(jtagInfo.pads.tdoEn), "level")
-        // let senslist = Node.SensList([ sens ])
-
-        // let tdoAssignTrue = Node.BlockingSubstitution(
-        //     Node.Lvalue(Node.Identifier(tdoName)),
-        //     Node.Rvalue(Node.Identifier(jtagInfo.pads.tdo))
-        // )
-        // let tdoAssignFalse = Node.BlockingSubstitution(
-        //     Node.Lvalue(Node.Identifier(tdoName)),
-        //     Node.Rvalue(Node.IntConst("z"))
-        // )
-        // let ifTdoEn = Node.IfStatement(
-        //     Node.Identifier(jtagInfo.pads.tdoEn),
-        //     Node.Block([ tdoAssignTrue ]),
-        //     Node.Block([ tdoAssignFalse ])
-        // ) 
-        // let ifStatement = Node.Block([ ifTdoEn ])
-
-        // let always = Node.Always(senslist, ifStatement)
-
-        // statements.append(always)
+        // TDO tri-state enable assignment
+        let ternary = Node.Cond(
+            Node.Identifier(jtagInfo.pads.tdoEn),
+            Node.Identifier(jtagInfo.pads.tdo),
+            Node.IntConst("1'bz")
+        )
+        let tdoAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(tdoName)),
+            Node.Rvalue(ternary)
+        )
+        statements.append(tdoAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -382,14 +406,11 @@ func JTAGCreate(arguments: [String]) -> Int32{
             Python.tuple(statements)
         )
 
-        let triDefinition =
-             parse([triLocation])[0][dynamicMember: "description"].definitions
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
         
         let definitions = Python.list(description.definitions)
         
-        definitions.extend(triDefinition)
         definitions.extend(tapDefinition)
         definitions.append(supermodel)
         description.definitions = Python.tuple(definitions)
@@ -416,6 +437,34 @@ func JTAGCreate(arguments: [String]) -> Int32{
         }
         print("Done.")
 
+        guard let content = File.read(output) else {
+            throw "Could not re-read created file."
+        }
+    
+       
+       
+        let metadata = JTAGMetadata(
+            IRLength: 4,
+            boundaryCount: boundaryCount,
+            internalCount: internalCount,
+            tdi: tdiName,
+            tms: tmsName, 
+            tck: tckName,
+            tdo: tdoName,
+            trst: trstName
+        )
+        
+        guard let metadataString = metadata.toJSON() else {
+            fputs("Could not generate metadata string.", stderr)
+            return EX_SOFTWARE
+        }
+
+        try File.open(output, mode: .write) {
+            try $0.print(String.boilerplate)
+            try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
+            try $0.print(content)
+        }
+
         // MARK: Verification
         if let model = verifyOpt.value {
             print("Verifying tap port integrity…")
@@ -433,11 +482,11 @@ func JTAGCreate(arguments: [String]) -> Int32{
                 fputs("No module found.\n", stderr)
                 return EX_DATAERR
             }
-               
             let (ports, inputs, outputs) = try Port.extract(from: definition)
-            let boundaryCount = inputs.count + outputs.count - 7
-            let internalCount = dffCount - boundaryCount * 2;
-           
+
+            let clockName = clockOpt.value ?? ""
+            let resetName = resetOpt.value ?? ""
+
             let verified = try Simulator.simulate(
                 verifying: definitionName,
                 in: intermediate, // DEBUG
@@ -447,8 +496,8 @@ func JTAGCreate(arguments: [String]) -> Int32{
                 outputs: outputs,
                 boundaryCount: boundaryCount,
                 internalCount: internalCount,
-                clock: clockOpt.value!,
-                reset: resetOpt.value!,
+                clock: clockName,
+                reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
                 tms: tmsName,
                 tdi: tdiName,
@@ -470,7 +519,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
         }
-    } catch{
+    } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE
     }

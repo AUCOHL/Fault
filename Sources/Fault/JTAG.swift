@@ -37,10 +37,12 @@ class JTAGCreator {
             Node.Wire(selectSignals.samplePreload),
             Node.Wire(selectSignals.mbist),
             Node.Wire(selectSignals.debug),
+            Node.Wire(selectSignals.scanIn),
             Node.Wire(jtagInfo.tdoSignal),
             Node.Wire(tdiSignals.debug),
             Node.Wire(tdiSignals.bsChain),
-            Node.Wire(tdiSignals.mbist)
+            Node.Wire(tdiSignals.mbist),
+            Node.Wire(tdiSignals.scanIn)
         ]
 
         let portArguments = [
@@ -103,6 +105,10 @@ class JTAGCreator {
                 selectSignals.debug,
                 Node.Identifier(selectSignals.debug)
             ),
+            Node.PortArg(
+                selectSignals.scanIn,
+                Node.Identifier(selectSignals.scanIn)
+            ),
             //  TDO signal that is connected to TDI of sub-modules.
             Node.PortArg(
                 jtagInfo.tdoSignal,
@@ -120,6 +126,10 @@ class JTAGCreator {
             Node.PortArg(
                 tdiSignals.mbist,
                 Node.Identifier(tdiSignals.mbist)
+            ),
+            Node.PortArg(
+                tdiSignals.scanIn,
+                Node.Identifier(tdiSignals.scanIn)
             )
         ]
 
@@ -211,17 +221,19 @@ struct selectSignals: Codable {
     var samplePreload: String
     var mbist: String
     var debug: String
-
+    var scanIn: String
     init (
         extest: String,
         samplePreload: String,
         mbist: String,
-        debug: String
+        debug: String,
+        scanIn: String
     ) {
         self.extest = extest
         self.samplePreload = samplePreload
         self.mbist =  mbist
         self.debug = debug
+        self.scanIn = scanIn
     }
 }
 
@@ -229,14 +241,17 @@ struct tdiSignals: Codable {
     var debug: String
     var bsChain: String
     var mbist: String
-
+    var scanIn: String
+    
     init (
         debug: String,
         bsChain: String,
-        mbist: String
+        mbist: String,
+        scanIn: String
     ) {
         self.debug = debug
         self.bsChain = bsChain
         self.mbist = mbist
+        self.scanIn = scanIn
     }
 }

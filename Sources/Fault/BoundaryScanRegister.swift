@@ -14,6 +14,7 @@ class BoundaryScanRegisterCreator {
     private var captureIdentifier: PythonObject
     private var updateIdentifier: PythonObject
     private var shiftIdentifier: PythonObject
+    private var extestIdentifier: PythonObject
     private var clockIdentifier: PythonObject
     private var resetIdentifier: PythonObject
 
@@ -27,6 +28,7 @@ class BoundaryScanRegisterCreator {
         capture: String,
         update: String,
         shift: String,
+        extest: String,
         using Node: PythonObject
     ) {
         self.name = name
@@ -44,6 +46,7 @@ class BoundaryScanRegisterCreator {
         self.captureIdentifier = Node.Identifier(capture)
         self.updateIdentifier = Node.Identifier(update)
         self.shiftIdentifier = Node.Identifier(shift)
+        self.extestIdentifier = Node.Identifier(extest)
 
         self.Node = Node
     }
@@ -77,6 +80,7 @@ class BoundaryScanRegisterCreator {
 
         if (!input){
             portArguments.append(Node.PortArg("updateDR", updateIdentifier))
+            portArguments.append(Node.PortArg("extest", extestIdentifier))
         }
 
         let submoduleInstance = Node.Instance(

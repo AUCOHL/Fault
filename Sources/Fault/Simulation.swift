@@ -305,9 +305,15 @@ class Simulator {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        dffCount: Int,
+        boundaryCount: Int,
+        internalCount: Int,
         clock: String,
         reset: String,
+        tck: String,
+        sinInternal: String,
+        sinBoundary: String,
+        soutInternal: String,
+        soutBoundary: String,
         resetActive: Active = .low,
         testing: String,
         using iverilogExecutable: String,
@@ -339,9 +345,19 @@ class Simulator {
             }
         }
 
-        var serial = ""
-        for _ in 0..<dffCount {
-            serial += "\(Int.random(in: 0...1))"
+        var boundarySerial = "0"
+        for _ in 0..<boundaryCount {
+            boundarySerial += "\(Int.random(in: 0...1))"
+        }
+
+        var internalSerial = "0"
+        for _ in 0..<internalCount {
+            internalSerial += "\(Int.random(in: 0...1))"
+        }
+        
+        var clockCreator = ""
+        if !clock.isEmpty {
+            clockCreator = "always #1 \(clock) = ~\(clock);"
         }
 
         let bench = """
@@ -351,16 +367,22 @@ class Simulator {
 
         module testbench;
         \(portWires)
-            
-            always #1 \(clock) = ~\(clock);
+
+            \(clockCreator)
+            always #1 \(tck) = ~\(tck);
 
             \(module) uut(
                 \(portHooks.dropLast(2))
             );
 
-            wire[\(dffCount - 1):0] serializable =
-                \(dffCount)'b\(serial);
-            reg[\(dffCount - 1):0] serial;
+            wire[\(boundaryCount - 1):0] boundarySerializable =
+                \(boundaryCount)'b\(boundarySerial);
+            reg[\(boundaryCount - 1):0] boundarySerial;
+            
+            wire[\(internalCount == 0 ? 1 : internalCount  - 1):0] internalSerializable =
+                \(internalCount == 0 ? 1 : internalCount)'b\(internalSerial);
+            reg[\(internalCount - 1):0] internalSerial;
+
             integer i;
 
             initial begin
@@ -369,18 +391,36 @@ class Simulator {
                 \(reset) = ~\(reset);
                 \(testing) = 1;
 
-                for (i = 0; i < \(dffCount); i = i + 1) begin
-                    sin = serializable[i];
+                for (i = 0; i < \(boundaryCount); i = i + 1) begin
+                    \(sinBoundary) = boundarySerializable[i];
                     #2;
                 end
-                #2;
-                for (i = 0; i < \(dffCount); i = i + 1) begin
-                    serial[i] = sout;
+                #4;
+                for (i = 0; i < \(boundaryCount); i = i + 1) begin
+                    boundarySerial[i] = \(soutBoundary);
                     #2;
                 end
-                if (serial == serializable) begin
-                    $display("SUCCESS_STRING");
+
+                if (boundarySerial != boundarySerializable) begin
+                    $error("FAILED_SERIALIZING_THROUGH_BOUNDARY_CHAIN");
+                    $finish;
                 end
+
+                for (i = 0; i < \(internalCount); i = i + 1) begin
+                    \(sinInternal) = internalSerializable[i];
+                    #2;
+                end
+                for (i = 0; i < \(internalCount); i = i + 1) begin
+                    internalSerial[i] = \(soutInternal);
+                    #2;
+                end
+
+                if (internalSerial != internalSerializable) begin
+                    $error("FAILED_SERIALIZING_THROUGH_INTERNAL_CHAIN");
+                    $finish;
+                end
+                
+                $display("SUCCESS_STRING");
                 $finish;
             end
         endmodule
@@ -466,30 +506,45 @@ class Simulator {
                     let bit = Int.random(in: 0...1)
                     inputAssignment += "        \(name) = \(bit) ;\n"
                     serial += "\(bit)"
-                    let assignStatement = "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_input_\(count)__.store "
+                    let assignStatement =
+                        "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_input_\(count)__.store "
                     storesAssignment += "\(assignStatement);\n"
                     count = count + 1
                 }
             }
         }
-
-        let inputBSCount = count
-        
+       
+        var outputAssignment  = ""
         for output in outputs {
             if (output.name != tdo){
-                let assignStatement = "stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_output_\(count)__.store "
+                let assignStatement = 
+                    "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_output_\(count)__.store "
                 storesAssignment += "\(assignStatement);\n"
+                outputAssignment += "        serializable[\(boundaryCount - count - 1)] = \(output.name) ; \n" 
+                serial += "0"
                 count = count + 1
             }
         }
-        
-        let outputBSCount = count - inputBSCount
-        let dffCount = internalCount + boundaryCount - 1
 
-        var tdiSerial = ""
-        for _ in 0..<dffCount {
-            tdiSerial += "\(Int.random(in: 0...1))"
+        var boundarySerial = ""
+        for _ in 0..<boundaryCount {
+            boundarySerial += "\(Int.random(in: 0...1))"
         }
+
+        var scanInSerial = ""
+        for _ in 0..<internalCount {
+            scanInSerial += "\(Int.random(in: 0...1))"
+        }
+
+        var clockCreator = ""
+        if !clock.isEmpty {
+            clockCreator = "always #1 \(clock) = ~\(clock);"
+        }
+        var resetToggler = ""
+        if !reset.isEmpty {
+            resetToggler = "\(reset) = ~\(reset);"
+        }
+
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
@@ -498,7 +553,7 @@ class Simulator {
         module testbench;
         \(portWires)
             
-            always #1 \(clock) = ~\(clock);
+            \(clockCreator)
             always #1 \(tck) = ~\(tck);
 
             \(module) uut(
@@ -507,25 +562,26 @@ class Simulator {
 
             integer i;
             reg [\(boundaryCount - 1): 0] stores;
-
             wire[3:0] extest = 4'b 0000;
             wire[3:0] samplePreload = 4'b 0001;
-            wire[3:0] idcode = 4'b 0010;
             wire[3:0] bypass = 4'b 1111;
-            
-            wire[3:0] ir_reg = 4'b 0101;
-            wire[\(boundaryCount - 1):0] serializable =
+            wire[3:0] scanIn = 4'b 0100;
+
+            reg[\(boundaryCount - 1):0] serializable =
                 \(boundaryCount)'b\(serial);
-            wire [\(dffCount - 1): 0] tdiSerial = 
-                \(dffCount)'b\(tdiSerial);
-            reg[\(dffCount - 1):0] serial;
+            wire [\(boundaryCount - 1): 0] boundarySerial = 
+                \(boundaryCount)'b\(boundarySerial);
+           
+            reg[\(boundaryCount - 1):0] serial;
+            
+            wire [\(internalCount == 0 ? 1 : internalCount - 1): 0] scanInSerializable = 
+                \(internalCount == 0 ? 1 : internalCount)'b\(scanInSerial.isEmpty ? "0" : scanInSerial);
+            reg[\(internalCount - 1):0] scanInSerial;
 
             initial begin
-                $dumpfile("dut.vcd"); // DEBUG
-                $dumpvars(0, testbench);
         \(inputInit)
                 #10;
-                \(reset) = ~\(reset);
+                \(resetToggler)
                 \(trst) = 1;        
                 #2;
                 /*
@@ -564,13 +620,15 @@ class Simulator {
         \(inputAssignment)
                 #2;
                 \(tms) = 0;     // shift-DR 
-                #6;
-                for (i = 0; i < \(dffCount); i = i + 1) begin
+                #2;
+        \(outputAssignment)
+                #2;
+                for (i = 0; i < \(boundaryCount); i = i + 1) begin
                     \(tms) = 0;
                     serial[i] = \(tdo); 
                     #2;
                 end
-                if(serial[\(boundaryCount + 1):\(internalCount - 1)] != serializable) begin
+                if(serial != serializable) begin
                     $error("EXECUTING_SAMPLE_INST_FAILED");
                     $finish;
                 end
@@ -589,9 +647,9 @@ class Simulator {
                 #2;
                 \(tms) = 0;     // shift DR
                 #2;
-                for (i = 0; i < \(dffCount); i = i + 1) begin
-                    \(tdi) = tdiSerial[i];
-                    if(i == \(dffCount - 1))
+                for (i = 0; i < \(boundaryCount); i = i + 1) begin
+                    \(tdi) = boundarySerial[i];
+                    if(i == \(boundaryCount - 1))
                         \(tms) = 1;     // exit-dr
                     #2;
                 end
@@ -600,25 +658,109 @@ class Simulator {
                 \(tms) = 0;     // run-test idle
                 #2;
         \(storesAssignment)
-                for(i = 0; i< \(inputBSCount); i = i + 1) begin
-                    if(stores[i] != tdiSerial[i + \(dffCount - 1)]) begin
+                for(i = 0; i< \(boundaryCount); i = i + 1) begin
+                    if(stores[i] != boundarySerial[i + \(boundaryCount - 1)]) begin
                         $error("EXECUTING_PRELOAD_INST_FAILED");
                         $finish;
                     end
                 end 
+                /*
+                    Test SCAN IN Instruction
+                */
+                \(tms) = 1;     // select-DR 
+                #2;
+                \(tms) = 1;     // select-IR 
+                #2;
+                \(tms) = 0;     // capture-IR
+                #2;
+                \(tms) = 0;     // Shift-IR 
+                #2
 
-                for(i = 0; i< \(outputBSCount); i = i + 1) begin
-                    if(stores[\(boundaryCount) - i] != tdiSerial[i]) begin
-                        $error("EXECUTING_PRELOAD_INST_FAILED");
-                        $finish;
+                // shift new instruction on tdi line
+                for (i = 0; i < 4; i = i + 1) begin
+                    \(tdi) = scanIn[i];
+                    if(i == 3) begin
+                        \(tms) = 1;     // exit-ir
                     end
+                    #2;
+                end
+                \(tms) = 1;     // update-ir 
+                #2;
+                \(tms) = 0;     // run test-idle
+                #6;
+                
+                \(tms) = 1;     // select-DR
+                #2;
+                \(tms) = 0;     // capture-DR
+                #2;
+                \(tms) = 0;     // shift-DR
+                #2;
+
+                for (i = 0; i < \(internalCount); i = i + 1) begin
+                    \(tdi) = scanInSerializable[i];
+                    #2;
                 end
 
+                for (i = 0; i < \(internalCount); i = i + 1) begin
+                    scanInSerial[i] = \(tdo);
+                    if(i == \(internalCount - 1))
+                        \(tms) = 1;     // exit-dr
+                    #2;
+                end
+                if(scanInSerial != scanInSerializable) begin
+                    $error("EXECUTING_SCANIN_INST_FAILED");
+                    $finish;
+                end
+                \(tms) = 1;     // update-DR
+                #2;
+                \(tms) = 0;     // run-test idle
+                #2;
+
                 /*
-                    Test EXTEST Instruction
+                    Test BYPASS Instruction 
                 */
+                \(tms) = 1;     // select-DR 
+                #2;
+                \(tms) = 1;     // select-IR 
+                #2;
+                \(tms) = 0;     // capture-IR
+                #2;
+                \(tms) = 0;     // Shift-IR 
+                #2
+                // shift new instruction on tdi line
+                for (i = 0; i < 4; i = i + 1) begin
+                    \(tdi) = bypass[i];
+                    if(i == 3) begin
+                        \(tms) = 1;     // exit-ir
+                    end
+                    #2;
+                end
+                \(tms) = 1;     // update-ir 
+                #2;
+                \(tms) = 0;     // run test-idle
+                #6;
                 
-                #100;
+                \(tms) = 1;     // select-DR
+                #2;
+                \(tms) = 0;     // capture-DR
+                #2;
+                \(tms) = 0;     // shift-DR
+                #2;
+                for (i = 0; i < 10; i = i + 1) begin
+                    \(tdi) = 1;
+                    #2;
+                    if (\(tdo) != 1) begin
+                        $error("ERROR_EXECUTING_BYPASS_INST");
+                    end
+                    if(i == 9) begin
+                        \(tms) = 1;     // exit-ir
+                    end
+                end
+                
+                \(tms) = 1;     // update-ir 
+                #2;
+                \(tms) = 0;     // run test-idle
+                #2;
                 $display("SUCCESS_STRING");
                 $finish;
             end
