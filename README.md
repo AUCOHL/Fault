@@ -58,6 +58,15 @@ This performs static compaction on the generated test vectors by reducing the te
 
 For more options, you can invoke `fault compact --help`.
 
+## tap
+`fault tap --clock <clockName> --reset <resetName> <chained netlist>`
+
+Tap adds JTAG interface to a chained netlist. Currently, two scan chains are supported: the boundary cell scan chain and the internal registers chain. Tap supports the IEEE 1149.1 four mandatory: Extest, Bypass, Sample, and Preload. Also, it has been extended to support ScanIn (4'b 0100) instruction to select the internal register chain.   
+
+For more information on the supported instructions, check the example [testbench](Tests/Testbenches/TestTap.sv).
+
+For more options, you can invoke `fault tap --help`.
+
 # License
 The GNU General Public License v3 (or later, at your option). See 'License'.
 
