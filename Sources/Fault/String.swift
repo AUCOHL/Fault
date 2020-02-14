@@ -15,9 +15,11 @@ extension String {
             print("Could not launch task `\(self)': \(error)")
             exit(EX_UNAVAILABLE)
         }
-        task.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+
+        task.waitUntilExit()
+
         let output = String(data: data, encoding: .utf8)
 
         return (terminationStatus: task.terminationStatus, output: output!)
