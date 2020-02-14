@@ -1,4 +1,4 @@
-FROM swift:5.1.2-bionic
+FROM swift:5.1.4-bionic
 
 RUN apt-get update
 RUN apt-get install -y apt-utils
