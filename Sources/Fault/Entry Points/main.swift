@@ -2,13 +2,23 @@ import Foundation
 import CommandLineKit
 import PythonKit
 import Defile
-import CoreFoundation
+import OrderedDictionary
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
 let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
+
+let subcommands: OrderedDictionary =  [
+    "synth": (func: synth, desc: "synthesis"),
+    "chain": (func: scanChainCreate, desc: "scan chain"),
+    "cut": (func: cut, desc: "cutting"),
+    "asm": (func: assemble, desc: "test vector assembly"),
+    "compact": (func: compactTestVectors, desc: "test vector static compaction"),
+    "tap": (func: jtagCreate, desc: "JTAG port")
+]
+
 
 func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
@@ -121,12 +131,9 @@ func main(arguments: [String]) -> Int32 {
 
     if help.value {
         cli.printUsage()
-        print("To take a look at synthesis options, try 'fault synth --help'")
-        print("To take a look at cutting options, try 'fault cut --help'")
-        print("To take a look at scan chain options, try 'fault chain --help'")
-        print("To take a look at test vector assembly options, try 'fault asm --help'")
-        print("To take a look at test vector static compaction options, try 'fault compact --help'")
-        print("To take a look at JTAG port options, try 'fault tap --help'")
+        for (key, value) in subcommands {
+            print("To take a look at \(value.desc) options, try 'fault \(key) --help'")
+        }
         return EX_OK
     }
 
@@ -325,31 +332,10 @@ func main(arguments: [String]) -> Int32 {
 }
 
 var arguments = Swift.CommandLine.arguments
-if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "synth" {
+if arguments.count >= 2, let subcommand = subcommands[arguments[1]] {
     arguments[0] = "\(arguments[0]) \(arguments[1])"
     arguments.remove(at: 1)
-    exit(synth(arguments: arguments))
-} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "chain" {
-    arguments[0] = "\(arguments[0]) \(arguments[1])"
-    arguments.remove(at: 1)
-    exit(scanChainCreate(arguments: arguments))
-} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "cut" {
-    arguments[0] = "\(arguments[0]) \(arguments[1])"
-    arguments.remove(at: 1)
-    exit(cut(arguments: arguments))
-} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "asm" {
-    arguments[0] = "\(arguments[0]) \(arguments[1])"
-    arguments.remove(at: 1)
-    exit(assemble(arguments: arguments))
-} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "compact" {
-    arguments[0] = "\(arguments[0]) \(arguments[1])"
-    arguments.remove(at: 1)
-    exit(compactTestVectors(arguments: arguments))
-} else if Swift.CommandLine.arguments.count >= 2 && Swift.CommandLine.arguments[1] == "tap"{
-    arguments[0] = "\(arguments[0]) \(arguments[1])"
-    arguments.remove(at: 1)
-    exit(JTAGCreate(arguments: arguments))
-}
-  else {
+    exit(subcommand.func(arguments))
+} else {
     exit(main(arguments: arguments))
 }

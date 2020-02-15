@@ -178,7 +178,7 @@ class Simulator {
         var totalTVAttempts = 0
         var tvAttempts = initialVectorCount
         
-        let rng: URNG = RandGenFactory.shared().getRandGen(type:randomGenerator) // LFSR(nbits: 64)
+        let rng: URNG = RandGenFactory.shared().getRandGen(type: randomGenerator) // LFSR(nbits: 64)
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {

@@ -3,7 +3,7 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-func JTAGCreate(arguments: [String]) -> Int32{
+func jtagCreate(arguments: [String]) -> Int32{
     let env = ProcessInfo.processInfo.environment
     let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
 

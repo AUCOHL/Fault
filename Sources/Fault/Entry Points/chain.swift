@@ -647,7 +647,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             if  resetActiveLow.value {
                 jtagArguments.append("--activeLow")
             }
-            exit(JTAGCreate(arguments: jtagArguments))
+            exit(jtagCreate(arguments: jtagArguments))
         }
 
     } catch {

@@ -29,6 +29,15 @@
         }
       },
       {
+        "package": "OrderedDictionary",
+        "repositoryURL": "https://github.com/lukaskubanek/OrderedDictionary.git",
+        "state": {
+          "branch": "master",
+          "revision": "005ef5c3ee5a059608281ca95efc342e47467bab",
+          "version": null
+        }
+      },
+      {
         "package": "PythonKit",
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
