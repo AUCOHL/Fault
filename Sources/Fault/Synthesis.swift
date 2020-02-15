@@ -16,7 +16,7 @@ struct Synthesis {
 
     static func script(
         for module: String,
-        in file: String,
+        in files: [String],
         cutting: Bool = false,
         checkHierarchy: Bool = true,
         liberty libertyFile: String,
@@ -25,7 +25,7 @@ struct Synthesis {
     ) -> String {
         let opt = optimize ? "opt" : ""
         return """
-        read_verilog \(file)
+        read_verilog \(files.map({(file) in "'\(file)'" }).joined(separator: " "))
 
         # check design hierarchy
         hierarchy \(checkHierarchy ? "-check" : "") -top \(module)

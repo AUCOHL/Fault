@@ -1,6 +1,5 @@
 import Foundation
 import CommandLineKit
-import PythonKit
 import Defile
 
 func synth(arguments: [String]) -> Int32 {
@@ -18,7 +17,7 @@ func synth(arguments: [String]) -> Int32 {
     let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: !defaultLiberty, helpMessage: "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")")
     cli.addOptions(liberty)
 
-    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Default: first module found.)")
+    let topModule = StringOption(shortFlag: "t", longFlag: "top", required: true, helpMessage: "Top module. (Required.)")
     cli.addOptions(topModule)
     
     do {
@@ -34,22 +33,24 @@ func synth(arguments: [String]) -> Int32 {
     }
 
     let args = cli.unparsedArguments
-    if args.count != 1 {
+    if args.count < 1 {
         cli.printUsage()
         return EX_USAGE
     }      
 
     let fileManager = FileManager()
-    let file = args[0]
-    if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
-        return EX_NOINPUT
+    let files = args
+
+    for file in files {
+        if !fileManager.fileExists(atPath: file) {
+            fputs("File '\(file)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
     }
-    let output = filePath.value ?? "Netlists/\(file).netlist.v"
 
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
-            fputs("Liberty file '\(file)' not found.\n", stderr)
+            fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
         if !libertyTest.hasSuffix(".lib") {
@@ -60,39 +61,9 @@ func synth(arguments: [String]) -> Int32 {
         }
     }
 
-    // MARK: Importing Python and Pyverilog
-    
-    let parse = Python.import("pyverilog.vparser.parser").parse
+    let module = "\(topModule.value!)"
 
-    // Get topModule name
-    let ast = parse([args[0]])[0]
-    let description = ast[dynamicMember: "description"]
-    var definitionOptional: PythonObject?
-    for definition in description.definitions {
-        let type = Python.type(definition).__name__
-        if type == "ModuleDef" {
-            if let value = topModule.value {
-                if "\(definition.name)" == value {
-                    definitionOptional = definition
-                    break
-                }
-            } else {
-                definitionOptional = definition
-                break
-            }
-        }
-    }
-    
-    guard let definition = definitionOptional else {
-        if let value = topModule.value {
-            fputs("The top module '\(value)' was not found.\n", stderr)
-            exit(EX_DATAERR)
-        }
-        fputs("No module found.\n", stderr)
-        exit(EX_DATAERR)
-    }
-
-    let module = "\(definition.name)"
+    let output = filePath.value ?? "Netlists/\(module).netlist.v"
     
     // I am so sorry.
     let libertyFile = defaultLiberty ?
@@ -100,7 +71,7 @@ func synth(arguments: [String]) -> Int32 {
         "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
         liberty.value!
 
-    let script = Synthesis.script(for: module, in: file, cutting: false, liberty: libertyFile, output: output)
+    let script = Synthesis.script(for: module, in: args, cutting: false, liberty: libertyFile, output: output)
 
     let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
     let result = "echo '\(script)' | '\(yosysExecutable)'".sh()

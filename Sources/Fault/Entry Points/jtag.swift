@@ -421,7 +421,7 @@ func JTAGCreate(arguments: [String]) -> Int32{
 
         let script = Synthesis.script(
             for: definitionName,
-            in: intermediate,
+            in: [intermediate],
             checkHierarchy: false,
             liberty: libertyFile,
             output: output
