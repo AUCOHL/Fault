@@ -29,7 +29,7 @@
         }
       },
       {
-        "package": "PythonTool",
+        "package": "PythonKit",
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
           "branch": "master",

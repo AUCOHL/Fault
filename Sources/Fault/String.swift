@@ -25,8 +25,21 @@ extension String {
         return (terminationStatus: task.terminationStatus, output: output!)
     }
 
-    func sh() -> Int {
-        return Int(self.shOutput().terminationStatus)
+    func sh() -> Int32 {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        task.arguments = ["sh", "-c", self]
+
+        do {
+            try task.run()
+        } catch {
+            print("Could not launch task `\(self)': \(error)")
+            exit(EX_UNAVAILABLE)
+        }
+
+        task.waitUntilExit()
+
+        return task.terminationStatus
     }
 
     func uniqueName(_ number: Int) -> String {

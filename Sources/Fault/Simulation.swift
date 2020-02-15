@@ -115,6 +115,7 @@ class Simulator {
         }
 
         let aoutName = "\(folderName)/a.out"
+        let intermediate = "\(folderName)/intermediate"
         
         let env = ProcessInfo.processInfo.environment
         let iverilogExecutable = env["FAULT_IVERILOG"] ?? "iverilog"
@@ -126,17 +127,20 @@ class Simulator {
             exit(Int32(iverilogResult))
         }
 
-        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
-
-        if vvpTask.terminationStatus != EX_OK {
-            exit(vvpTask.terminationStatus)
+        let vvpTask = "'\(vvpExecutable)' \(aoutName) > \(intermediate)".sh()
+        if vvpTask != EX_OK {
+            exit(vvpTask)
         }
 
-        if cleanUp {
-            let _ = "rm -rf \(folderName)".sh()
+        let output = File.read(intermediate)!
+
+        defer {
+            if cleanUp {
+                let _ = "rm -rf \(folderName)".sh()
+            }
         }
 
-        return vvpTask.output.components(separatedBy: "\n").filter {
+        return output.components(separatedBy: "\n").filter {
             !$0.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
@@ -192,6 +196,9 @@ class Simulator {
                     testVector.append(
                        rng.generate(0...max)
                     )
+                    // testVector.append(
+                    //     BigUInt.randomInteger(withMaximumWidth: input.width)
+                    // )
                 }
                 if testVectorHash.contains(testVector) {
                     continue
