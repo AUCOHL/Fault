@@ -1,21 +1,18 @@
 import Foundation 
+import BigInt
 
-enum RandomGenerator: String {
+enum RNG: String {
     case swift
     case LFSR
 }
 
-protocol URNG { // Swift RNG protocol sucks
-    func generate(_ range: Range<UInt>) -> UInt
-    func generate(_ range: ClosedRange<UInt>) -> UInt
+protocol URNG {
+    func generate(bits: Int) -> BigUInt
 }
 
 class SwiftRNG: URNG {
-    func generate(_ range: Range<UInt>) -> UInt {
-        return UInt.random(in: range)
-    }
-    func generate(_ range: ClosedRange<UInt>) -> UInt {
-        return UInt.random(in: Range(range))
+    func generate(bits: Int) -> BigUInt {
+        return BigUInt.randomInteger(withMaximumWidth: bits)
     }
 }
 
@@ -60,7 +57,7 @@ class LFSR: URNG {
     var polynomialHex: UInt
     let nbits: UInt 
     
-    init (nbits: UInt){     
+    init(nbits: UInt) {     
         let max: UInt = (nbits == 64) ? UInt(pow(Double(2),Double(63))-1) : (1 << nbits) - 1  
         let polynomial =  LFSR.taps[nbits]!
 
@@ -73,10 +70,10 @@ class LFSR: URNG {
         }
     }
 
-    static func parity (number: UInt) -> UInt {
+    static func parity(number: UInt) -> UInt {
         var parityVal: UInt = 0
         var numberTemp = number
-        while(numberTemp != 0){
+        while numberTemp != 0 {
             parityVal ^= 1 
             numberTemp = numberTemp & (numberTemp - 1)
         }
@@ -89,23 +86,31 @@ class LFSR: URNG {
         return self.seed
     }
 
-    func generate(_ range: Range<UInt>) -> UInt {
-        return rand() % UInt(range.upperBound - range.lowerBound + 1) + UInt(range.lowerBound)
-    }
-
-    func generate(_ range: ClosedRange<UInt>) -> UInt {
-        return generate(Range(range))
+    func generate(bits: Int) -> BigUInt {
+        var returnValue: BigUInt = 0
+        var generations = bits / Int(nbits)
+        let leftover = bits % Int(nbits)
+        while generations > 0 {
+            returnValue <<= BigUInt(nbits)
+            returnValue |= BigUInt(rand())
+            generations -= 1
+        }
+        if leftover > 0 {
+            returnValue <<= BigUInt(leftover)
+            returnValue |= BigUInt(rand() % ((1 << leftover) - 1))
+        }
+        return returnValue
     }
 }
 
-class RandGenFactory{
-    private static var sharedRandFactory = RandGenFactory()
+class RNGFactory{
+    private static var sharedRandFactory = RNGFactory()
 
-    class func shared() -> RandGenFactory {
+    class func shared() -> RNGFactory {
         return sharedRandFactory
     }
 
-    func getRandGen(type: RandomGenerator)->URNG{
+    func getRNG(type: RNG) -> URNG {
         switch type {
             case .swift:
                 return SwiftRNG()

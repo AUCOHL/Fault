@@ -159,7 +159,7 @@ class Simulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
-        randomGenerator: RandomGenerator,
+        randomGenerator: RNG,
         sampleRun: Bool,
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -178,7 +178,7 @@ class Simulator {
         var totalTVAttempts = 0
         var tvAttempts = initialVectorCount
         
-        let rng: URNG = RandGenFactory.shared().getRandGen(type: randomGenerator) // LFSR(nbits: 64)
+        let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -192,13 +192,7 @@ class Simulator {
             for _ in 0..<tvAttempts {
                 var testVector: TestVector = []
                 for input in inputs {
-                    let max: UInt = (1 << UInt(input.width)) - 1
-                    testVector.append(
-                       rng.generate(0...max)
-                    )
-                    // testVector.append(
-                    //     BigUInt.randomInteger(withMaximumWidth: input.width)
-                    // )
+                    testVector.append(rng.generate(bits: input.width))
                 }
                 if testVectorHash.contains(testVector) {
                     continue

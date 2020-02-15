@@ -2,6 +2,15 @@
   "object": {
     "pins": [
       {
+        "package": "BigInt",
+        "repositoryURL": "https://github.com/attaswift/BigInt.git",
+        "state": {
+          "branch": null,
+          "revision": "19f5e8a48be155e34abb98a2bcf4a343316f0343",
+          "version": "5.0.0"
+        }
+      },
+      {
         "package": "CommandLineKit",
         "repositoryURL": "https://github.com/pvieito/CommandLineKit",
         "state": {

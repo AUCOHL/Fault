@@ -170,7 +170,7 @@ func main(arguments: [String]) -> Int32 {
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
         let tvCeiling = Int(ceiling.value ?? defaultCeiling),
-        let randomGenerator: RandomGenerator = RandomGenerator(rawValue: randGen.value ?? defaultRandGen)
+        let randomGenerator: RNG = RNG(rawValue: randGen.value ?? defaultRandGen)
     else {
         cli.printUsage()
         return EX_USAGE
@@ -262,6 +262,8 @@ func main(arguments: [String]) -> Int32 {
                 }
             }
         }
+
+        var warnAboutDFF = false
         
         for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
@@ -270,10 +272,17 @@ func main(arguments: [String]) -> Int32 {
             if type == "InstanceList" {
                 gateCount += 1
                 let instance = itemDeclaration.instances[0]
+                if String(describing: instance.module).starts(with: "DFF") {
+                    warnAboutDFF = true
+                }
                 for hook in instance.portlist {
                     faultPoints.insert("\(instance.name).\(hook.portname)")
                 }
             }
+        }
+
+        if warnAboutDFF {
+            print("Warning: D-flipflops were found in this netlist. Are you sure you ran it through 'fault cut'?")
         }
 
         print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")

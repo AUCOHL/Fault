@@ -2,6 +2,7 @@ import Foundation
 import CommandLineKit
 import PythonKit
 import Defile
+import BigInt
 
 func assemble(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -98,7 +99,7 @@ func assemble(arguments: [String]) -> Int32 {
 
     let vectors = tvinfo.coverageList.map { $0.vector }
 
-    func pad(_ number: UInt, digits: Int, radix: Int) -> String {
+    func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
         var padded = String(number, radix: radix)
         let length = padded.count
         if digits > length {
@@ -114,7 +115,7 @@ func assemble(arguments: [String]) -> Int32 {
     for vector in vectors {
         var binaryString = ""
         for element in order {
-            var value: UInt = 0
+            var value: BigUInt = 0
             if let locus = inputMap[element.name] {
                 value = vector[locus]
             }

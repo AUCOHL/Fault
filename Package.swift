@@ -14,14 +14,15 @@ let package = Package(
         .package(url: "https://github.com/lukaskubanek/OrderedDictionary.git", .branch("master")),
         .package(url: "https://github.com/pvieito/PythonKit", .branch("master")),
         .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
-        .package(url: "https://github.com/donn/Defile.git", .branch("master"))
+        .package(url: "https://github.com/donn/Defile.git", .branch("master")),
+        .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "Fault",
-            dependencies: ["PythonKit", "CommandLineKit", "Defile", "OrderedDictionary"],
+            dependencies: ["PythonKit", "CommandLineKit", "Defile", "OrderedDictionary", "BigInt"],
             path: "Sources"
         ),
         .testTarget(

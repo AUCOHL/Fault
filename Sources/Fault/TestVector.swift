@@ -1,6 +1,7 @@
 import Foundation
+import BigInt
 
-typealias TestVector = [UInt]
+typealias TestVector = [BigUInt]
 
 struct Coverage: Codable {
     var sa0: [String]
