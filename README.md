@@ -32,7 +32,7 @@ Generated test vectors are printed to stdout by default, but you can use `-o <fi
 
 For more options, you can invoke `fault --help`.
 
-## chain
+### chain
 `fault chain --liberty <your-liberty-file> --clock <clockName> --reset <resetName> <--activeLow> <your-file>`, `--liberty` behaving identical to Synth.
 
 Chain is another synthesis script that links registers together for scan insertion. It takes all the assumptions made in the main program but the last, and one more:
@@ -46,19 +46,19 @@ You can have Chain automagically verify its generated scanchain-- see the help f
 
 For more options, you can invoke `fault chain --help`.
 
-## asm
+### asm
 `fault asm <test vector json> <chained netlist>`, in any order, will assemble a .bin file for use with `$readmemb`.
 
 For more options, you can invoke `fault asm --help`.
 
-## compact
+### compact
 `fault compact <test vector json>`
 
 This performs static compaction on the generated test vectors by reducing the test vectors count while keeping the same coverage.
 
 For more options, you can invoke `fault compact --help`.
 
-## tap
+### tap
 `fault tap --clock <clockName> --reset <resetName> <chained netlist>`
 
 Tap adds JTAG interface to a chained netlist. Currently, two scan chains are supported: the boundary cell scan chain and the internal registers chain. Tap supports the IEEE 1149.1 four mandatory: Extest, Bypass, Sample, and Preload. Also, it has been extended to support ScanIn (4'b 0100) instruction to select the internal register chain.   
