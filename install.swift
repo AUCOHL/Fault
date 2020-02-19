@@ -15,6 +15,7 @@ extension String {
 
         let pipe = Pipe()
         task.standardOutput = pipe
+        task.standardError = pipe
 
         do {
             try task.run()
@@ -22,9 +23,9 @@ extension String {
             print("Could not launch task `\(self)': \(error)")
             exit(EX_UNAVAILABLE)
         }
-        task.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
         let output = String(data: data, encoding: .utf8)
 
         return (terminationStatus: task.terminationStatus, output: output!)
@@ -84,20 +85,21 @@ if action == .install {
     print("Installing Fault (\(gitVersion))...")
 
     print("Compiling...")
-    let compilationResult = "swift build".shOutput().terminationStatus
-    if compilationResult != EX_OK {
+    let compilationResult = "swift build".shOutput()
+    if compilationResult.terminationStatus != EX_OK {
         print("Compiling Fault failed.")
+        print(compilationResult)
         exit(EX_DATAERR)
     }
 
-    let folder = "mkdir -p '\(path)'".shOutput().terminationStatus
-    if folder != EX_OK {
+    let folder = "mkdir -p '\(path)'".shOutput()
+    if folder.terminationStatus != EX_OK {
         print("Could not create folder.")
         exit(EX_CANTCREAT)
     }
 
-    let internalFolder = "mkdir -p '\(path)/FaultInstall'".shOutput().terminationStatus
-    if internalFolder != EX_OK {
+    let internalFolder = "mkdir -p '\(path)/FaultInstall'".shOutput()
+    if internalFolder.terminationStatus != EX_OK {
         print("Could not create folder.")
         exit(EX_CANTCREAT)
     }

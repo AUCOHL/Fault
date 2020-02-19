@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation // Not automatically imported on Linux
 import CommandLineKit
 import PythonKit
 import Defile
