@@ -28,7 +28,7 @@ Then install the Swift programming language: instructions are on [swift.org](htt
 
 Notice how Icarus Verilog is excluded. This is because as of the time of writing, there is no version of Swift on a version of Ubuntu that has Icarus Verilog 10.2 or above. Which is ridiculous. You'll have to build it from source. First, grab these dev dependencies:
 
-`sudo apt-get install autoconf make gperf flex bison`
+`sudo apt-get install curl autoconf make gperf flex bison`
 
 Then just run this in a terminal instance:
 
