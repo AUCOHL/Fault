@@ -52,7 +52,7 @@ func main(arguments: [String]) -> Int32 {
     let filePath = StringOption(
         shortFlag: "o",
         longFlag: "output",
-        helpMessage: "Path to the output JSON file. (Default: input + .tv.json)"
+        helpMessage: "Path to the output JSON & SVF files. (Default: input + .tv.json, input + .tv.svf)"
     )
     cli.addOptions(filePath)
 
@@ -164,7 +164,8 @@ func main(arguments: [String]) -> Int32 {
         }
     }
     
-    let output = filePath.value ?? "\(file).tv.json"
+    let jsonOutput = "\(filePath.value ?? file).tv.json"
+    let svfOutput = "\(filePath.value  ?? file).tv.svf"
 
     guard
         let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
@@ -316,23 +317,27 @@ func main(arguments: [String]) -> Int32 {
         print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
-        
+
+        let tvInfo = TVInfo(inputs: inputsMinusIgnored,
+            coverageList: result.coverageList)
         let encoder = JSONEncoder()
-        let data = try encoder.encode(
-            TVInfo(
-                inputs: inputsMinusIgnored,
-                coverageList: result.coverageList
-            )
-        )
+        let data = try encoder.encode(tvInfo)
 
         guard let string = String(data: data, encoding: .utf8)
         else {
             throw "Could not create utf8 string."
         }
 
-        try File.open(output, mode: .write) {
+        try File.open(jsonOutput, mode: .write) {
             try $0.print(string)
         }
+
+        let svf = try SerialVectorCreator.create(tvInfo: tvInfo)
+
+        try File.open(svfOutput, mode: .write) {
+            try $0.print(svf)
+        }
+      
     } catch {
         fputs("Internal error: \(error)", stderr)
         return EX_SOFTWARE

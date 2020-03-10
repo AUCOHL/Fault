@@ -21,10 +21,11 @@ class Simulator {
         outputs: [Port],
         stuckAt: Int,
         cleanUp: Bool,
+        goldenOutput: Bool,
         filePrefix: String = ".",
         using iverilogExecutable: String,
         with vvpExecutable: String
-    ) throws -> [String] {
+    ) throws -> (faults: [String], goldenOutput: String) {
         var portWires = ""
         var portHooks = ""
         var portHooksGM = ""
@@ -37,7 +38,7 @@ class Simulator {
         }
 
         let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p \(folderName)".sh()
+        let result = "mkdir -p \(folderName)".sh()
 
         var inputAssignment = ""
         var fmtString = ""
@@ -63,14 +64,18 @@ class Simulator {
         fmtString = String(fmtString.dropLast(1))
         inputList = String(inputList.dropLast(2))
 
+        var count = outputs.count - 1
         var outputComparison = ""
+        var outputAssignment = ""
         for output in outputs {
             let name = (output.name.hasPrefix("\\")) ? output.name : "\\\(output.name)"
             outputComparison += " ( \(name) != \(name).gm ) || "
+            outputAssignment += "   assign goldenOutput[\(count)] = \(name).gm ; \n"
+            count -= 1
         }
         outputComparison = String(outputComparison.dropLast(3))
 
-        var faultForces = ""
+        var faultForces = ""    
         for fault in faultPoints {
             faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"   
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
@@ -80,6 +85,8 @@ class Simulator {
 
         let bench = """
         \(String.boilerplate)
+
+
 
         `include "\(cells)"
         `include "\(file)"
@@ -94,15 +101,19 @@ class Simulator {
             \(module) gm(
                 \(portHooksGM.dropLast(2))
             );
+           
+            \(goldenOutput ?
+            "wire [\(outputs.count - 1):0] goldenOutput; \n \(outputAssignment)" : "")
 
             wire difference ;
             assign difference = (\(outputComparison));
-
+            
             integer counter;
 
             initial begin
         \(inputAssignment)
         \(faultForces)
+        \(goldenOutput ? "        $displayb(\"%b\", goldenOutput);": "" )
                 $finish;
             end
 
@@ -116,7 +127,6 @@ class Simulator {
 
         let aoutName = "\(folderName)/a.out"
         let intermediate = "\(folderName)/intermediate"
-        
         let env = ProcessInfo.processInfo.environment
         let iverilogExecutable = env["FAULT_IVERILOG"] ?? "iverilog"
         let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
@@ -140,9 +150,12 @@ class Simulator {
             }
         }
 
-        return output.components(separatedBy: "\n").filter {
+        var faults = output.components(separatedBy: "\n").filter {
             !$0.trimmingCharacters(in: .whitespaces).isEmpty
         }
+    
+        let gmOutput = goldenOutput ? faults.removeLast() : ""
+        return (faults: faults, goldenOutput: gmOutput)
     }
 
     static func simulate(
@@ -209,7 +222,7 @@ class Simulator {
             for vector in testVectors {
                 let future = Future {
                     do {
-                        let sa0 =
+                        let (sa0, output) =
                             try Simulator.pseudoRandomVerilogGeneration(
                                 using: vector,
                                 for: faultPoints,
@@ -223,12 +236,13 @@ class Simulator {
                                 outputs: outputs,
                                 stuckAt: 0,
                                 cleanUp: !sampleRun,
+                                goldenOutput: true,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
 
-                        let sa1 =
+                        let (sa1, _) =
                             try Simulator.pseudoRandomVerilogGeneration(
                                 using: vector,
                                 for: faultPoints,
@@ -242,15 +256,16 @@ class Simulator {
                                 outputs: outputs,
                                 stuckAt: 1,
                                 cleanUp: !sampleRun,
+                                goldenOutput: false,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
 
-                        return Coverage(sa0: sa0, sa1: sa1)
+                        return (Covers: Coverage(sa0: sa0, sa1: sa1) , Output: output)
                     } catch {
                         print("IO Error @ vector \(vector)")
-                        return Coverage(sa0: [], sa1: [])
+                        return (Covers: Coverage(sa0: [], sa1: []) , Output: "")
 
                     }
                 }
@@ -261,7 +276,7 @@ class Simulator {
             }
 
             for (i, future) in futureList.enumerated() {
-                let coverLists = future.value as! Coverage
+                let (coverLists, output) = future.value as! (Coverage, String)
                 for cover in coverLists.sa0 {
                     sa0Covered.insert(cover)
                 }
@@ -271,7 +286,8 @@ class Simulator {
                 coverageList.append(
                     TVCPair(
                         vector: testVectors[i],
-                        coverage: coverLists
+                        coverage: coverLists,
+                        goldenOutput: output
                     )
                 )
             }

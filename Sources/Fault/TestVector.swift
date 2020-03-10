@@ -15,17 +15,17 @@ struct Coverage: Codable {
 struct TVCPair: Codable {
     var vector: TestVector
     var coverage: Coverage
-
-    init(vector: TestVector, coverage: Coverage) {
+    var goldenOutput: String
+    init(vector: TestVector, coverage: Coverage, goldenOutput: String) {
         self.vector = vector
         self.coverage = coverage
+        self.goldenOutput = goldenOutput
     }
 }
 
 struct TVInfo: Codable {
     var inputs: [Port]
     var coverageList: [TVCPair]
-
     init(
         inputs: [Port],
         coverageList: [TVCPair]
