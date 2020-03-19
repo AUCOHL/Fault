@@ -6,8 +6,8 @@
         "repositoryURL": "https://github.com/attaswift/BigInt.git",
         "state": {
           "branch": null,
-          "revision": "19f5e8a48be155e34abb98a2bcf4a343316f0343",
-          "version": "5.0.0"
+          "revision": "2bbb8a7addeb79ceccf45acac9f6e2a07cbe9680",
+          "version": "5.1.0"
         }
       },
       {
@@ -15,7 +15,7 @@
         "repositoryURL": "https://github.com/pvieito/CommandLineKit",
         "state": {
           "branch": "master",
-          "revision": "5de2f669b0a8eb6d1db0c9592332a5584384c1df",
+          "revision": "a4ca3c200b87490d070c930d5033ade2fd26ef71",
           "version": null
         }
       },
@@ -33,7 +33,7 @@
         "repositoryURL": "https://github.com/pvieito/LoggerKit.git",
         "state": {
           "branch": "master",
-          "revision": "9d09a46f54c87e2545eeb4801078ea1ea7f997f5",
+          "revision": "2d1cecdc0c8c01a0714031c7e0740318f5b1a60e",
           "version": null
         }
       },
@@ -42,7 +42,7 @@
         "repositoryURL": "https://github.com/lukaskubanek/OrderedDictionary.git",
         "state": {
           "branch": "master",
-          "revision": "005ef5c3ee5a059608281ca95efc342e47467bab",
+          "revision": "acb62df76052bef95a918d26f12bf4996b8587ea",
           "version": null
         }
       },
@@ -51,8 +51,17 @@
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
           "branch": "master",
-          "revision": "45d9a983920f9015ae6fdfd9f96bbe13b5b3ecdb",
+          "revision": "05f75d162601eb39d879812d5ab0cc7e7d8954cf",
           "version": null
+        }
+      },
+      {
+        "package": "swift-argument-parser",
+        "repositoryURL": "https://github.com/apple/swift-argument-parser",
+        "state": {
+          "branch": null,
+          "revision": "35b76bf577d3cc74820f8991894ce3bcdf024ddc",
+          "version": "0.0.2"
         }
       }
     ]

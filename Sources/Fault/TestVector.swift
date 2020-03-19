@@ -34,3 +34,15 @@ struct TVInfo: Codable {
         self.coverageList = coverageList
     }
 }
+
+struct TVSet: Codable {
+    var inputs: [Port]
+    var vectors: [TestVector]
+    init(
+        inputs: [Port],
+        vectors: [TestVector]
+    ) {
+        self.inputs = inputs
+        self.vectors = vectors
+    }
+} 

@@ -173,6 +173,7 @@ class Simulator {
         minimumCoverage: Float,
         ceiling: Int,
         randomGenerator: RNG,
+        TVSet: [TestVector],
         sampleRun: Bool,
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -189,8 +190,9 @@ class Simulator {
         sa1Covered.reserveCapacity(faultPoints.count)
 
         var totalTVAttempts = 0
-        var tvAttempts = initialVectorCount
+        var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
         
+        let simulateOnly = (TVSet.count != 0)
         let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
@@ -200,12 +202,14 @@ class Simulator {
 
             var futureList: [Future] = []
             var testVectors: [TestVector] = []
-            
-
-            for _ in 0..<tvAttempts {
+            for index in 0..<tvAttempts {
                 var testVector: TestVector = []
-                for input in inputs {
-                    testVector.append(rng.generate(bits: input.width))
+                if (simulateOnly){
+                    testVector = TVSet[totalTVAttempts + index]
+                } else {
+                    for input in inputs {
+                        testVector.append(rng.generate(bits: input.width))
+                    }
                 }
                 if testVectorHash.contains(testVector) {
                     continue
