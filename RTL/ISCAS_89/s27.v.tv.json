@@ -1,0 +1,86 @@
+{
+    "inputs": [
+        {
+            "name": "GND" ,
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 0
+        },
+        {
+            "name": "VDD",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 1
+        },
+        {
+            "name": "CK" ,
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 2
+        },
+        {
+            "name": "reset",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 3
+        },
+        {
+            "name": "G0",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 4
+        },
+        {
+            "name": "G1",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 5
+        },
+        {
+            "name": "G2",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 6
+        },
+        {
+            "name": "G3",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 7
+        },
+        {
+            "name":"_20_",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 8
+        },
+        {
+            "name": "_21_",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 9
+        },
+        {
+            "name": "_22_",
+            "to" : 0,
+            "polarity" : "input",
+            "from" : 0,
+            "ordinal" : 10
+        }
+    ],
+    "vectors": [
+        [ ["+",0],["+",0],["+",0],["+",0],["+",0],["+",0],["+",1],["+",1],["+",0],["+",1],["+",0]],
+        [ ["+",0],["+",1],["+",0],["+",1],["+",1],["+",0],["+",1],["+",0],["+",1],["+",0],["+",0]],
+        [ ["+",1],["+",0],["+",1],["+",0],["+",0],["+",1],["+",0],["+",0],["+",1],["+",1],["+",0]]
+    ]
+}
