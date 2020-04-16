@@ -4,6 +4,7 @@ import CommandLineKit
 import PythonKit
 import Defile
 import OrderedDictionary
+import BigInt
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -177,20 +178,36 @@ func main(arguments: [String]) -> Int32 {
             fputs("TVs json file '\(tvSetTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
-        if !tvSetTest.hasSuffix(".json"){
-            fputs(
-                "Warning: TVs file provided does not end with .json",
-                stderr
-            )
-        }
+
         do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: tvSetTest ), options: .mappedIfSafe)
-            guard let tvSet = try? JSONDecoder().decode(TVSet.self, from: data) else {
-                fputs("File '\(tvSetTest)' is invalid.\n", stderr)
-                return EX_DATAERR
+            if tvSetTest.hasSuffix(".json"){
+                let data = try Data(contentsOf: URL(fileURLWithPath: tvSetTest ), options: .mappedIfSafe)
+                guard let tvSet = try? JSONDecoder().decode(TVSet.self, from: data) else {
+                    fputs("File '\(tvSetTest)' is invalid.\n", stderr)
+                    return EX_DATAERR
+                }
+                tvSetVectors = tvSet.vectors
+                tvSetInputs = tvSet.inputs
+            } else {
+                guard let reader = LineReader(path: tvSetTest) else {
+                    fputs("Test vector set input file '\(tvSetTest)' not found.\n", stderr)
+                    return EX_DATAERR
+                }
+                let ports = reader.nextLine!.components(separatedBy: " ")
+                for (index, port) in ports.enumerated(){
+                    if port != "PI"{
+                        tvSetInputs.append(Port(name: port, at: index))
+                    }
+                }
+                tvSetInputs = tvSetInputs.dropLast(1)
+
+                for line in reader {
+                    let testvectors = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let char = Array(testvectors).map {BigUInt(String($0), radix: 2)!}
+                    tvSetVectors.append(char)
+                }
             }
-            tvSetVectors = tvSet.vectors
-            tvSetInputs = tvSet.inputs
+          
         } catch{
             cli.printUsage()
             return EX_USAGE
