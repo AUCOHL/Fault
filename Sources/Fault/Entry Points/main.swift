@@ -193,6 +193,7 @@ func main(arguments: [String]) -> Int32 {
                     fputs("Test vector set input file '\(tvSetTest)' not found.\n", stderr)
                     return EX_DATAERR
                 }
+
                 let ports = reader.nextLine!.components(separatedBy: " ")
                 for (index, port) in ports.enumerated(){
                     if port != "PI"{
@@ -201,10 +202,24 @@ func main(arguments: [String]) -> Int32 {
                 }
                 tvSetInputs = tvSetInputs.dropLast(1)
 
+                var readPorts = true
                 for line in reader {
-                    let testvectors = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let char = Array(testvectors).map {BigUInt(String($0), radix: 2)!}
-                    tvSetVectors.append(char)
+                    let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if (trimmedLine[trimmedLine.startIndex].isNumber){
+                        let testvector = Array(trimmedLine).map {BigUInt(String($0), radix: 2)!}
+                        tvSetVectors.append(testvector)
+                        readPorts = false
+                    } else if readPorts {
+                        let ports = trimmedLine.components(separatedBy: " ")
+                        for (index, port) in ports.enumerated(){
+                            if port != "PI"{
+                                tvSetInputs.append(Port(name: port, at: index))
+                            }
+                        }
+                        tvSetInputs = tvSetInputs.dropLast(1)
+                    } else {
+                        fputs("Warning: Dropped invalid testvector line \(line)", stderr)
+                    }
                 }
             }
           

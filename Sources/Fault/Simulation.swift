@@ -194,7 +194,8 @@ class Simulator {
         
         let simulateOnly = (TVSet.count != 0)
         let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
-
+        print(ports)
+        print(inputs)
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
                 print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
@@ -299,9 +300,11 @@ class Simulator {
             coverage =
                 Float(sa0Covered.count + sa1Covered.count) /
                 Float(2 * faultPoints.count)
-        
+           
             totalTVAttempts += tvAttempts
-            tvAttempts = increment
+            let remainingTV = ceiling - totalTVAttempts
+            print("Remaining Tv,  ",remainingTV )
+            tvAttempts = (remainingTV < increment) ? remainingTV : increment
         }
 
         if coverage < minimumCoverage {
