@@ -42,6 +42,8 @@
 //////////////////////////////////////////////////////////////////////
 //
 // CVS Revision History
+// Revision 1.6 2020/04/20 
+// added SCANIN instruction for selecting the internal scan chain
 //
 // $Log: not supported by cvs2svn $
 // Revision 1.5  2004/01/18 09:27:39  simons
