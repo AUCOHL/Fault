@@ -18,7 +18,8 @@ let subcommands: OrderedDictionary =  [
     "cut": (func: cut, desc: "cutting"),
     "asm": (func: assemble, desc: "test vector assembly"),
     "compact": (func: compactTestVectors, desc: "test vector static compaction"),
-    "tap": (func: jtagCreate, desc: "JTAG port")
+    "tap": (func: jtagCreate, desc: "JTAG port"),
+    "bench": (func: bench, desc: "Netlist to bench conversion")
 ]
 
 
@@ -296,8 +297,7 @@ func main(arguments: [String]) -> Int32 {
 
     do {
         let (ports, inputs, outputs) = try Port.extract(from: definition)
-
-
+        
         if inputs.count == 0 {
             print("Module has no inputs.")
             return EX_OK
