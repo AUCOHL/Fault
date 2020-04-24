@@ -3,7 +3,6 @@ import CoreFoundation
 import CommandLineKit
 import PythonKit
 import Defile
-import OrderedDictionary
 
 func bench(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
@@ -15,6 +14,14 @@ func bench(arguments: [String]) -> Int32 {
         helpMessage: "Prints this message and exits."
     )
     cli.addOptions(help)
+
+    let cellsOption = StringOption(
+        shortFlag: "c",
+        longFlag: "cells",
+        required: true,
+        helpMessage: "Path to cell models file in json."
+    )
+    cli.addOptions(cellsOption)
 
     let filePath = StringOption(
         shortFlag: "o",
@@ -48,134 +55,163 @@ func bench(arguments: [String]) -> Int32 {
         return EX_NOINPUT
     }
 
-    let output = filePath.value ?? "\(file).json"
-
-    do {
-        let cellModels =
-            "grep -E -- \"module|endmodule|and|*or|not |buf|^input|^output\" \(file)".shOutput();
     
-        let folderName = "./thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let result = "mkdir -p \(folderName)".sh()
-        defer {
-            let _ = "rm -rf \(folderName)".sh()
+    let output = filePath.value ?? "\(file).bench"
+
+    var cellModelsFile: String = cellsOption.value!
+    if let modelTest = cellsOption.value {
+        if !fileManager.fileExists(atPath: modelTest) {
+            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            return EX_NOINPUT
         }
-        let cellFile = "\(folderName)/cells.v"
-        print(cellModels.output)
-        try File.open(cellFile, mode: .write) {
-            try $0.print(cellModels.output)
+
+        if modelTest.hasSuffix(".v") || modelTest.hasSuffix(".sv") {
+            print("Creating json for the cell models...")
+            cellModelsFile = "\(modelTest).json"
+
+            let cellModels =
+            "grep -E -- \"\\bmodule\\b|\\bendmodule\\b|and|xor|or|not(\\s+|\\()|buf|input.*;|output.*;\" \(modelTest)".shOutput();
+            let pattern = "(?s)(?:module).*?(?:endmodule)"
+
+            var cellDefinitions = ""
+            if let range = cellModels.output.range(of: pattern, options: .regularExpression) {
+                cellDefinitions = String(cellModels.output[range])
+            }
+            do {
+
+            let regex = try NSRegularExpression(pattern: pattern)
+            let range = NSRange(cellModels.output.startIndex..., in: cellModels.output)
+            let results = regex.matches(in: cellModels.output, range: range)   
+            let matches = results.map { String(cellModels.output[Range($0.range, in: cellModels.output)!])}     
+            
+            cellDefinitions = matches.joined(separator: "\n")
+
+            let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+            let result = "mkdir -p \(folderName)".sh()
+            defer {
+                let _ = "rm -rf \(folderName)".sh()
+            }
+            let CellFile = "\(folderName)/cells.v"
+        
+            try File.open(CellFile, mode: .write) {
+                try $0.print(cellDefinitions)
+            }
+
+            // MARK: Importing Python and Pyverilog
+            let parse = Python.import("pyverilog.vparser.parser").parse
+
+            // MARK: Parse
+            let ast = parse([CellFile])[0]
+            let description = ast[dynamicMember: "description"]
+
+            let cells = try BenchCircuit.extract(definitions: description.definitions)
+            let circuit = BenchCircuit(cells: cells)
+            let encoder = JSONEncoder()
+            
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(circuit)
+
+            guard let string = String(data: data, encoding: .utf8) else {
+                throw "Could not create utf8 string."
+            }
+
+            try File.open(output, mode: .write) {
+                try $0.print(string)
+            }
+
+            } catch {
+                fputs("Internal error: \(error)", stderr)
+                return EX_SOFTWARE
+            }
+        }
+        else if !modelTest.hasSuffix(".json") {
+            fputs(
+                "Warning: Cell model file provided does not end with .v or .sv or .json.",
+                stderr
+            )
+        }
+    }
+    do {
+        // MARK: Processing Library Cells
+        let data = try Data(contentsOf: URL(fileURLWithPath: cellModelsFile), options: .mappedIfSafe)
+        guard let benchCells = try? JSONDecoder().decode(BenchCircuit.self, from: data) else {
+            fputs("File '\(cellsOption.value!)' is invalid.\n", stderr)
+            return EX_DATAERR
+        }
+
+        let cellsDict = benchCells.cells.reduce(into: [String: BenchCell]()) {
+            $0[$1.name] = $1
         }
 
         // MARK: Importing Python and Pyverilog
-    
         let parse = Python.import("pyverilog.vparser.parser").parse
 
-        let Node = Python.import("pyverilog.vparser.ast")
-
-        let Generator =
-            Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
-
-        var cellsDict: [String: [String]] = [:]
-
-        // // MARK: Parse
-        let ast = parse([cellFile])[0]
+        // MARK: Parse
+        let ast = parse([file])[0]
         let description = ast[dynamicMember: "description"]
         var definitionOptional: PythonObject?
-        var template: String = ""
-        var cells: [BenchCell] = []
         for definition in description.definitions {
             let type = Python.type(definition).__name__
             if type == "ModuleDef" {
                 definitionOptional = definition
-                // process the definition for each cell
-                let (_, inputs, outputs) = try Port.extract(from: definition)
-                let cellName = definition.name
-                var benchStatements: String = ""
-                var cellOutput: String = ""
-                var cellInputs: [String] = []
-                var cellStatements: [String] = []
-                for output in outputs {
-                    cellOutput = String(describing: output.name)
-                }
-                for input in inputs {
-                    cellInputs.append(String(describing: input.name))
-                }
-                for item in definition.items {
-                    let type = Python.type(item).__name__
-                    if type == "InstanceList" {
-                        let instance = item.instances[0]
-                        var benchStatement = "("
-                        let output = String(describing: instance.portlist[0].argname)
-                        for hook in instance.portlist[1...]{
-                            benchStatement += "\(hook.argname), "
-                        }
-                        benchStatement = String(benchStatement.dropLast(2))
-                        benchStatement += ")"
-                        switch instance.module {
-                        case "and":
-                            cellStatements.append("\(output) = AND" + benchStatement)
-                            break
-                        case "or":
-                            cellStatements.append("\(output) = OR" + benchStatement)
-                            break
-                        case "xor":
-                            let inputA = instance.portlist[1].argname
-                            let inputB = instance.portlist[2].argname
-                            cellStatements.append(contentsOf: [
-                                "or_out = OR(\(inputA), \(inputB))",
-                                "nand_out = NAND(\(inputA), \(inputB))",
-                                "\(output) = AND(or_out, nand_out)"
-                            ])
-                            print(cellStatements)
-                            break
-                        case "buf":
-                            cellStatements.append("\(output) = BUFF" + benchStatement)
-                            break
-                        case "not":
-                            cellStatements.append("\(output) = NOT" + benchStatement)
-                            break
-                        default:
-                            print(instance.module)
-                        }
-                        benchStatements += """
-                        \(benchStatement) \n
-                        """ 
-                        //cellStatements.append(benchStatement)
-                    }
-                }
-                template += """
-                \(cellName):
-                \(benchStatements)
-                """ 
-                let cell = BenchCell(
-                    name: String(cellName)!,
-                    inputs: cellInputs,
-                    output: cellOutput,
-                    statements: cellStatements
-                )
-                cells.append(cell)
+                break
             }
-          
         }
 
         guard let definition = definitionOptional else {
             fputs("No module found.\n", stderr)
             exit(EX_DATAERR)
         }
-        let circuit = BenchCircuit(cells: cells)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        let data = try encoder.encode(circuit)
-        guard let string = String(data: data, encoding: .utf8)
-        else {
-            throw "Could not create utf8 string."
+
+        let (_, inputs, outputs) = try Port.extract(from: definition)
+
+        var benchStatements: String = ""
+        for input in inputs {
+            benchStatements += "INPUT(\(input.name)) \n"
+        }
+        for output in outputs {
+            benchStatements += "OUTPUT(\(output.name)) \n"
         }
 
+        for item in definition.items {
+            
+            let type = Python.type(item).__name__
+            // Process gates
+            if type == "InstanceList" {
+                let instance = item.instances[0]
+                let cellName =  String(describing: instance.module)
+                let instanceName = String(describing: instance.name)
+                let cell = cellsDict[cellName]!
+
+                var inputs: [String:String] = [:]
+                var outputs: [String] = []
+
+                for hook in instance.portlist {
+                    let portname = String(describing: hook.portname)
+
+                    if  portname == cell.output {
+                        outputs.append(String(describing: hook.argname))
+                    }
+                    else {
+                        inputs[portname] = String(describing: hook.argname)
+                    }
+                }
+
+                let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
+                benchStatements += "\(statements) \n"
+            }
+        }
+
+        let boilerplate = """
+        #    Bench for \(definition.name)
+        #    Automatically generated by Fault.
+        #    Don't modify.
+        """
         try File.open(output, mode: .write) {
-            try $0.print(string)
+            try $0.print(boilerplate)
+            try $0.print(benchStatements)
         }
-        try File.open("\(output).bench", mode: .write) {
-            try $0.print(template)
-        }
+
     } catch {
         fputs("Internal error: \(error)", stderr)
         return EX_SOFTWARE
@@ -186,29 +222,8 @@ func bench(arguments: [String]) -> Int32 {
     return EX_OK
 }
 
-struct BenchCircuit: Codable {
-    var cells: [BenchCell]
-    init(
-        cells: [BenchCell]
-    ){
-        self.cells = cells
-    }
-}
-
-struct BenchCell: Codable {
-    var name: String
-    var inputs: [String]
-    var output: String
-    var statements: [String]
-    init(
-        name: String,
-        inputs: [String],
-        output: String,
-        statements: [String]
-    ){
-        self.name = name
-        self.inputs = inputs
-        self.output = output
-        self.statements = statements
-    }
-}
+/**
+    TO Do:
+        - SUpport multi-output celss
+        - support wires with width
+*/

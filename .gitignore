@@ -15,3 +15,4 @@ Netlists
 /*.log
 
 *.json
+*.bench
