@@ -72,7 +72,6 @@ struct BenchCircuit: Codable {
                                 "__nand_out___ = NAND(\(inputA), \(inputB))",
                                 "\(output) = AND(__or_out___, __nand_out___)"
                             ])
-                            print(cellStatements)
                             break
                         case "buf":
                             cellStatements.append("\(output) = BUFF" + benchStatement)

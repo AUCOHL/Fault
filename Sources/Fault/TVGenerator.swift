@@ -24,7 +24,7 @@ class AtalantaGen {
         }
 
         let output = "\(folderName)/\(module).test"
-        let atalanta = "atalanta -t \(output) \(file)".sh()
+        let atalanta = "atalanta -t \(output) \(file) > /dev/null 2>&1".sh()
 
         if atalanta != EX_OK {
             exit(atalanta)
