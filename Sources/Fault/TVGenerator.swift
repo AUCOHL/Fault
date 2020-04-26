@@ -1,15 +1,50 @@
 import Foundation 
 import BigInt
 
+enum TVGen: String{
+    case swift
+    case LFSR
+    case atalanta
+}
+
 enum RNG: String {
     case swift
     case LFSR
+}
+
+class AtalantaGen {
+    static func generate(file: String, module: String) -> ([TestVector], [Port])  {
+        
+        let tempDir = "\(NSTemporaryDirectory())"
+
+        let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let _ = "mkdir -p '\(folderName)'".sh()
+        defer {
+           let _ = "rm -rf '\(folderName)'".sh()
+        }
+
+        let output = "\(folderName)/\(module).test"
+        let atalanta = "atalanta -t \(output) \(file)".sh()
+
+        if atalanta != EX_OK {
+            exit(atalanta)
+        }
+        
+        do {
+            let (testvectors, inputs) = try TVSet.readFromTest(file: output)
+            return (vectors: testvectors, inputs: inputs)
+        } catch {
+            fputs("Internal software error: \(error)", stderr)
+            exit(EX_SOFTWARE)
+        }
+    }
 }
 
 protocol URNG {
     func generate(bits: Int) -> BigUInt
 }
 
+// MARK: Random Generators
 class SwiftRNG: URNG {
     func generate(bits: Int) -> BigUInt {
         return BigUInt.randomInteger(withMaximumWidth: bits)
