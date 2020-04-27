@@ -16,3 +16,4 @@ Netlists
 
 *.json
 *.bench
+*.test

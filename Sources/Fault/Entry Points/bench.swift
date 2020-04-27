@@ -19,7 +19,7 @@ func bench(arguments: [String]) -> Int32 {
         shortFlag: "c",
         longFlag: "cells",
         required: true,
-        helpMessage: "Path to cell models file in json."
+        helpMessage: "Path to cell models file. (.v) files are converted to (.json). If .json is available, it could be supplied directly."
     )
     cli.addOptions(cellsOption)
 

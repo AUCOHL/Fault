@@ -1,0 +1,31 @@
+{
+    "pads":{
+        "tms": "tms_pad_i",
+        "tck": "tck_pad_i",
+        "tdi": "tdi_pad_i",
+        "tdo": "tdo_pad_o",
+        "trst": "trst_pad_i",
+        "tdoEn": "tdo_padoe_o"
+    },
+    "tapStates":{
+        "shift": "shift_dr_o",
+        "pause": "pause_dr_o",
+        "update": "update_dr_o",
+        "capture": "capture_dr_o"   
+    },
+    "selectSignals": {
+        "extest": "extest_select_o",
+        "samplePreload": "sample_preload_select_o",
+        "mbist": "mbist_select_o",
+        "debug": "debug_select_o",
+        "scanIn": "scan_in_select_o"
+    },
+    "tdoSignal": "tdo_o",
+
+    "tdiSignals": {
+        "debug": "debug_tdi_i",
+        "bsChain": "bs_chain_tdi_i",
+        "mbist": "mbist_tdi_i",
+        "scanIn": "scan_in_tdi_i"
+    }
+}

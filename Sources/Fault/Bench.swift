@@ -80,7 +80,7 @@ struct BenchCircuit: Codable {
                             cellStatements.append("\(output) = NOT" + benchStatement)
                             break
                         default:
-                            print("[Warning]: can't expand \(instance.module) cell to primitive cells")
+                            print("[Warning]: can't expand \(instance.module) in \(cellName) to primitive cells")
                         }
                     }
                 }

@@ -32,7 +32,6 @@ func main(arguments: [String]) -> Int32 {
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
     let defaultRandGen = "swift"
-    let defaultBench = ""
 
     let installed = env["FAULT_INSTALL_PATH"] != nil
 
@@ -253,6 +252,7 @@ func main(arguments: [String]) -> Int32 {
         if tvGeneTest == .atalanta {
             if let benchTest = bench.value {
                 (tvSetVectors, tvSetInputs) = AtalantaGen.generate(file: benchTest, module: "\(definition.name)")
+                print("Atalanta generated \(tvSetVectors.count) test vectors")
             } else {
                 print("[Error]: bench netlist must be passed to generate TVs with atalanta.\n Run the synthesized netlist through `fault bench` to generate bench netlist. ")
                 exit(EX_SOFTWARE)
