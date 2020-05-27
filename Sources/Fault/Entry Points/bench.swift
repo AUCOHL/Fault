@@ -200,6 +200,12 @@ func bench(arguments: [String]) -> Int32 {
                 let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
                 benchStatements += "\(statements) \n"
             }
+            else if type == "Assign"{
+                let right = String(describing: item.right.var)
+                let left = String(describing: item.left.var)
+                let statement = "\(left) = BUFF(\(right)) \n"
+                benchStatements += statement                
+            }
         }
 
         let boilerplate = """
@@ -217,13 +223,5 @@ func bench(arguments: [String]) -> Int32 {
         return EX_SOFTWARE
     }
     
-    
-
     return EX_OK
 }
-
-/**
-    TO Do:
-        - SUpport multi-output celss
-        - support wires with width
-*/
