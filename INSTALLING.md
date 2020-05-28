@@ -4,6 +4,7 @@
 * Yosys 0.7+
 * Icarus Verilog 10.2+
 * Pyverilog (dev)
+* Atalanta
 
 # Installing
 You need a Swift-compatible operating system (i.e. macOS or Linux).
@@ -40,6 +41,12 @@ EXEC_PREFIX=</usr/local/bin> sudo ./iverilog_build.swift
 You'll need the dev branch of Pyverilog install with pip.
 
 `python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/develop.zip`
+
+You'll also need to install Atalanta if you want to use it for test vector generation.
+
+```bash
+EXEC_PREFIX=</usr/local/bin> sudo ./atalanta_build.swift
+```
 
 # Installation
 Type `git submodule update --init --recursive` in the terminal to initialize submodules.
