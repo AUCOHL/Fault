@@ -6,6 +6,7 @@ let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
 let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
+let atalantaExecutable = env["FAULT_ATALANTA"] ?? "atalanta"
 
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
@@ -81,7 +82,11 @@ if action == .install {
         }
     }
 
-
+    let atalanta = "'\(atalantaExecutable)'".shOutput()
+    if atalanta.terminationStatus != EX_OK {
+        print("Warning: Atalanta does not seem to be installed.")
+    }
+    
     print("Installing Fault (\(gitVersion))...")
 
     print("Compiling...")

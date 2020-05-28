@@ -26,6 +26,12 @@ RUN mkdir -p /share/iverilog
 WORKDIR /share/iverilog
 RUN curl -sL https://github.com/FPGAwars/toolchain-iverilog/releases/download/v1.2.1/toolchain-iverilog-linux_x86_64-1.2.1.tar.gz | tar -xzf -
 
+# Install Atalanta
+RUN curl -sL https://github.com/hsluoyz/Atalanta/archive/master.tar.gz | tar -xzf -
+WORKDIR Atalanta-master
+RUN make
+RUN cp atalanta /usr/bin
+
 # Install Fault
 ENV PYVERILOG_IVERILOG="/share/iverilog/bin/iverilog"
 ENV FAULT_IVERILOG="/share/iverilog/bin/iverilog"
