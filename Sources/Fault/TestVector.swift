@@ -104,31 +104,78 @@ struct TVSet: Codable {
 
             let inputPattern = "(?s)(?<=\\* Primary inputs :).*?(?=\\* Primary outputs:)"
             let tvPattern = "(?s)(?<=: ).*?(?= [0-1]*)"
-            var inputResult = ""
-            var tvResult = ""
-            
+            let multibitPattern = "(?<name>.*).{1}(?<=\\[)(?<bit>[0-9]+)(?=\\])"
+
+            var inputResult = ""            
             if let range = string.range(of: inputPattern, options: .regularExpression) {
                 inputResult = String(string[range])
                 inputResult = inputResult.trimmingCharacters(in: .whitespacesAndNewlines)
             }
+
             let ports = inputResult.components(separatedBy: " ")
-            
-            let regex = try NSRegularExpression(pattern: tvPattern)
+            let multiBitRegex = try NSRegularExpression(pattern: multibitPattern)
+
+            var multiBitPorts : [String: Port] = [:]
+            var portName:String = "", bitNumber:Int = 0
+            for (index, port) in ports.enumerated(){  
+                if !port.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty{ 
+                    if let match = multiBitRegex.firstMatch(in: port, options: [], range: NSRange(location: 0, length: port.utf16.count)) {
+                        if let nameRange = Range(match.range(at: 1), in: port) {                            
+                            portName = String(port[nameRange])
+                            let exists = multiBitPorts[portName] != nil
+                            if !exists {
+                                multiBitPorts[portName] = Port(name: portName, at: index)
+                                multiBitPorts[portName]!.from = 0
+                            } 
+                        }
+                        if let bitRange = Range(match.range(at: 2), in: port) {
+                            bitNumber = Int(port[bitRange])!
+                            multiBitPorts[portName]!.to = bitNumber
+                        }
+                    }
+                    else {
+                        inputs.append(Port(name: port, at: index))
+                    }                     
+                }
+            }
+
+            var vectorSlices: [Range<Int>] =  []
+            for port in multiBitPorts.values {
+                inputs.append(port)
+                vectorSlices.append(port.ordinal..<(port.to+port.ordinal)+1)
+            }
+
+              
+            let vectorRegex = try NSRegularExpression(pattern: tvPattern)
             let range = NSRange(string.startIndex..., in: string)
-            let results = regex.matches(in: string, range: range)   
+            let results = vectorRegex.matches(in: string, range: range)   
             let matches = results.map { String(string[Range($0.range, in: string)!])}     
 
             for match in matches {
-                let testvector = Array(match).map {BigUInt(String($0), radix: 2)!}
-                if testvector.count != 0 {
-                    vectors.append(testvector)    
+                let vector = Array(match)
+                if vector.count != 0 {
+                    var testVector: TestVector = []
+                    var start = 0
+                    for slice in vectorSlices {
+                        let lowerVec = vector[start..<slice.lowerBound].map{ BigUInt(String($0), radix: 2)!}
+                        if lowerVec.count != 0 {
+                            testVector.append(contentsOf: lowerVec)
+                        }
+
+                        let middleVec = BigUInt(String(vector[slice]), radix: 2)!
+                        testVector.append(middleVec)
+        
+                        start = slice.upperBound
+                    }
+                    
+                    if start < vector.count {
+                        let remVector = vector[start...].map{ BigUInt(String($0), radix: 2)!}
+                        testVector.append(contentsOf: remVector)
+                    }
+
+                    vectors.append(testVector)  
                 }
-            }            
-            for (index, port) in ports.enumerated(){  
-                if !port.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty{
-                    inputs.append(Port(name: port, at: index))
-                }
-            }
+            }         
         } catch {
             exit(EX_DATAERR)
         }

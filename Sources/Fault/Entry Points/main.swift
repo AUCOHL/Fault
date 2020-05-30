@@ -298,9 +298,10 @@ func main(arguments: [String]) -> Int32 {
             }
         } else {
             tvSetInputs.sort { $0.ordinal < $1.ordinal }
-            inputsMinusIgnored = tvSetInputs
+            inputsMinusIgnored = tvSetInputs.filter {
+                !ignoredInputs.contains($0.name)
+            }
         }
-
         
         for (_, port) in ports {
             if ignoredInputs.contains(port.name) {

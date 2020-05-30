@@ -45,7 +45,7 @@ struct BenchCircuit: Codable {
                         var benchStatement = "("
                         for hook in instance.portlist[1...]{
                             let argname = String(describing: hook.argname)
-
+                            
                             if cellInputs.contains(argname) {
                                 benchStatement += "\(hook.argname), "
                             }
@@ -141,7 +141,7 @@ struct BenchCell: Codable {
                     withTemplate: "__\(name)")
 
                 for input in self.inputs {
-                    let regexInput = try NSRegularExpression(pattern: "\\b\(input)\\b")
+                    let regexInput = try NSRegularExpression(pattern: "\(input)(?=\\s*,|\\s*\\))")
                     
                     range = NSRange(benchStatements[index].startIndex..., in:  benchStatements[index])
                     benchStatements[index] = regexInput.stringByReplacingMatches(
