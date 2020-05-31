@@ -122,16 +122,17 @@ struct BenchCell: Codable {
         do {
             let regexOutput = try NSRegularExpression(pattern: "\(self.output) = ")
             let regexWires = try NSRegularExpression(pattern: "___")
+            let outputName = (output[0].hasPrefix("\\")) ? "\\\(output[0])" : "\(output[0])"
 
             var benchStatements = self.statements
             for (index, _) in statements.enumerated() {
-
+                
                 var range = NSRange(benchStatements[index].startIndex..., in: benchStatements[index])
                 benchStatements[index] = regexOutput.stringByReplacingMatches(
                     in: benchStatements[index],
                     options: [],
                     range: range,
-                    withTemplate: "\(output[0]) = ")
+                    withTemplate: "\(outputName) = ")
 
                 range = NSRange(benchStatements[index].startIndex..., in:  benchStatements[index]) 
                 benchStatements[index] = regexWires.stringByReplacingMatches(
@@ -142,13 +143,14 @@ struct BenchCell: Codable {
 
                 for input in self.inputs {
                     let regexInput = try NSRegularExpression(pattern: "\(input)(?=\\s*,|\\s*\\))")
-                    
+                    let name = (inputs[input]!.hasPrefix("\\")) ? "\\\(inputs[input]!)" : "\(inputs[input]!)"
+
                     range = NSRange(benchStatements[index].startIndex..., in:  benchStatements[index])
                     benchStatements[index] = regexInput.stringByReplacingMatches(
                         in: benchStatements[index],
                         options: [],
                         range: NSRange(benchStatements[index].startIndex..., in: benchStatements[index]),
-                        withTemplate: "\(inputs[input]!)")
+                        withTemplate: name )
                 }
             }
 
