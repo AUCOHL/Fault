@@ -7,6 +7,7 @@ __pycache__
 Netlists
 /iverilog*/
 /Atalanta*/
+/podem*/
 
 *.out
 *.vcd
