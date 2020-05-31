@@ -1,18 +1,18 @@
 import Foundation 
 import BigInt
 
-enum TVGen: String{
+enum TVGen: String {
     case swift
     case LFSR
     case atalanta
+    case podem
 }
-
 enum RNG: String {
     case swift
     case LFSR
 }
 
-class AtalantaGen {
+class Atalanta {
     static func generate(file: String, module: String) -> ([TestVector], [Port])  {
         
         let tempDir = "\(NSTemporaryDirectory())"
@@ -40,6 +40,31 @@ class AtalantaGen {
     }
 }
 
+class Podem {
+    static func generate (file: String, module: String) -> ([TestVector], [Port]) {
+        let tempDir = "\(NSTemporaryDirectory())"
+
+        let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let _ = "mkdir -p '\(folderName)'".sh()
+        defer {
+           let _ = "rm -rf '\(folderName)'".sh()
+        }
+
+        let output = "\(folderName)/\(module).out"
+        let podem = "atpg -output \(output) \(file) > /dev/null 2>&1".sh()
+
+        if podem != EX_OK {
+            exit(podem)
+        }
+         do {
+            let (testvectors, inputs) = try TVSet.readFromText(file: output)
+            return (vectors: testvectors, inputs: inputs)
+        } catch {
+            fputs("Internal software error: \(error)", stderr)
+            exit(EX_SOFTWARE)
+        }
+    }
+}
 protocol URNG {
     func generate(bits: Int) -> BigUInt
 }

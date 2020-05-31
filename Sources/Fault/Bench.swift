@@ -158,6 +158,8 @@ struct BenchCell: Codable {
             for statement in benchStatements {
                 cellDefinition += "\(statement) \n"
             }
+            cellDefinition = String(cellDefinition.dropLast(1))
+
             return cellDefinition
         } catch {
             print("Invalid regex: \(error.localizedDescription)")

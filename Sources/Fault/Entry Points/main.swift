@@ -103,7 +103,7 @@ func main(arguments: [String]) -> Int32 {
     let tvGen = StringOption(
         shortFlag: "g",
         longFlag: "tvGen",
-        helpMessage: "Type of the TV Generator, two RNGs supported: LFSR and swift, and one FAN generator: atalanta. (Default: \(defaultRandGen).)"
+        helpMessage: "Type of the TV Generator: LFSR, swift, atalanta, and podem. (Default: \(defaultRandGen).)"
     )
     cli.addOptions(tvGen)
 
@@ -248,11 +248,18 @@ func main(arguments: [String]) -> Int32 {
             return EX_USAGE
         }
     }
-    if let tvGeneTest = TVGen(rawValue: tvGen.value ?? defaultRandGen) {
-        if tvGeneTest == .atalanta {
+
+    let tvGenerator: TVGen = TVGen(rawValue: tvGen.value ?? defaultRandGen)!
+    let externalGenerator = (tvGenerator == .atalanta || tvGenerator == .podem)
+    if let tvGeneratorTest = TVGen(rawValue: tvGen.value ?? defaultRandGen) {
+        if externalGenerator {
             if let benchTest = bench.value {
-                (tvSetVectors, tvSetInputs) = AtalantaGen.generate(file: benchTest, module: "\(definition.name)")
-                print("Atalanta generated \(tvSetVectors.count) test vectors")
+                if tvGeneratorTest == .atalanta {
+                    (tvSetVectors, tvSetInputs) = Atalanta.generate(file: benchTest, module: "\(definition.name)")
+                } else {
+                    (tvSetVectors, tvSetInputs) = Podem.generate(file: benchTest, module: "\(definition.name)")
+                }
+                print("Generated \(tvSetVectors.count) test vectors")
             } else {
                 print("[Error]: bench netlist must be passed to generate TVs with atalanta.\n Run the synthesized netlist through `fault bench` to generate bench netlist. ")
                 exit(EX_SOFTWARE)
@@ -265,8 +272,7 @@ func main(arguments: [String]) -> Int32 {
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
         let tvCeiling = Int(ceiling.value ?? (tvSetVectors.count == 0 ? defaultCeiling: String(tvSetVectors.count))),
-        let tvGenerator: TVGen = TVGen(rawValue: tvGen.value ?? defaultRandGen),
-        let randomGenerator: RNG = (tvGenerator != .atalanta) ? RNG(rawValue: tvGen.value ?? defaultRandGen) : RNG(rawValue: defaultRandGen)
+        let randomGenerator: RNG = (!externalGenerator) ? RNG(rawValue: tvGen.value ?? defaultRandGen) : RNG(rawValue: defaultRandGen)
     else {
         cli.printUsage()
         return EX_USAGE
