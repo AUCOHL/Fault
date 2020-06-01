@@ -142,7 +142,7 @@ struct BenchCell: Codable {
                     withTemplate: "__\(name)")
 
                 for input in self.inputs {
-                    let regexInput = try NSRegularExpression(pattern: "\(input)(?=\\s*,|\\s*\\))")
+                    let regexInput = try NSRegularExpression(pattern: "(?<=\\(|,)\\s*\(input)(?=\\s*,|\\s*\\))")
                     let name = (inputs[input]!.hasPrefix("\\")) ? "\\\(inputs[input]!)" : "\(inputs[input]!)"
 
                     range = NSRange(benchStatements[index].startIndex..., in:  benchStatements[index])

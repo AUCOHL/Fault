@@ -144,8 +144,8 @@ struct TVSet: Codable {
                 inputs.append(port)
                 vectorSlices.append(port.ordinal..<(port.to+port.ordinal)+1)
             }
+            vectorSlices.sort { $0.lowerBound < $1.lowerBound }
 
-              
             let vectorRegex = try NSRegularExpression(pattern: tvPattern)
             let range = NSRange(string.startIndex..., in: string)
             let results = vectorRegex.matches(in: string, range: range)   

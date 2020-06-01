@@ -16,7 +16,7 @@ func main() -> Int32 {
 
     let apt = "which apt-get".sh()
     if apt == 0 {
-        let _ = "sudo apt-get install -y make ".sh()
+        let _ = "sudo apt-get install -y make flex bison libreadline-dev libncurses5-dev libncursesw5-dev ".sh()
     }
 
     let env = ProcessInfo.processInfo.environment
