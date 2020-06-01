@@ -254,6 +254,10 @@ func main(arguments: [String]) -> Int32 {
     if let tvGeneratorTest = TVGen(rawValue: tvGen.value ?? defaultRandGen) {
         if externalGenerator {
             if let benchTest = bench.value {
+                if !fileManager.fileExists(atPath: benchTest) {
+                    fputs("Bench file '\(benchTest)' not found.\n", stderr)
+                    return EX_NOINPUT
+                }
                 if tvGeneratorTest == .atalanta {
                     (tvSetVectors, tvSetInputs) = Atalanta.generate(file: benchTest, module: "\(definition.name)")
                 } else {

@@ -7,6 +7,7 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 let atalantaExecutable = env["FAULT_ATALANTA"] ?? "atalanta"
+let podemExecutable = env["FAULT_ATALANTA"] ?? "atpg"
 
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
@@ -85,6 +86,11 @@ if action == .install {
     let atalanta = "'\(atalantaExecutable)'".shOutput()
     if atalanta.terminationStatus != EX_OK {
         print("Warning: Atalanta does not seem to be installed.")
+    }
+
+    let podem = "'\(podemExecutable)'".shOutput()
+    if podem.terminationStatus != EX_OK {
+        print("Warning: Podem does not seem to be installed.")
     }
     
     print("Installing Fault (\(gitVersion))...")

@@ -19,3 +19,4 @@ Netlists
 *.json
 *.bench
 *.test
+*.log
