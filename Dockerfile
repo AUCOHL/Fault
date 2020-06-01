@@ -32,6 +32,12 @@ WORKDIR Atalanta-master
 RUN make
 RUN cp atalanta /usr/bin
 
+# Install PODEM
+RUN curl -sL http://tiger.ee.nctu.edu.tw/course/Testing2018/assignments/hw0/podem.tgz  | tar -xzf -
+WORKDIR podem
+RUN make
+RUN sudo cp atpg /usr/bin
+
 # Install Fault
 ENV PYVERILOG_IVERILOG="/share/iverilog/bin/iverilog"
 ENV FAULT_IVERILOG="/share/iverilog/bin/iverilog"
