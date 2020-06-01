@@ -115,7 +115,7 @@ func bench(arguments: [String]) -> Int32 {
                 throw "Could not create utf8 string."
             }
 
-            try File.open(output, mode: .write) {
+            try File.open(cellModelsFile, mode: .write) {
                 try $0.print(string)
             }
 
