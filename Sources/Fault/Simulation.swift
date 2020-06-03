@@ -584,6 +584,8 @@ class Simulator {
 
             integer i;
             reg [\(boundaryCount - 1): 0] stores;
+            reg[7:0] tmsPattern = 8'b 01100110;
+
             wire[3:0] extest = 4'b 0000;
             wire[3:0] samplePreload = 4'b 0001;
             wire[3:0] bypass = 4'b 1111;
@@ -601,6 +603,8 @@ class Simulator {
             reg[\(internalCount - 1):0] scanInSerial;
 
             initial begin
+                $dumpfile("dut.vcd"); // DEBUG
+                $dumpvars(0, testbench);
         \(inputInit)
                 #10;
                 \(resetToggler)
@@ -609,31 +613,7 @@ class Simulator {
                 /*
                     Test Sample/Preload Instruction
                 */
-                \(tms) = 1;     // test logic reset state
-                #10;
-                \(tms) = 0;     // run-test idle state
-                #2;
-                \(tms) = 1;     // select-DR state
-                #2;
-                \(tms) = 1;     // select-IR state
-                #2;
-                \(tms) = 0;     // capture IR
-                #2;
-                \(tms) = 0;     // Shift IR state
-                #2
-
-                // shift new instruction on tdi line
-                for (i = 0; i < 4; i = i + 1) begin
-                    \(tdi) = samplePreload[i];
-                    if(i == 3) begin
-                        \(tms) = 1;     // exit-ir
-                    end
-                    #2;
-                end
-                \(tms) = 1;     // update-ir 
-                #2;
-                \(tms) = 0;     // run test-idle
-                #6;
+                shiftIR(samplePreload);
 
                 // SAMPLE
                 \(tms) = 1;     // select-DR 
@@ -655,30 +635,17 @@ class Simulator {
                     $finish;
                 end
                 #100;
-                \(tms) = 1;     // Exit DR
-                #2;
-                \(tms) = 1;     // update DR
-                #2;
-                \(tms) = 0;     // Run test-idle
-                #2;
+                exitDR();
 
                 // PRELOAD
-                \(tms) = 1;     // select DR
-                #2;
-                \(tms) = 0;     // capture DR
-                #2;
-                \(tms) = 0;     // shift DR
-                #2;
+                enterShiftDR();
                 for (i = 0; i < \(boundaryCount); i = i + 1) begin
                     \(tdi) = boundarySerial[i];
-                    if(i == \(boundaryCount - 1))
-                        \(tms) = 1;     // exit-dr
+                    if(i == \(boundaryCount - 1)) begin
+                        exitDR();
+                    end
                     #2;
                 end
-                \(tms) = 1;     // update DR
-                #2;
-                \(tms) = 0;     // run-test idle
-                #2;
         \(storesAssignment)
                 for(i = 0; i< \(boundaryCount); i = i + 1) begin
                     if(stores[i] != boundarySerial[i + \(boundaryCount - 1)]) begin
@@ -689,34 +656,8 @@ class Simulator {
                 /*
                     Test SCAN IN Instruction
                 */
-                \(tms) = 1;     // select-DR 
-                #2;
-                \(tms) = 1;     // select-IR 
-                #2;
-                \(tms) = 0;     // capture-IR
-                #2;
-                \(tms) = 0;     // Shift-IR 
-                #2
-
-                // shift new instruction on tdi line
-                for (i = 0; i < 4; i = i + 1) begin
-                    \(tdi) = scanIn[i];
-                    if(i == 3) begin
-                        \(tms) = 1;     // exit-ir
-                    end
-                    #2;
-                end
-                \(tms) = 1;     // update-ir 
-                #2;
-                \(tms) = 0;     // run test-idle
-                #6;
-                
-                \(tms) = 1;     // select-DR
-                #2;
-                \(tms) = 0;     // capture-DR
-                #2;
-                \(tms) = 0;     // shift-DR
-                #2;
+                shiftIR(scanIn);
+                enterShiftDR();
 
                 for (i = 0; i < \(internalCount); i = i + 1) begin
                     \(tdi) = scanInSerializable[i];
@@ -725,49 +666,21 @@ class Simulator {
 
                 for (i = 0; i < \(internalCount); i = i + 1) begin
                     scanInSerial[i] = \(tdo);
-                    if(i == \(internalCount - 1))
-                        \(tms) = 1;     // exit-dr
+                    if(i == \(internalCount - 1)) begin
+                        exitDR();
+                    end
                     #2;
                 end
                 if(scanInSerial != scanInSerializable) begin
                     $error("EXECUTING_SCANIN_INST_FAILED");
                     $finish;
                 end
-                \(tms) = 1;     // update-DR
-                #2;
-                \(tms) = 0;     // run-test idle
-                #2;
-
                 /*
                     Test BYPASS Instruction 
                 */
-                \(tms) = 1;     // select-DR 
-                #2;
-                \(tms) = 1;     // select-IR 
-                #2;
-                \(tms) = 0;     // capture-IR
-                #2;
-                \(tms) = 0;     // Shift-IR 
-                #2
-                // shift new instruction on tdi line
-                for (i = 0; i < 4; i = i + 1) begin
-                    \(tdi) = bypass[i];
-                    if(i == 3) begin
-                        \(tms) = 1;     // exit-ir
-                    end
-                    #2;
-                end
-                \(tms) = 1;     // update-ir 
-                #2;
-                \(tms) = 0;     // run test-idle
-                #6;
-                
-                \(tms) = 1;     // select-DR
-                #2;
-                \(tms) = 0;     // capture-DR
-                #2;
-                \(tms) = 0;     // shift-DR
-                #2;
+                shiftIR(bypass);
+                enterShiftDR();
+
                 for (i = 0; i < 10; i = i + 1) begin
                     \(tdi) = 1;
                     #2;
@@ -775,17 +688,56 @@ class Simulator {
                         $error("ERROR_EXECUTING_BYPASS_INST");
                     end
                     if(i == 9) begin
-                        \(tms) = 1;     // exit-ir
+                        exitDR();
                     end
                 end
-                
-                \(tms) = 1;     // update-ir 
-                #2;
-                \(tms) = 0;     // run test-idle
-                #2;
+
                 $display("SUCCESS_STRING");
                 $finish;
             end
+
+            task shiftIR;
+                input[3:0] instruction;
+                integer i;
+                begin
+                    for (i = 0; i< 5; i = i + 1) begin
+                        \(tms) = tmsPattern[i];
+                        #2;
+                    end
+
+                    // At shift-IR: shift new instruction on tdi line
+                    for (i = 0; i < 4; i = i + 1) begin
+                        tdi = instruction[i];
+                        if(i == 3) begin
+                            \(tms) = tmsPattern[5];     // exit-ir
+                        end
+                        #2;
+                    end
+
+                    \(tms) = tmsPattern[6];     // update-ir 
+                    #2;
+                    \(tms) = tmsPattern[7];     // run test-idle
+                    #6;
+                end
+            endtask
+
+            task enterShiftDR;
+                begin
+                    \(tms) = 1;     // select DR
+                    #2;
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                end
+            endtask
+
+            task exitDR;
+                begin
+                    \(tms) = 1;     // Exit DR -- update DR
+                    #4;
+                    \(tms) = 0;     // Run test-idle
+                    #2;
+                end
+            endtask
         endmodule
         """
 
@@ -796,11 +748,9 @@ class Simulator {
         }
 
         let aoutName = "\(folderName)/a.out"
-
         let iverilogResult =
             "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
         
-
         if iverilogResult.terminationStatus != EX_OK {
             fputs("An iverilog error has occurred: \n", stderr)
             fputs(iverilogResult.output, stderr)
