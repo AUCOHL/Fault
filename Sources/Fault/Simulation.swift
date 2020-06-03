@@ -686,6 +686,7 @@ class Simulator {
                     #2;
                     if (\(tdo) != 1) begin
                         $error("ERROR_EXECUTING_BYPASS_INST");
+                        $finish;
                     end
                     if(i == 9) begin
                         exitDR();
