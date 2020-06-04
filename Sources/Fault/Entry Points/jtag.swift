@@ -57,6 +57,21 @@ func jtagCreate(arguments: [String]) -> Int32{
     )
     cli.addOptions(liberty)
 
+    let testvectors = StringOption(
+        shortFlag: "t",
+        longFlag: "testVectors",
+        helpMessage: 
+            " .json test vector file to generate a testbecnh for the testing. "
+    )
+    cli.addOptions(testvectors)
+
+     let ignored = StringOption(
+        shortFlag: "i",
+        longFlag: "ignoring",
+        helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
+    )
+    cli.addOptions(ignored)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -106,13 +121,21 @@ func jtagCreate(arguments: [String]) -> Int32{
         fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
+    
+    let ignoredInputs: Set<String>
+        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+    let behavior
+        = Array<Simulator.Behavior>(
+            repeating: .holdHigh,
+            count: ignoredInputs.count
+        )
 
-    var ignoredInputs = 0
+    var ignoredCount = ignoredInputs.count
     if let _ = clockOpt.value {
-        ignoredInputs += 1
+        ignoredCount += 1
     }
     if let _ = resetOpt.value {
-        ignoredInputs += 1
+        ignoredCount += 1
     }
     
     if let libertyTest = liberty.value {
@@ -136,6 +159,19 @@ func jtagCreate(arguments: [String]) -> Int32{
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
             fputs(
                 "Warning: Cell model file provided does not end with .v or .sv.\n",
+                stderr
+            )
+        }
+    }
+
+    if let tvTest = testvectors.value {
+         if !fileManager.fileExists(atPath: tvTest) {
+            fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !tvTest.hasSuffix(".json") {
+            fputs(
+                "Warning: Cell model file provided does not end with .json \n",
                 stderr
             )
         }
@@ -241,7 +277,7 @@ func jtagCreate(arguments: [String]) -> Int32{
             extestName
         ]
 
-        let boundaryCount = inputs.count + outputs.count - (scanChainPorts.count + ignoredInputs)
+        let boundaryCount = inputs.count + outputs.count - (scanChainPorts.count + ignoredCount)
         let internalCount = dffCount - boundaryCount * 2 - 1 * (outputs.count - 2)
        
         if clockOpt.value == nil {
@@ -305,15 +341,15 @@ func jtagCreate(arguments: [String]) -> Int32{
         }
             
         // MARK: tap module  
-        let file = "RTL/JTAG/tapConfig.json"
-        if !fileManager.fileExists(atPath: file) {
-            fputs("JTAG configuration file '\(file)' not found.\n", stderr)
+        let tapConfig = "RTL/JTAG/tapConfig.json"
+        if !fileManager.fileExists(atPath: tapConfig) {
+            fputs("JTAG configuration file '\(tapConfig)' not found.\n", stderr)
             return EX_NOINPUT
         }
-        let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
+        let data = try Data(contentsOf: URL(fileURLWithPath: tapConfig), options: .mappedIfSafe)
         
         guard let jtagInfo = try? JSONDecoder().decode(JTAGInfo.self, from: data) else {
-            fputs("File '\(file)' is invalid.\n", stderr)
+            fputs("File '\(tapConfig)' is invalid.\n", stderr)
             return EX_DATAERR
         }
 
@@ -517,6 +553,48 @@ func jtagCreate(arguments: [String]) -> Int32{
                     print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
+            }
+
+            // MARK: Test bench
+            if let tvFile = testvectors.value {
+                print("Generating testbench for test vectors...")
+                let data = try Data(contentsOf: URL(fileURLWithPath: tvFile), options: .mappedIfSafe)
+                guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
+                    fputs("File '\(tvFile)' is invalid.\n", stderr)
+                    exit(EX_DATAERR)
+                }
+                let output = filePath.value != nil ? "\(filePath.value).tb.sv" :  "\(file).tb.sv"
+
+                let verified = try Simulator.simulate(
+                    verifying: definitionName,
+                    in: intermediate, // DEBUG
+                    with: model,
+                    ports: ports,
+                    inputs: inputs,
+                    ignoring: ignoredInputs,
+                    behavior: behavior,
+                    outputs: outputs,
+                    clock: clockName,
+                    reset: resetName,
+                    resetActive: resetActiveLow.value ? .low : .high,
+                    tms: tmsName,
+                    tdi: tdiName,
+                    tck: tckName,
+                    tdo: tdoName,
+                    trst: trstName,
+                    coverageList: tvInfo.coverageList, 
+                    output: output,
+                    internalCount: internalCount, 
+                    using: iverilogExecutable,
+                    with: vvpExecutable
+                )
+                print("Done.")
+                if (verified) {
+                    print("Test vectors verified successfully.")
+                } else {
+                    print("Test vector simulation failed.")
+                }
+                
             }
         }
     } catch {

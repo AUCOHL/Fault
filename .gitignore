@@ -8,6 +8,7 @@ Netlists
 /iverilog*/
 /Atalanta*/
 /podem*/
+/Testbench*/
 
 *.out
 *.vcd
