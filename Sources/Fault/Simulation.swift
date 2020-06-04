@@ -260,7 +260,7 @@ class Simulator {
                                 outputs: outputs,
                                 stuckAt: 1,
                                 cleanUp: !sampleRun,
-                                goldenOutput: false,
+                                goldenOutput: true,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
@@ -749,6 +749,228 @@ class Simulator {
         }
 
         let aoutName = "\(folderName)/a.out"
+        let iverilogResult =
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
+        
+        if iverilogResult.terminationStatus != EX_OK {
+            fputs("An iverilog error has occurred: \n", stderr)
+            fputs(iverilogResult.output, stderr)
+            exit(Int32(iverilogResult.terminationStatus))
+        }
+        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
+
+        if vvpTask.terminationStatus != EX_OK {
+            throw "Failed to run vvp."
+        }
+
+        return vvpTask.output.contains("SUCCESS_STRING")
+    }
+
+    static func simulate(
+        verifying module: String,
+        in file: String,
+        with cells: String,
+        ports: [String: Port],
+        inputs: [Port],
+        ignoring ignoredInputs: Set<String>,
+        behavior: [Behavior],
+        outputs: [Port],
+        clock: String,
+        reset: String,
+        resetActive: Active = .low,
+        tms: String,
+        tdi: String,
+        tck: String,
+        tdo: String,
+        trst: String,
+        coverageList: [TVCPair], 
+        output: String,
+        internalCount: Int,
+        using iverilogExecutable: String,
+        with vvpExecutable: String
+    ) throws -> Bool {
+    
+        var portWires = ""
+        var portHooks = ""
+        for (rawName, port) in ports {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portHooks += ".\(name) ( \(name) ) , "
+        }
+
+        var inputAssignment = ""
+        for (i, rawName) in ignoredInputs.enumerated() {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+            inputAssignment += "        \(name) = \(behavior[i].rawValue) ;\n"
+        }
+
+        let tvCount = coverageList.count
+        let vectorLength = (tvCount != 0) ? coverageList[0].vector.count : 0
+        let tapPorts = [tck, trst, tdi]
+
+        var count = vectorLength - 1
+        var vectorAssignment = ""
+        for input in inputs {
+            let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
+            if input.name == reset {
+                inputAssignment += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
+            } else if input.name == tms {
+                inputAssignment += "        \(name) = 1 ;\n"
+            }
+            else {
+                inputAssignment += "        \(name) = 0 ;\n"
+                if (input.name != clock && !tapPorts.contains(input.name)){
+                    vectorAssignment += "        \(name) = vector[\(count)] ; \n" 
+                    count -= 1
+                }
+            }
+        }        
+
+        var vectorInit = ""
+        for (i, tvcPair) in coverageList.enumerated() {
+            let output = tvcPair.goldenOutput
+            var vector = ""
+            for port in tvcPair.vector {
+                vector += String(port, radix: 2) 
+            }
+            vectorInit += "        vectors[\(i)] = \(vector) ; \n"
+            vectorInit += "        goldenOutput[\(i)] = \(output) ; \n"
+        }
+
+        var clockCreator = ""
+        if !clock.isEmpty {
+            clockCreator = "always #1 \(clock) = ~\(clock);"
+        }
+        var resetToggler = ""
+        if !reset.isEmpty {
+            resetToggler = "\(reset) = ~\(reset);"
+        }
+
+        let bench = """
+        \(String.boilerplate)
+        `include "\(cells)"
+        `include "\(file)"
+
+        module testbench;
+        \(portWires)
+            
+            \(clockCreator)
+            always #1 \(tck) = ~\(tck);
+
+            \(module) uut(
+                \(portHooks.dropLast(2))
+            );
+
+            integer i;
+
+            reg[7:0] tmsPattern = 8'b 01100110;
+            reg [2:0] scanInSerial;
+            reg [\(vectorLength - 1):0] vectors [0:\(tvCount - 1)];
+            reg [\(internalCount - 1):0] goldenOutput[0:\(tvCount - 1)];
+
+            wire[3:0] scanIn = 4'b 0100;
+
+            initial begin
+                $dumpfile("dut.vcd"); // DEBUG
+                $dumpvars(0, testbench);
+        \(inputAssignment)
+        \(vectorInit)
+                #10;
+                \(resetToggler)
+                \(trst) = 1;        
+                #2;
+
+                shiftIR(scanIn);
+                enterShiftDR();
+                
+                for (i = 0 ; i < \(tvCount); i = i + 1) begin
+                    test(vectors[i], goldenOutput[i]);
+                end
+
+                $display("SUCCESS_STRING");
+                $finish;
+            end
+
+            task test;
+                input [\(vectorLength - 1): 0] vector;
+                input [\(internalCount - 1): 0] goldenOutput;
+                begin
+                \(vectorAssignment)
+                    shiftIR(scanIn);
+                    enterShiftDR();
+
+                    for (i = 0; i < \(internalCount); i = i + 1) begin
+                        tdi = vector[i];
+                        #2;
+                    end
+                    
+                    for (i = 0; i < \(internalCount); i = i + 1) begin
+                        scanInSerial[i] = \(tdo);
+                        if(i == \(internalCount - 1)) begin
+                            exitDR();
+                        end
+                        #2;
+                    end
+
+                    if(scanInSerial != goldenOutput) begin
+                        $error("EXECUTING_SCANIN_INST_FAILED");
+                        $finish;
+                    end
+                end
+            endtask
+
+            task shiftIR;
+                input[3:0] instruction;
+                integer i;
+                begin
+                    for (i = 0; i< 5; i = i + 1) begin
+                        \(tms) = tmsPattern[i];
+                        #2;
+                    end
+
+                    // At shift-IR: shift new instruction on tdi line
+                    for (i = 0; i < 4; i = i + 1) begin
+                        tdi = instruction[i];
+                        if(i == 3) begin
+                            \(tms) = tmsPattern[5];     // exit-ir
+                        end
+                        #2;
+                    end
+
+                    \(tms) = tmsPattern[6];     // update-ir 
+                    #2;
+                    \(tms) = tmsPattern[7];     // run test-idle
+                    #6;
+                end
+            endtask
+
+            task enterShiftDR;
+                begin
+                    \(tms) = 1;     // select DR
+                    #2;
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                end
+            endtask
+
+            task exitDR;
+                begin
+                    \(tms) = 1;     // Exit DR -- update DR
+                    #4;
+                    \(tms) = 0;     // Run test-idle
+                    #2;
+                end
+            endtask
+        endmodule
+        """
+
+        let tbName = "\(output)"
+
+        try File.open(tbName, mode: .write) {
+            try $0.print(bench)
+        }
+
+        let aoutName = "\(output)_a.out"
         let iverilogResult =
             "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
         

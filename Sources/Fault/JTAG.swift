@@ -259,6 +259,7 @@ struct tdiSignals: Codable {
 
 
 class SerialVectorCreator {
+
     static func create(
         tvInfo: TVInfo
     ) throws -> String {
@@ -314,5 +315,3 @@ class SerialVectorCreator {
         return svf;
     }
 }
-
-
