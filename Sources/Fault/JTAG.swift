@@ -281,15 +281,22 @@ class SerialVectorCreator {
             for port in testVector {
                 tdi += String(port, radix: 16) 
             }
-            let tdiHex = String(BigUInt(tdi, radix: 2)!, radix: 16)
-            let mask = String(repeating: "f", count: tdiHex.count)
+            if let tdiInt = BigUInt(tdi, radix: 2) {
+                let tdiHex = String(tdiInt, radix: 16)
+                let mask = String(repeating: "f", count: tdiHex.count)
 
-            let offset = tvcPair.goldenOutput.count - dffCount
-            let start = tvcPair.goldenOutput.index(tvcPair.goldenOutput.startIndex, offsetBy: offset) 
-            let range = start..<tvcPair.goldenOutput.endIndex
-            let output = BigUInt(tvcPair.goldenOutput[range], radix: 2)!
-            let hexOutput = String(output, radix: 16) 
-            scanStatements += "SDR \(dffCount) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
+                let offset = tvcPair.goldenOutput.count - dffCount
+                let start = tvcPair.goldenOutput.index(tvcPair.goldenOutput.startIndex, offsetBy: offset) 
+                let range = start..<tvcPair.goldenOutput.endIndex
+                if let output = BigUInt(tvcPair.goldenOutput[range], radix: 2) {
+                    let hexOutput = String(output, radix: 16) 
+                    scanStatements += "SDR \(dffCount) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
+                } else {
+                    print("TV \(tvcPair.vector) is invalid.")
+                }
+            } else {
+                print("TV \(tvcPair.vector) is invalid.")
+            }
         }
 
         var svf: String {
