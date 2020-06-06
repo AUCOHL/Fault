@@ -169,7 +169,8 @@ func bench(arguments: [String]) -> Int32 {
         var benchStatements: String = ""
         for input in inputs {
             if input.width > 1 {
-                for index in 0..<input.width {
+                let range = (input.from > input.to) ? input.to...input.from : input.from...input.to
+                for index in range {
                     let name = "\(input.name)[\(index)]"
                     ignoredInputs.append(name)
                     benchStatements += "INPUT(\(name)) \n"
@@ -183,7 +184,8 @@ func bench(arguments: [String]) -> Int32 {
         }
         for output in outputs {
             if output.width > 1 {
-                for index in 0..<output.width {
+                let range = (output.from > output.to) ? output.to...output.from : output.from...output.to
+                for index in range {
                     benchStatements += "OUTPUT(\(output.name)[\(index)]) \n"
                 }
             }
