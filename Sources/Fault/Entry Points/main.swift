@@ -264,6 +264,10 @@ func main(arguments: [String]) -> Int32 {
                     (tvSetVectors, tvSetInputs) = Podem.generate(file: benchTest, module: "\(definition.name)")
                 }
                 print("Generated \(tvSetVectors.count) test vectors")
+                if testvectors.count == 0 {
+                    print("[Error]: bench netlist not valid. Are you sure there are no floating nets/outputs ? ")
+                    return EX_DATAERR
+                }
             } else {
                 print("[Error]: bench netlist must be passed to generate TVs with atalanta.\n Run the synthesized netlist through `fault bench` to generate bench netlist. ")
                 exit(EX_SOFTWARE)
