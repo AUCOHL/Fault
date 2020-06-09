@@ -38,12 +38,11 @@ class JTAGCreator {
             Node.Wire(selectSignals.samplePreload),
             Node.Wire(selectSignals.mbist),
             Node.Wire(selectSignals.debug),
-            Node.Wire(selectSignals.scanIn),
+            Node.Wire(selectSignals.intest),
             Node.Wire(jtagInfo.tdoSignal),
             Node.Wire(tdiSignals.debug),
             Node.Wire(tdiSignals.bsChain),
-            Node.Wire(tdiSignals.mbist),
-            Node.Wire(tdiSignals.scanIn)
+            Node.Wire(tdiSignals.mbist)
         ]
 
         let portArguments = [
@@ -107,8 +106,8 @@ class JTAGCreator {
                 Node.Identifier(selectSignals.debug)
             ),
             Node.PortArg(
-                selectSignals.scanIn,
-                Node.Identifier(selectSignals.scanIn)
+                selectSignals.intest,
+                Node.Identifier(selectSignals.intest)
             ),
             //  TDO signal that is connected to TDI of sub-modules.
             Node.PortArg(
@@ -127,10 +126,6 @@ class JTAGCreator {
             Node.PortArg(
                 tdiSignals.mbist,
                 Node.Identifier(tdiSignals.mbist)
-            ),
-            Node.PortArg(
-                tdiSignals.scanIn,
-                Node.Identifier(tdiSignals.scanIn)
             )
         ]
 
@@ -222,19 +217,19 @@ struct selectSignals: Codable {
     var samplePreload: String
     var mbist: String
     var debug: String
-    var scanIn: String
+    var intest: String
     init (
         extest: String,
         samplePreload: String,
         mbist: String,
         debug: String,
-        scanIn: String
+        intest: String
     ) {
         self.extest = extest
         self.samplePreload = samplePreload
         self.mbist =  mbist
         self.debug = debug
-        self.scanIn = scanIn
+        self.intest = intest
     }
 }
 
@@ -242,18 +237,16 @@ struct tdiSignals: Codable {
     var debug: String
     var bsChain: String
     var mbist: String
-    var scanIn: String
     
     init (
         debug: String,
         bsChain: String,
         mbist: String,
-        scanIn: String
+        intest: String
     ) {
         self.debug = debug
         self.bsChain = bsChain
         self.mbist = mbist
-        self.scanIn = scanIn
     }
 }
 
@@ -306,7 +299,7 @@ class SerialVectorCreator {
             TIR 0;
             HDR 0;
             TDR 0;
-            ! SCANIN Instruction
+            ! Intest Instruction
             SIR 4 TDI (4);
             ! San Test Vectors
             \(scanStatements)

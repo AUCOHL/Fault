@@ -89,7 +89,7 @@ func assemble(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    let order = metadata.boundaryOrder 
+    let order = metadata.order 
     let inputOrder = tvinfo.inputs
     var inputMap: [String: Int] = [:]
 
