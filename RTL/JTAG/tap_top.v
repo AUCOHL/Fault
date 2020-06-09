@@ -43,7 +43,7 @@
 //
 // CVS Revision History
 // Revision 1.6 2020/04/20 
-// added SCANIN instruction for selecting the internal scan chain
+// added Intest instruction for applying TV to the to the internal logic
 //
 // $Log: not supported by cvs2svn $
 // Revision 1.5  2004/01/18 09:27:39  simons
@@ -115,7 +115,7 @@
 `define DEBUG           4'b1000
 `define MBIST           4'b1001
 `define BYPASS          4'b1111
-`define SCAN_IN         4'b0100
+`define INTEST          4'b0100
 
 // Top module
 module tap_top(
@@ -138,7 +138,7 @@ module tap_top(
                 sample_preload_select_o,
                 mbist_select_o,
                 debug_select_o,
-                scan_in_select_o,
+                intest_select_o,
                 
                 // TDO signal that is connected to TDI of sub-modules.
                 tdo_o, 
@@ -146,8 +146,7 @@ module tap_top(
                 // TDI signals from sub-modules
                 debug_tdi_i,     // from debug module
                 bs_chain_tdi_i,  // from Boundary Scan Chain
-                mbist_tdi_i,     // from Mbist Chain
-                scan_in_tdi_i    // from internal register chain
+                mbist_tdi_i    // from Mbist Chain
               );
 
 
@@ -170,7 +169,7 @@ output  extest_select_o;
 output  sample_preload_select_o;
 output  mbist_select_o;
 output  debug_select_o;
-output  scan_in_select_o;
+output  intest_select_o;
 
 // TDO signal that is connected to TDI of sub-modules.
 output  tdo_o;
@@ -179,7 +178,7 @@ output  tdo_o;
 input   debug_tdi_i;    // from debug module
 input   bs_chain_tdi_i; // from Boundary Scan Chain
 input   mbist_tdi_i;    // from Mbist Chain
-input   scan_in_tdi_i;  // from internal register chain 
+
 // Registers
 reg     test_logic_reset;
 reg     run_test_idle;
@@ -203,7 +202,7 @@ reg     idcode_select;
 reg     mbist_select;
 reg     debug_select;
 reg     bypass_select;
-reg     scan_in_select;
+reg     intest_select;
 reg     tdo_pad_o;
 reg     tdo_padoe_o;
 reg     tms_q1, tms_q2, tms_q3, tms_q4;
@@ -219,7 +218,7 @@ assign extest_select_o = extest_select;
 assign sample_preload_select_o = sample_preload_select;
 assign mbist_select_o = mbist_select;
 assign debug_select_o = debug_select;
-assign scan_in_select_o = scan_in_select;
+assign intest_select_o = intest_select;
 
 always @ (posedge tck_pad_i)
 begin
@@ -590,7 +589,7 @@ begin
   mbist_select            = 1'b0;
   debug_select            = 1'b0;
   bypass_select           = 1'b0;
-  scan_in_select          = 1'b0;
+  intest_select          = 1'b0;
   case(latched_jtag_ir)    /* synthesis parallel_case */ 
     `EXTEST:            extest_select           = 1'b1;    // External test
     `SAMPLE_PRELOAD:    sample_preload_select   = 1'b1;    // Sample preload
@@ -598,7 +597,7 @@ begin
     `MBIST:             mbist_select            = 1'b1;    // Mbist test
     `DEBUG:             debug_select            = 1'b1;    // Debug
     `BYPASS:            bypass_select           = 1'b1;    // BYPASS
-    `SCAN_IN:           scan_in_select          = 1'b1;    // Scan in
+    `INTEST:            intest_select          = 1'b1;    // Scan in
     default:            bypass_select           = 1'b1;    // BYPASS
   endcase
 end
@@ -611,7 +610,7 @@ end
 *                                                                                 *
 **********************************************************************************/
 always @ (shift_ir_neg or exit1_ir or instruction_tdo or latched_jtag_ir_neg or idcode_tdo or
-          debug_tdi_i or bs_chain_tdi_i or mbist_tdi_i or scan_in_tdi_i or
+          debug_tdi_i or bs_chain_tdi_i or mbist_tdi_i or
           bypassed_tdo)
 begin
   if(shift_ir_neg)
@@ -624,7 +623,7 @@ begin
         `SAMPLE_PRELOAD:    tdo_pad_o = bs_chain_tdi_i;   // Sampling/Preloading
         `EXTEST:            tdo_pad_o = bs_chain_tdi_i;   // External test
         `MBIST:             tdo_pad_o = mbist_tdi_i;      // Mbist test
-        `SCAN_IN:           tdo_pad_o = scan_in_tdi_i;    // ScanIn test
+        `INTEST:            tdo_pad_o = bs_chain_tdi_i;    // Intest
         default:            tdo_pad_o = bypassed_tdo;     // BYPASS instruction
       endcase
     end
