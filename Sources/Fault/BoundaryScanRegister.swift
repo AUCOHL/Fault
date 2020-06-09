@@ -11,12 +11,12 @@ class BoundaryScanRegisterCreator {
     var reset: String
     var resetActive: Simulator.Active
     
-    private var captureIdentifier: PythonObject
+    private var clockDRIdentifier: PythonObject
     private var updateIdentifier: PythonObject
     private var shiftIdentifier: PythonObject
-    private var extestIdentifier: PythonObject
     private var clockIdentifier: PythonObject
     private var resetIdentifier: PythonObject
+    private var modeIdentifier: PythonObject
 
     private var Node: PythonObject
 
@@ -25,10 +25,10 @@ class BoundaryScanRegisterCreator {
         clock: String,
         reset: String,
         resetActive: Simulator.Active,
-        capture: String,
+        clockDR: String,
         update: String,
         shift: String,
-        extest: String,
+        mode: String,
         using Node: PythonObject
     ) {
         self.name = name
@@ -43,10 +43,10 @@ class BoundaryScanRegisterCreator {
 
         self.resetActive = resetActive
 
-        self.captureIdentifier = Node.Identifier(capture)
+        self.clockDRIdentifier = Node.Identifier(clockDR)
         self.updateIdentifier = Node.Identifier(update)
         self.shiftIdentifier = Node.Identifier(shift)
-        self.extestIdentifier = Node.Identifier(extest)
+        self.modeIdentifier = Node.Identifier(mode)
 
         self.Node = Node
     }
@@ -63,11 +63,12 @@ class BoundaryScanRegisterCreator {
         let doutIdentifier = Node.Identifier(dout)
         let sinIdentifier = Node.Identifier(sin)
         let soutIdentifier = Node.Identifier(sout)
-        let ordinalConstant = Node.Constant(ordinal)
 
+        let ordinalConstant = Node.Constant(ordinal)
+    
         let name = input ? inputName : outputName
         
-        var portArguments = [
+        let portArguments = [
             Node.PortArg("din", Node.Pointer(dinIdentifier, ordinalConstant)),
             Node.PortArg("dout", Node.Pointer(doutIdentifier, ordinalConstant)),
             Node.PortArg("sin", sinIdentifier),
@@ -75,13 +76,10 @@ class BoundaryScanRegisterCreator {
             Node.PortArg("clock", clockIdentifier),
             Node.PortArg("reset", resetIdentifier),
             Node.PortArg("shiftDR", shiftIdentifier),
-            Node.PortArg("captureDR", captureIdentifier)
+            Node.PortArg("clockDR", clockDRIdentifier),
+            Node.PortArg("updateDR", updateIdentifier),
+            Node.PortArg("mode", modeIdentifier)
         ]
-
-        if (!input){
-            portArguments.append(Node.PortArg("updateDR", updateIdentifier))
-            portArguments.append(Node.PortArg("extest", extestIdentifier))
-        }
 
         let submoduleInstance = Node.Instance(
             name,
@@ -109,34 +107,38 @@ class BoundaryScanRegisterCreator {
             clock,
             reset,
             shiftDR,
-            captureDR
+            clockDR,
+            updateDR,
+            mode
         );
             input din; output dout;
             input sin; output sout;
-            input clock, reset, shiftDR, captureDR;
+            input clock, reset, shiftDR, clockDR, updateDR;
+            input mode;
 
             reg store;  
             reg sout;  
             
-            wire SelectedInput = captureDR ? din : sin;
+            wire selectedInput = shiftDR ? sin : din;
 
             always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
                 if (\(resetActive == .high ? "" : "~") reset) begin
-                    store <= 1'b0;
+                    sout <= 1'b0;
                 end else begin
-                    if(captureDR | shiftDR) 
-                        store <= SelectedInput;
+                    if(clockDR) 
+                        sout <= selectedInput;
                 end
             end
 
             always @ (negedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
                  if (\(resetActive == .high ? "" : "~") reset) begin
-                    sout <= 1'b0;
+                    store <= 1'b0;
                 end else begin
-                    sout <= store;
+                    if(updateDR)
+                        store <= sout;
                 end
             end
-        assign dout = shiftDR ? store : din;
+        assign dout = mode ? store : din;
 
         endmodule
             
@@ -146,47 +148,45 @@ class BoundaryScanRegisterCreator {
     var outputDefinition: String {
         return """
         module \(outputName) (
-            din,         
-            dout,      
-            sin,       
-            sout,     
-            clock,   
+            din,     
+            dout,   
+            sin,  
+            sout, 
+            clock,
             reset,
             shiftDR,
-            captureDR,
+            clockDR,
             updateDR,
-            extest
+            mode
         );
             input din; output dout;
             input sin; output sout;
-            input clock, reset, shiftDR, captureDR, updateDR;
-            input extest;
+            input clock, reset, shiftDR, clockDR, updateDR;
+            input mode;
 
-            reg sout; 
             reg store;  
-            reg shifted;
-
-            wire SelectedInput = captureDR ? din : sin;
+            reg sout;  
+            
+            wire selectedInput = shiftDR ? sin : din;
 
             always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
                 if (\(resetActive == .high ? "" : "~") reset) begin
-                    store <= 1'b0;
+                    sout <= 1'b0;
                 end else begin
-                    if (captureDR | shiftDR)
-                        store <= SelectedInput;
+                    if(clockDR) 
+                        sout <= selectedInput;
                 end
             end
 
-            always @ (negedge clock) begin
-                sout <= store;
+            always @ (negedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
+                 if (\(resetActive == .high ? "" : "~") reset) begin
+                    store <= 1'b0;
+                end else begin
+                    if(updateDR)
+                        store <= sout;
+                end
             end
-
-            always @ (negedge clock) begin
-                if (updateDR)
-                    shifted <= sout;
-            end
-
-            assign dout = extest? shifted : din;
+            assign dout = mode ? store : din;
 
         endmodule
 
