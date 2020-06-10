@@ -264,7 +264,7 @@ func main(arguments: [String]) -> Int32 {
                     (tvSetVectors, tvSetInputs) = Podem.generate(file: benchTest, module: "\(definition.name)")
                 }
                 print("Generated \(tvSetVectors.count) test vectors")
-                if testvectors.count == 0 {
+                if tvSetVectors.count == 0 {
                     print("[Error]: bench netlist not valid. Are you sure there are no floating nets/outputs ? ")
                     return EX_DATAERR
                 }
@@ -400,7 +400,7 @@ func main(arguments: [String]) -> Int32 {
         try File.open(jsonOutput, mode: .write) {
             try $0.print(string)
         }
-
+  
         let svf = try SerialVectorCreator.create(tvInfo: tvInfo)
 
         try File.open(svfOutput, mode: .write) {

@@ -263,36 +263,36 @@ class SerialVectorCreator {
     static func create(
         tvInfo: TVInfo
     ) throws -> String {
-        var positions: [Int] = []
-        let dffCount: Int = {
+
+        var scanStatements = ""
+
+        let chainLength: Int = {
             var count = 0
-            for (index, input) in tvInfo.inputs.enumerated() {
-                if(input.name.hasPrefix("_")){
-                    count += 1
-                    positions.append(index)
-                }
+            for input in tvInfo.inputs {
+                count += input.width
             }
             return count
         }()
-        var scanStatements = ""
+
         for tvcPair in tvInfo.coverageList {
             var tdi = ""
-            let testVector = positions.map {tvcPair.vector[$0]}
-            for port in testVector {
-                tdi += String(port, radix: 16) 
+            let testVector = tvcPair.vector
+            var length = 0
+            for (index, port) in testVector.enumerated() {
+                let portVector = String(port, radix: 2)
+                let offset = tvInfo.inputs[index].width - portVector.count
+                tdi = String(repeating: "0", count: offset) + portVector + tdi
             }
+
             if let tdiInt = BigUInt(tdi, radix: 2) {
                 let tdiHex = String(tdiInt, radix: 16)
+                
                 let mask = String(repeating: "f", count: tdiHex.count)
-
-                let offset = tvcPair.goldenOutput.count - dffCount
-                let start = tvcPair.goldenOutput.index(tvcPair.goldenOutput.startIndex, offsetBy: offset) 
-                let range = start..<tvcPair.goldenOutput.endIndex
-                if let output = BigUInt(tvcPair.goldenOutput[range], radix: 2) {
+                if let output = BigUInt(tvcPair.goldenOutput, radix: 2) {
                     let hexOutput = String(output, radix: 16) 
-                    scanStatements += "SDR \(dffCount) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
+                    scanStatements += "SDR \(chainLength) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
                 } else {
-                    print("TV \(tvcPair.vector) is invalid.")
+                    print("TV golden output \(tvcPair.goldenOutput) is invalid.")
                 }
             } else {
                 print("TV \(tvcPair.vector) is invalid.")
@@ -313,9 +313,9 @@ class SerialVectorCreator {
             TIR 0;
             HDR 0;
             TDR 0;
-            ! SCANIN Instruction
+            ! INTEST Instruction
             SIR 4 TDI (4);
-            ! San Test Vectors
+            ! San Test Vectors through the scan chain with length:  \(chainLength)
             \(scanStatements)
             """
         }
