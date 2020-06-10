@@ -20,34 +20,25 @@ struct ChainRegister: Codable {
 struct Metadata: Codable {
     var boundaryCount: Int
     var internalCount: Int
-    var boundaryOrder: [ChainRegister]
-    var internalOrder: [ChainRegister]
+    var order: [ChainRegister]
     var shift: String
-    var sinBoundary: String
-    var sinInternal: String
-    var soutBoundary: String
-    var soutInternal: String
+    var sin: String
+    var sout: String
 
     init(
         boundaryCount: Int,
         internalCount: Int,
-        boundaryOrder: [ChainRegister],
-        internalOrder: [ChainRegister],
+        order: [ChainRegister],
         shift: String,
-        sinBoundary: String,
-        sinInternal: String,
-        soutBoundary: String,
-        soutInternal: String
+        sin: String,
+        sout: String
     ) {
         self.boundaryCount = boundaryCount
         self.internalCount = internalCount
-        self.boundaryOrder = boundaryOrder
-        self.internalOrder = internalOrder
+        self.order = order
         self.shift = shift
-        self.sinBoundary = sinBoundary
-        self.sinInternal = sinInternal
-        self.soutBoundary = soutBoundary
-        self.soutInternal = soutInternal
+        self.sin = sin
+        self.sout = sout
     }
 }
 

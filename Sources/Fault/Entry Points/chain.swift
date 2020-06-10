@@ -75,14 +75,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
-        ("sinBoundary", "boundary scan register serial data in"),
-        ("sinInternal", "internal register serial data in"),
-        ("soutBoundary", "boundary scan register serial data out"),
-        ("soutInternal",  "internal register serial data out"),
+        ("sin", "boundary scan register serial data in"),
+        ("sout", "boundary scan register serial data out"),
+        ("mode", "boundary scan cell mode"),
         ("shift", "JTAG shift"),
-        ("capture", "JTAG capture"),
+        ("clockDR", "BS cell clock DR"),
         ("update", "JTAG update"),
-        ("extest", "JTAG extest"),
         ("tck", "JTAG test clock"),
     ] {
         let option = StringOption(
@@ -195,45 +193,33 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let alteredName = "__UNIT__UNDER__FINANGLING__"
 
     var internalOrder: [ChainRegister] = []
+    var chainPorts: [String: (default: String, identifier: PythonObject)] = [:]
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
-        let testingName = names["shift"]!.option.value
-            ?? names["shift"]!.default
+        let testingName = names["shift"]!.option.value ?? names["shift"]!.default
         let testingIdentifier = Node.Identifier(testingName)
-
-        let inputBoundaryName = names["sinBoundary"]!.option.value
-            ?? names["sinBoundary"]!.default
-        let inputBoundaryIdentifier = Node.Identifier(inputBoundaryName)
-
-        let inputInternalName = names["sinInternal"]!.option.value 
-            ?? names["sinInternal"]!.default
-        let inputInternalIdentifier = Node.Identifier(inputInternalName)
-
-        let outputBoundaryName = names["soutBoundary"]!.option.value
-            ?? names["soutBoundary"]!.default
-        let outputBoundaryIdentifier = Node.Identifier(outputBoundaryName)
-
-        let outputInternalName = names["soutInternal"]!.option.value
-            ?? names["soutInternal"]!.default
-        let outputInternalIdentifier = Node.Identifier(outputInternalName)
-
-        let captureName = names["capture"]!.option.value ?? names["capture"]!.default
+        let inputName = names["sin"]!.option.value ?? names["sin"]!.default
+        let inputIdentifier = Node.Identifier(inputName)
+        let outputName = names["sout"]!.option.value ?? names["sout"]!.default
+        let outputIdentifier = Node.Identifier(outputName)
+        let modeName = names["mode"]!.option.value ?? names["mode"]!.default
+        let clockDRName = names["clockDR"]!.option.value ?? names["clockDR"]!.default
         let updateName = names["update"]!.option.value ?? names["update"]!.default
-        let extestName = names["extest"]!.option.value ?? names["extest"]!.default
         let tckName = names["tck"]!.option.value ?? names["tck"]!.default
         
         let resetName = resetOpt.value ?? defaultBoundaryReset
         let clockName = clockOpt.value ?? ""
+
         // MARK: Register chaining original module
         let internalCount: Int = {
-            var previousOutput = inputInternalIdentifier
+            var previousOutput = inputIdentifier
 
             let ports = Python.list(definition.portlist.ports)
             ports.append(Node.Port(testingName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(inputInternalName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(outputInternalName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
             definition.portlist.ports = Python.tuple(ports)
 
             var counter = 0
@@ -270,14 +256,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             }
 
             let statements = Python.list()
-            statements.append(Node.Input(inputInternalName))
-            statements.append(Node.Output(outputInternalName))
+            statements.append(Node.Input(inputName))
+            statements.append(Node.Output(outputName))
             statements.append(Node.Input(testingName))
-
             statements.extend(Python.list(definition.items))
 
             let finalAssignment = Node.Assign(
-                Node.Lvalue(outputInternalIdentifier),
+                Node.Lvalue(outputIdentifier),
                 Node.Rvalue(previousOutput)
             )
             statements.append(finalAssignment)
@@ -296,15 +281,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         
         // MARK: Chaining boundary registers
         print("Creating and chaining boundary flip-flops…")
-        var boundaryOrder: [ChainRegister] = []
-
+        var order: [ChainRegister] = []
         let boundaryCount: Int = try {
             let ports = Python.list(definition.portlist.ports)
-            ports.append(Node.Port(inputBoundaryName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(outputBoundaryName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(captureName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(clockDRName, Python.None, Python.None, Python.None))
             ports.append(Node.Port(updateName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(extestName, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(modeName, Python.None, Python.None, Python.None))
             ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
 
             if resetOpt.value == nil {
@@ -314,17 +296,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             }
             
             var statements: [PythonObject] = []
-            statements.append(Node.Input(inputInternalName))
-            statements.append(Node.Output(outputInternalName))
-            statements.append(Node.Input(inputBoundaryName))
-            statements.append(Node.Output(outputBoundaryName))
+            statements.append(Node.Input(inputName))
+            statements.append(Node.Output(outputName))
             statements.append(Node.Input(resetName))
             statements.append(Node.Input(tckName))            
             statements.append(Node.Input(testingName))
-            statements.append(Node.Input(captureName))
+            statements.append(Node.Input(clockDRName))
             statements.append(Node.Input(updateName))
-            statements.append(Node.Input(extestName))
-
+            statements.append(Node.Input(modeName))
 
             if let clock = clockOpt.value {
                 statements.append(Node.Input(clock))            
@@ -336,18 +315,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clock: tckName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
-                capture: captureName,
+                clockDR: clockDRName,
                 update: updateName,
                 shift: testingName,
-                extest: extestName,
+                mode: modeName,
                 using: Node
             )
 
             var counter = 0
             
             let initialAssignment = Node.Assign(
-                Node.Lvalue(Node.Identifier(inputBoundaryName.uniqueName(0))),
-                Node.Rvalue(inputBoundaryIdentifier)
+                Node.Lvalue(Node.Identifier(inputName.uniqueName(0))),
+                Node.Rvalue(inputIdentifier)
             )
             statements.append(initialAssignment)
 
@@ -391,15 +370,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             ordinal: i,
                             din: input.name,
                             dout: doutName,
-                            sin: inputBoundaryName.uniqueName(counter),
-                            sout: inputBoundaryName.uniqueName(counter + 1),
+                            sin: inputName.uniqueName(counter),
+                            sout: inputName.uniqueName(counter + 1),
                             input: true
                         )
                     )
                     counter += 1
                 }
 
-                boundaryOrder.append(
+                order.append(
                     ChainRegister(
                         name: String(describing: input.name),
                         kind: .input,
@@ -414,13 +393,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ))
 
             portArguments.append(Node.PortArg(
-                inputInternalName,
-                Node.Identifier(inputInternalName)
+                inputName,
+                Node.Identifier(inputName.uniqueName(counter))
             ))
+            
+            counter += 1 // as a skip
+            order += internalOrder
 
             portArguments.append(Node.PortArg(
-                outputInternalName,
-                Node.Identifier(outputInternalName)
+                outputName,
+                Node.Identifier(inputName.uniqueName(counter))
             ))
 
             for output in outputs {
@@ -452,15 +434,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             ordinal: i,
                             din: dinName,
                             dout: output.name,
-                            sin:  inputBoundaryName.uniqueName(counter),
-                            sout: inputBoundaryName.uniqueName(counter + 1),
+                            sin:  inputName.uniqueName(counter),
+                            sout: inputName.uniqueName(counter + 1),
                             input: false
                         )
                     )
                     counter += 1
                 }
 
-                boundaryOrder.append(
+                order.append(
                     ChainRegister(
                         name: String(describing: output.name),
                         kind: .output,
@@ -483,14 +465,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ))
 
             let boundaryAssignment = Node.Assign(
-                Node.Lvalue(outputBoundaryIdentifier),
-                Node.Rvalue(Node.Identifier(inputBoundaryName.uniqueName(counter)))
+                Node.Lvalue(outputIdentifier),
+                Node.Rvalue(Node.Identifier(inputName.uniqueName(counter)))
             )
             statements.append(boundaryAssignment)
 
             var wireDeclarations: [PythonObject] = []
             for i in 0...counter {
-                wireDeclarations.append(Node.Wire(inputBoundaryName.uniqueName(i)))
+                wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
             }
 
             let supermodel = Node.ModuleDef(
@@ -519,13 +501,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let metadata = Metadata(
             boundaryCount: boundaryCount,
             internalCount: internalCount,
-            boundaryOrder: boundaryOrder,
-            internalOrder: internalOrder,
+            order: order,
             shift: testingName, 
-            sinBoundary: inputBoundaryName,
-            sinInternal: inputInternalName,
-            soutBoundary: outputBoundaryName,
-            soutInternal: outputInternalName
+            sin: inputName,
+            sout: outputName
         )
         
         guard let metadataString = metadata.toJSON() else {
@@ -595,12 +574,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clock: clockName,
                 reset: resetName,
                 tck: tckName,
-                sinInternal: inputInternalName,
-                sinBoundary: inputBoundaryName,
-                soutInternal: outputInternalName,
-                soutBoundary: outputBoundaryName,
+                sin: inputName,
+                sout: outputName,
                 resetActive: resetActiveLow.value ? .low : .high,
                 testing: testingName,
+                clockDR: clockDRName,
+                update: updateName,
+                mode: modeName,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -625,12 +605,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 "tap",
                 "-l", libertyFile,
                 "--reset", resetName,
-                "--sinInternal", inputInternalName,
-                "--soutInternal", outputInternalName,
-                "--sinBoundary", inputBoundaryName,
-                "--soutBoundary", outputBoundaryName,
+                "--sin", inputName,
+                "--sout", outputName,
                 "--shift", testingName,
-                "--capture", captureName,
+                "--clockDR", clockDRName,
                 "--update", updateName,
                 "--tck", tckName,
                 output

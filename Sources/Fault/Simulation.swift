@@ -332,12 +332,13 @@ class Simulator {
         clock: String,
         reset: String,
         tck: String,
-        sinInternal: String,
-        sinBoundary: String,
-        soutInternal: String,
-        soutBoundary: String,
+        sin: String,
+        sout: String,
         resetActive: Active = .low,
         testing: String,
+        clockDR: String,
+        update: String,
+        mode: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -366,17 +367,13 @@ class Simulator {
                 inputAssignment += "        \(name) = 0 ;\n"
             }
         }
+        let chainLength = internalCount + boundaryCount
 
-        var boundarySerial = "0"
-        for _ in 0..<boundaryCount {
-            boundarySerial += "\(Int.random(in: 0...1))"
+        var serial = "0"
+        for _ in 0..<chainLength {
+            serial += "\(Int.random(in: 0...1))"
         }
 
-        var internalSerial = "0"
-        for _ in 0..<internalCount {
-            internalSerial += "\(Int.random(in: 0...1))"
-        }
-        
         var clockCreator = ""
         if !clock.isEmpty {
             clockCreator = "always #1 \(clock) = ~\(clock);"
@@ -386,63 +383,39 @@ class Simulator {
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
-
         module testbench;
         \(portWires)
-
+            
             \(clockCreator)
             always #1 \(tck) = ~\(tck);
-
             \(module) uut(
                 \(portHooks.dropLast(2))
             );
-
-            wire[\(boundaryCount - 1):0] boundarySerializable =
-                \(boundaryCount)'b\(boundarySerial);
-            reg[\(boundaryCount - 1):0] boundarySerial;
-            
-            wire[\(internalCount == 0 ? 1 : internalCount  - 1):0] internalSerializable =
-                \(internalCount == 0 ? 1 : internalCount)'b\(internalSerial);
-            reg[\(internalCount - 1):0] internalSerial;
-
+            wire[\(chainLength - 1):0] serializable =
+                \(chainLength)'b\(serial);
+            reg[\(chainLength - 1):0] serial;
             integer i;
-
             initial begin
+                $dumpfile("dut.vcd"); // DEBUG
+                $dumpvars(0, testbench);
         \(inputAssignment)
                 #10;
                 \(reset) = ~\(reset);
                 \(testing) = 1;
-
-                for (i = 0; i < \(boundaryCount); i = i + 1) begin
-                    \(sinBoundary) = boundarySerializable[i];
+                \(clockDR) = 1;
+                \(update) = 1;
+                \(mode) = 0;
+                for (i = 0; i < \(chainLength); i = i + 1) begin
+                    sin = serializable[i];
                     #2;
                 end
-                #4;
-                for (i = 0; i < \(boundaryCount); i = i + 1) begin
-                    boundarySerial[i] = \(soutBoundary);
+                for (i = 0; i < \(chainLength); i = i + 1) begin
+                    serial[i] = sout;
                     #2;
                 end
-
-                if (boundarySerial != boundarySerializable) begin
-                    $error("FAILED_SERIALIZING_THROUGH_BOUNDARY_CHAIN");
-                    $finish;
+                if (serial == serializable) begin
+                    $display("SUCCESS_STRING");
                 end
-
-                for (i = 0; i < \(internalCount); i = i + 1) begin
-                    \(sinInternal) = internalSerializable[i];
-                    #2;
-                end
-                for (i = 0; i < \(internalCount); i = i + 1) begin
-                    internalSerial[i] = \(soutInternal);
-                    #2;
-                end
-
-                if (internalSerial != internalSerializable) begin
-                    $error("FAILED_SERIALIZING_THROUGH_INTERNAL_CHAIN");
-                    $finish;
-                end
-                
-                $display("SUCCESS_STRING");
                 $finish;
             end
         endmodule
@@ -509,12 +482,13 @@ class Simulator {
             portHooks += ".\(name) ( \(name) ) , "
         }
 
+        let chainLength = internalCount + boundaryCount
+        let ignored = [tck, trst, tdi, clock, tms, reset]
+        let inputCellCount = inputs.count - ignored.count
+
         var inputInit = ""
         var inputAssignment = ""
-        var serial = ""
-        var storesAssignment = ""
-
-        var count = 0
+        var sampleSerializable = ""
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
@@ -524,38 +498,31 @@ class Simulator {
             }
             else {
                 inputInit += "        \(name) = 0 ;\n"
-                if (input.name != tck && input.name != clock && input.name != trst && input.name != tdi){
+                if (!ignored.contains(input.name)){
                     let bit = Int.random(in: 0...1)
                     inputAssignment += "        \(name) = \(bit) ;\n"
-                    serial += "\(bit)"
-                    let assignStatement =
-                        "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_input_\(count)__.store "
-                    storesAssignment += "\(assignStatement);\n"
-                    count = count + 1
+                    sampleSerializable += "\(bit)"
                 }
             }
         }
-       
+
+        for _ in 0..<internalCount {
+            sampleSerializable += "x"
+        }
+
         var outputAssignment  = ""
+        var count = 0
         for output in outputs {
             if (output.name != tdo){
-                let assignStatement = 
-                    "        stores[\(count)] = uut.__dut__.\\__BoundaryScanRegister_output_\(count)__.store "
-                storesAssignment += "\(assignStatement);\n"
-                outputAssignment += "        serializable[\(boundaryCount - count - 1)] = \(output.name) ; \n" 
-                serial += "0"
-                count = count + 1
+                outputAssignment += "        serializable[\(boundaryCount - inputCellCount - count - 1)] = \(output.name) ; \n" 
+                sampleSerializable += "x"
+                count += 1
             }
         }
 
         var boundarySerial = ""
-        for _ in 0..<boundaryCount {
+        for _ in 0..<chainLength {
             boundarySerial += "\(Int.random(in: 0...1))"
-        }
-
-        var scanInSerial = ""
-        for _ in 0..<internalCount {
-            scanInSerial += "\(Int.random(in: 0...1))"
         }
 
         var clockCreator = ""
@@ -583,30 +550,25 @@ class Simulator {
             );
 
             integer i;
-            reg [\(boundaryCount - 1): 0] stores;
-            reg[7:0] tmsPattern = 8'b 01100110;
 
+            wire[7:0] tmsPattern = 8'b 01100110;
             wire[3:0] extest = 4'b 0000;
             wire[3:0] samplePreload = 4'b 0001;
             wire[3:0] bypass = 4'b 1111;
-            wire[3:0] scanIn = 4'b 0100;
 
-            reg[\(boundaryCount - 1):0] serializable =
-                \(boundaryCount)'b\(serial);
-            wire [\(boundaryCount - 1): 0] boundarySerial = 
-                \(boundaryCount)'b\(boundarySerial);
-           
-            reg[\(boundaryCount - 1):0] serial;
-            
-            wire [\(internalCount == 0 ? 1 : internalCount - 1): 0] scanInSerializable = 
-                \(internalCount == 0 ? 1 : internalCount)'b\(scanInSerial.isEmpty ? "0" : scanInSerial);
-            reg[\(internalCount - 1):0] scanInSerial;
+            reg[\(chainLength - 1):0] serializable =
+                \(chainLength)'b\(sampleSerializable);
+            reg[\(chainLength - 1):0] serial;
+
+            wire [\(chainLength - 1): 0] boundarySerial = 
+                \(chainLength)'b\(boundarySerial);
+            reg [\(chainLength - 1): 0] stores;
 
             initial begin
                 $dumpfile("dut.vcd"); // DEBUG
                 $dumpvars(0, testbench);
         \(inputInit)
-                #10;
+                #2;
                 \(resetToggler)
                 \(trst) = 1;        
                 #2;
@@ -624,9 +586,8 @@ class Simulator {
                 \(tms) = 0;     // shift-DR 
                 #2;
         \(outputAssignment)
-                #2;
-                for (i = 0; i < \(boundaryCount); i = i + 1) begin
-                    \(tms) = 0;
+                for (i = 0; i < \(chainLength); i = i + 1) begin
+                    \(tdi) = 0;
                     serial[i] = \(tdo); 
                     #2;
                 end
@@ -634,64 +595,40 @@ class Simulator {
                     $error("EXECUTING_SAMPLE_INST_FAILED");
                     $finish;
                 end
-                #100;
                 exitDR();
-
+                #2;
                 // PRELOAD
                 enterShiftDR();
-                for (i = 0; i < \(boundaryCount); i = i + 1) begin
+                for (i = 0; i < \(chainLength); i = i + 1) begin
                     \(tdi) = boundarySerial[i];
-                    if(i == \(boundaryCount - 1)) begin
-                        exitDR();
-                    end
                     #2;
                 end
-        \(storesAssignment)
-                for(i = 0; i< \(boundaryCount); i = i + 1) begin
-                    if(stores[i] != boundarySerial[i + \(boundaryCount - 1)]) begin
-                        $error("EXECUTING_PRELOAD_INST_FAILED");
-                        $finish;
-                    end
+                for(i = 0; i< \(chainLength); i = i + 1) begin
+                    stores[i] = \(tdo);
+                    #2;
                 end 
-                /*
-                    Test SCAN IN Instruction
-                */
-                shiftIR(scanIn);
-                enterShiftDR();
-
-                for (i = 0; i < \(internalCount); i = i + 1) begin
-                    \(tdi) = scanInSerializable[i];
-                    #2;
-                end
-
-                for (i = 0; i < \(internalCount); i = i + 1) begin
-                    scanInSerial[i] = \(tdo);
-                    if(i == \(internalCount - 1)) begin
-                        exitDR();
-                    end
-                    #2;
-                end
-                if(scanInSerial != scanInSerializable) begin
-                    $error("EXECUTING_SCANIN_INST_FAILED");
+                if(stores != boundarySerial) begin
+                    $error("EXECUTING_PRELOAD_INST_FAILED");
                     $finish;
                 end
+                exitDR();
+                #2;
                 /*
                     Test BYPASS Instruction 
                 */
+                #10;
                 shiftIR(bypass);
                 enterShiftDR();
-
+                \(tdi) = 1;
+                #6;
                 for (i = 0; i < 10; i = i + 1) begin
-                    \(tdi) = 1;
-                    #2;
                     if (\(tdo) != 1) begin
                         $error("ERROR_EXECUTING_BYPASS_INST");
                         $finish;
                     end
-                    if(i == 9) begin
-                        exitDR();
-                    end
+                    #2;
                 end
+                exitDR();
 
                 $display("SUCCESS_STRING");
                 $finish;
@@ -743,7 +680,6 @@ class Simulator {
         """
 
         let tbName = "\(folderName)/tb.sv"
-
         try File.open(tbName, mode: .write) {
             try $0.print(bench)
         }
@@ -833,9 +769,11 @@ class Simulator {
             for port in tvcPair.vector {
                 vector += String(port, radix: 2) 
             }
-            vectorInit += "        vectors[\(i)] = \(vector) ; \n"
+            vectorInit += "        vectors[\(i)] = \(vectorLength)'b \(vector) ; \n"
             vectorInit += "        goldenOutput[\(i)] = \(output) ; \n"
         }
+
+        let outputCount = coverageList[0].goldenOutput.count
 
         var clockCreator = ""
         if !clock.isEmpty {
@@ -863,12 +801,12 @@ class Simulator {
 
             integer i;
 
-            reg[7:0] tmsPattern = 8'b 01100110;
-            reg [2:0] scanInSerial;
+            reg [\(outputCount - 1):0] scanInSerial;
             reg [\(vectorLength - 1):0] vectors [0:\(tvCount - 1)];
-            reg [\(internalCount - 1):0] goldenOutput[0:\(tvCount - 1)];
+            reg [\(outputCount - 1):0] goldenOutput[0:\(tvCount - 1)];
 
-            wire[3:0] scanIn = 4'b 0100;
+            wire[7:0] tmsPattern = 8'b 01100110;
+            wire[3:0] intest = 4'b 0100;
 
             initial begin
                 $dumpfile("dut.vcd"); // DEBUG
@@ -879,10 +817,7 @@ class Simulator {
                 \(resetToggler)
                 \(trst) = 1;        
                 #2;
-
-                shiftIR(scanIn);
-                enterShiftDR();
-                
+                 
                 for (i = 0 ; i < \(tvCount); i = i + 1) begin
                     test(vectors[i], goldenOutput[i]);
                 end
@@ -893,24 +828,32 @@ class Simulator {
 
             task test;
                 input [\(vectorLength - 1): 0] vector;
-                input [\(internalCount - 1): 0] goldenOutput;
+                input [\(outputCount - 1): 0] goldenOutput;
                 begin
-                \(vectorAssignment)
-                    shiftIR(scanIn);
+                    shiftIR(intest);
                     enterShiftDR();
 
-                    for (i = 0; i < \(internalCount); i = i + 1) begin
+                    for (i = 0; i < \(vectorLength); i = i + 1) begin
                         tdi = vector[i];
-                        #2;
-                    end
-                    
-                    for (i = 0; i < \(internalCount); i = i + 1) begin
-                        scanInSerial[i] = \(tdo);
-                        if(i == \(internalCount - 1)) begin
-                            exitDR();
+                        if(i == \(vectorLength - 1)) begin
+                            \(tms) = 1; // Exit-DR
                         end
                         #2;
                     end
+                    \(tms) = 1; // update-DR
+                    #2;
+                    \(tms) = 1; // select-DR
+                    #2;
+                    \(tms) = 0; // capture-DR
+                    #2;
+                    \(tms) = 0; // shift-DR
+                    for (i = 0; i < \(internalCount); i = i + 1) begin
+                        \(tdi) = 0;
+                        scanInSerial[i] = \(tdo);
+                        #2;
+                    end
+                    #20;
+                    exitDR();
 
                     if(scanInSerial != goldenOutput) begin
                         $error("EXECUTING_SCANIN_INST_FAILED");
@@ -970,7 +913,7 @@ class Simulator {
             try $0.print(bench)
         }
 
-        let aoutName = "\(output)_a.out"
+        let aoutName = "\(module).out"
         let iverilogResult =
             "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
         

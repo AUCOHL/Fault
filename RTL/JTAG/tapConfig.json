@@ -18,14 +18,13 @@
         "samplePreload": "sample_preload_select_o",
         "mbist": "mbist_select_o",
         "debug": "debug_select_o",
-        "scanIn": "scan_in_select_o"
+        "intest": "intest_select_o"
     },
     "tdoSignal": "tdo_o",
 
     "tdiSignals": {
         "debug": "debug_tdi_i",
         "bsChain": "bs_chain_tdi_i",
-        "mbist": "mbist_tdi_i",
-        "scanIn": "scan_in_tdi_i"
+        "mbist": "mbist_tdi_i"
     }
 }

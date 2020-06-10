@@ -75,14 +75,13 @@ func jtagCreate(arguments: [String]) -> Int32{
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
-        ("sinInternal", "internal scan chain serial data in"),
-        ("soutInternal", "internal scan chain serial data out"),
-        ("sinBoundary", "boundary scan  chain serial data in"),
-        ("soutBoundary", "boundary scan chain serial data out"),
+        ("sin", "boundary scan  chain serial data in"),
+        ("sout", "boundary scan chain serial data out"),
         ("shift", "boundary scan chain shift enable"),
-        ("capture", "boundary scan chain capture enable"),
+        ("clockDR", "boundary scan chain clockDR"),
         ("update", "boundary scan chain update enable"),
         ("extest", "boundary scan chain extest"),
+        ("mode", "boundary scan cell mode select"),
         ("tms", "JTAG test mode select"),
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
@@ -211,22 +210,18 @@ func jtagCreate(arguments: [String]) -> Int32{
         return EX_DATAERR
     }
 
-    let sinInternalName = names["sinInternal"]!.option.value 
-        ?? names["sinInternal"]!.default
-    let sinBoundaryName = names["sinBoundary"]!.option.value
-        ?? names["sinBoundary"]!.default
-    let soutBoundaryName = names["soutBoundary"]!.option.value
-        ?? names["soutBoundary"]!.default
-    let soutInternalName = names["soutInternal"]!.option.value
-        ?? names["soutInternal"]!.default
+    let sin = names["sin"]!.option.value 
+        ?? names["sin"]!.default
+    let sout = names["sout"]!.option.value
+        ?? names["sout"]!.default
     let shiftName = names["shift"]!.option.value
         ?? names["shift"]!.default
+    let clockDRName = names["clockDR"]!.option.value
+        ?? names["clockDR"]!.default
     let updateName = names["update"]!.option.value
         ?? names["update"]!.default
-    let captureName = names["capture"]!.option.value
-        ?? names["capture"]!.default
-    let extestName = names["extest"]!.option.value
-        ?? names["extest"]!.default
+    let modeName = names["mode"]!.option.value
+        ?? names["mode"]!.default
     let tmsName = names["tms"]!.option.value 
         ?? names["tms"]!.default
     let tdiName = names["tdi"]!.option.value 
@@ -266,20 +261,18 @@ func jtagCreate(arguments: [String]) -> Int32{
         }()
 
         let scanChainPorts = [
-            sinInternalName,
-            sinBoundaryName,
-            soutBoundaryName,
-            soutInternalName,
+            sin,
+            sout,
             tckName,
             shiftName,
             updateName,
-            captureName,
-            extestName
+            clockDRName,
+            modeName
         ]
 
         let boundaryCount = inputs.count + outputs.count - (scanChainPorts.count + ignoredCount)
-        let internalCount = dffCount - boundaryCount * 2 - 1 * (outputs.count - 2)
-       
+        let internalCount = dffCount - 2 * (boundaryCount - 1)
+        
         if clockOpt.value == nil {
             if (internalCount > 0){
                 fputs("Error: Clock signal name for the internal logic isn't passed.\n", stderr)
@@ -320,9 +313,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 ))
             }
             else {
-                let portIdentifier =
-                    (input.name == sinInternalName || input.name == sinBoundaryName) ?
-                    tdiName : input.name
+                let portIdentifier = (input.name == sin) ? tdiName : input.name
                 portArguments.append(Node.PortArg(
                     input.name,
                     Node.Identifier(portIdentifier)
@@ -370,12 +361,11 @@ func jtagCreate(arguments: [String]) -> Int32{
         
         statements.extend(wireDeclarations)
         statements.extend([
-            Node.Wire(soutBoundaryName),
-            Node.Wire(soutInternalName),
+            Node.Wire(sout),
             Node.Wire(shiftName),
-            Node.Wire(captureName),
+            Node.Wire(clockDRName),
             Node.Wire(updateName),
-            Node.Wire(extestName)
+            Node.Wire(modeName)
         ])
         statements.append(jtagModule.tapModule)
 
@@ -387,11 +377,7 @@ func jtagCreate(arguments: [String]) -> Int32{
         // sout and bschain_assign_statement
         statements.append(Node.Assign(
             Node.Lvalue(Node.Identifier(jtagInfo.tdiSignals.bsChain)),
-            Node.Rvalue(Node.Identifier(soutBoundaryName))
-        ))
-        statements.append(Node.Assign(
-            Node.Lvalue(Node.Identifier(jtagInfo.tdiSignals.scanIn)),
-            Node.Rvalue(Node.Identifier(soutInternalName))
+            Node.Rvalue(Node.Identifier(sout))
         ))
         //JTAG state signals assign 
         statements.append(Node.Assign(
@@ -399,16 +385,8 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.shift))
         ))
         statements.append(Node.Assign(
-            Node.Rvalue(Node.Identifier(captureName)),
-            Node.Lvalue(Node.Identifier(jtagInfo.tapStates.capture))
-        ))
-        statements.append(Node.Assign(
             Node.Rvalue(Node.Identifier(updateName)),
             Node.Lvalue(Node.Identifier(jtagInfo.tapStates.update))
-        ))
-        statements.append(Node.Assign(
-            Node.Rvalue(Node.Identifier(extestName)),
-            Node.Lvalue(Node.Identifier(jtagInfo.selectSignals.extest))
         ))
         // TDO tri-state enable assignment
         let ternary = Node.Cond(
@@ -421,6 +399,40 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Rvalue(ternary)
         )
         statements.append(tdoAssignment)
+
+        // Mode select assign statement
+        let modeCond = Node.Cond(
+            Node.Identifier(jtagInfo.selectSignals.intest),
+            Node.IntConst("1'b1"),
+            Node.IntConst("1'b0")
+        )
+        let modeAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(modeName)),
+            Node.Rvalue(modeCond)
+        )
+        statements.append(modeAssignment)
+
+        // Clock DR assign statement
+        let or = Node.Or(
+            Node.And( Node.Identifier(jtagInfo.selectSignals.samplePreload),
+            Node.Identifier(jtagInfo.tapStates.shift)),
+            Node.And( Node.Identifier(jtagInfo.selectSignals.intest),
+            Node.Identifier(jtagInfo.tapStates.shift))
+        )
+        let and = Node.Or(
+            or,
+            Node.Identifier(jtagInfo.tapStates.capture)
+        )
+        let clockCond = Node.Cond(
+            and,
+            Node.IntConst("1'b1"),
+            Node.IntConst("1'b0")
+        )
+        let clockAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(clockDRName)),
+            Node.Rvalue(clockCond)
+        )
+        statements.append(clockAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -563,7 +575,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                     fputs("File '\(tvFile)' is invalid.\n", stderr)
                     exit(EX_DATAERR)
                 }
-                let output = filePath.value != nil ? "\(filePath.value).tb.sv" :  "\(file).tb.sv"
+                let output = (filePath.value ?? file) + ".tb.sv"
 
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
