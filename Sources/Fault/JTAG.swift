@@ -266,7 +266,7 @@ class SerialVectorCreator {
             }
             return count
         }()
-
+       
         for tvcPair in tvInfo.coverageList {
             var tdi = ""
             let testVector = tvcPair.vector

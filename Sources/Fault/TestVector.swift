@@ -117,14 +117,16 @@ struct TVSet: Codable {
 
             var multiBitPorts : [String: Port] = [:]
             var portName:String = "", bitNumber:Int = 0
-            for (index, port) in ports.enumerated(){  
+
+            var count = 0;
+            for port in ports {  
                 if !port.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty{ 
                     if let match = multiBitRegex.firstMatch(in: port, options: [], range: NSRange(location: 0, length: port.utf16.count)) {
                         if let nameRange = Range(match.range(at: 1), in: port) {                            
                             portName = String(port[nameRange])
                             let exists = multiBitPorts[portName] != nil
                             if !exists {
-                                multiBitPorts[portName] = Port(name: portName, at: index)
+                                multiBitPorts[portName] = Port(name: portName, at: count)
                                 multiBitPorts[portName]!.from = 0
                             } 
                         }
@@ -134,8 +136,9 @@ struct TVSet: Codable {
                         }
                     }
                     else {
-                        inputs.append(Port(name: port, at: index))
-                    }                     
+                        inputs.append(Port(name: port, at: count))
+                    } 
+                    count += 1                    
                 }
             }
 
@@ -151,6 +154,8 @@ struct TVSet: Codable {
             let results = vectorRegex.matches(in: string, range: range)   
             let matches = results.map { String(string[Range($0.range, in: string)!])}     
 
+            inputs.sort {$0.ordinal < $1.ordinal }
+        
             for match in matches {
                 let vector = Array(match)
                 if vector.count != 0 {
@@ -161,25 +166,24 @@ struct TVSet: Codable {
                         if lowerVec.count != 0 {
                             testVector.append(contentsOf: lowerVec)
                         }
-
                         let middleVec = BigUInt(String(vector[slice]), radix: 2)!
                         testVector.append(middleVec)
-        
+
                         start = slice.upperBound
                     }
-                    
+
                     if start < vector.count {
                         let remVector = vector[start...].map{ BigUInt(String($0), radix: 2)!}
                         testVector.append(contentsOf: remVector)
                     }
-
-                    vectors.append(testVector)  
+                    vectors.append(testVector) 
                 }
-            }         
+            } 
         } catch {
             exit(EX_DATAERR)
         }
 
+    
         return (vectos: vectors, inputs: inputs)
     }
 } 
