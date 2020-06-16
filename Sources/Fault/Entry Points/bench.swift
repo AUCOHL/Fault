@@ -87,7 +87,8 @@ func bench(arguments: [String]) -> Int32 {
             cellDefinitions = matches.joined(separator: "\n")
 
             let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-            let result = "mkdir -p \(folderName)".sh()
+            let _ = "mkdir -p \(folderName)".sh()
+            
             defer {
                 let _ = "rm -rf \(folderName)".sh()
             }
@@ -165,32 +166,23 @@ func bench(arguments: [String]) -> Int32 {
 
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
-        var ignoredInputs: [String] = []
+        var inputNames: [String] = []
+        var usedInputs: [String] = []
+        var floatingOutputs: [String] = []
         var benchStatements: String = ""
         for input in inputs {
             if input.width > 1 {
                 let range = (input.from > input.to) ? input.to...input.from : input.from...input.to
                 for index in range {
                     let name = "\(input.name)[\(index)]"
-                    ignoredInputs.append(name)
+                    inputNames.append(name)
                     benchStatements += "INPUT(\(name)) \n"
                 }
             }
             else {
                 let name = input.name
-                ignoredInputs.append(name)
+                inputNames.append(name)
                 benchStatements += "INPUT(\(name)) \n"
-            }
-        }
-        for output in outputs {
-            if output.width > 1 {
-                let range = (output.from > output.to) ? output.to...output.from : output.from...output.to
-                for index in range {
-                    benchStatements += "OUTPUT(\(output.name)[\(index)]) \n"
-                }
-            }
-            else {
-                benchStatements += "OUTPUT(\(output.name)) \n"
             }
         }
 
@@ -228,8 +220,8 @@ func bench(arguments: [String]) -> Int32 {
                 
                 let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
                 benchStatements += "\(statements) \n" 
-
-                ignoredInputs = ignoredInputs.filter { !Array(inputs.values).contains($0) }
+                
+                usedInputs.append(contentsOf: Array(inputs.values))
             }
             else if type == "Assign"{
 
@@ -247,14 +239,33 @@ func bench(arguments: [String]) -> Int32 {
                     left = "\(item.left.var)"
                 }
 
-                let statement = "\(left) = BUFF(\(right)) \n"
-                benchStatements += statement  
-                
-                ignoredInputs = ignoredInputs.filter { $0 != right}
+                if right == "1'b0" || right == "1'h0" {
+                    print("[Warning]: Constants are not recognized by atalanta. Removing \(left) associated gates and nets..")
+                    floatingOutputs.append(left)
+                } else {
+                    let statement = "\(left) = BUFF(\(right)) \n"
+                    benchStatements += statement
+
+                    usedInputs.append(right)
+                }
+                    
             }
         }
-        
+        let ignoredInputs = inputNames.filter { !usedInputs.contains($0) }
         print("Found \(ignoredInputs.count) floating inputs.")
+
+        let filteredOutputs = outputs.filter { !floatingOutputs.contains($0.name) }
+        for output in filteredOutputs {
+            if output.width > 1 {
+                let range = (output.from > output.to) ? output.to...output.from : output.from...output.to
+                for index in range {
+                    benchStatements += "OUTPUT(\(output.name)[\(index)]) \n"
+                }
+            }
+            else {
+                benchStatements += "OUTPUT(\(output.name)) \n"
+            }
+        }
 
         var floatingStatements = ""
         for input in ignoredInputs {
