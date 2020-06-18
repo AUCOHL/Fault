@@ -87,7 +87,7 @@ func bench(arguments: [String]) -> Int32 {
             cellDefinitions = matches.joined(separator: "\n")
 
             let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-            let result = "mkdir -p \(folderName)".sh()
+            let _ = "mkdir -p \(folderName)".sh()
             defer {
                 let _ = "rm -rf \(folderName)".sh()
             }

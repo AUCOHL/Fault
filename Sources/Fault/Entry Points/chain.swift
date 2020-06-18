@@ -193,8 +193,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let alteredName = "__UNIT__UNDER__FINANGLING__"
 
     var internalOrder: [ChainRegister] = []
-    var chainPorts: [String: (default: String, identifier: PythonObject)] = [:]
-
+    
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
