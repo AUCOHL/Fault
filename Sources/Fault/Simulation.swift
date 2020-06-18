@@ -8,7 +8,7 @@ class Simulator {
         case holdLow = 0
     }
 
-    private static func pseudoRandomVerilogGeneration(
+    static func pseudoRandomVerilogGeneration(
         using testVector: TestVector,
         for faultPoints: Set<String>,
         in file: String,
@@ -20,6 +20,7 @@ class Simulator {
         behavior: [Behavior],
         outputs: [Port],
         stuckAt: Int,
+        delayFault: Bool,
         cleanUp: Bool,
         goldenOutput: Bool,
         filePrefix: String = ".",
@@ -38,7 +39,7 @@ class Simulator {
         }
 
         let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let result = "mkdir -p \(folderName)".sh()
+        let _ = "mkdir -p \(folderName)".sh()
 
         var inputAssignment = ""
         var fmtString = ""
@@ -81,6 +82,10 @@ class Simulator {
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
             faultForces += "        #1 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
+
+            if delayFault {
+                faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
+            }
         }
 
         let bench = """
@@ -153,7 +158,7 @@ class Simulator {
         var faults = output.components(separatedBy: "\n").filter {
             !$0.trimmingCharacters(in: .whitespaces).isEmpty
         }
-    
+
         let gmOutput = goldenOutput ? faults.removeLast() : ""
         return (faults: faults, goldenOutput: gmOutput)
     }
@@ -194,7 +199,7 @@ class Simulator {
         
         let simulateOnly = (TVSet.count != 0)
         let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
-        
+
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
                 print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
@@ -239,6 +244,7 @@ class Simulator {
                                 behavior: behavior,
                                 outputs: outputs,
                                 stuckAt: 0,
+                                delayFault: false,
                                 cleanUp: !sampleRun,
                                 goldenOutput: true,
                                 filePrefix: tempDir,
@@ -259,18 +265,18 @@ class Simulator {
                                 behavior: behavior,
                                 outputs: outputs,
                                 stuckAt: 1,
+                                delayFault: false,
                                 cleanUp: !sampleRun,
-                                goldenOutput: true,
+                                goldenOutput: false,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
-
+                        
                         return (Covers: Coverage(sa0: sa0, sa1: sa1) , Output: output)
                     } catch {
                         print("IO Error @ vector \(vector)")
                         return (Covers: Coverage(sa0: [], sa1: []) , Output: "")
-
                     }
                 }
                 futureList.append(future)

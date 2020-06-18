@@ -88,7 +88,10 @@ func bench(arguments: [String]) -> Int32 {
 
             let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
             let _ = "mkdir -p \(folderName)".sh()
+<<<<<<< HEAD
             
+=======
+>>>>>>> delay_faults
             defer {
                 let _ = "rm -rf \(folderName)".sh()
             }
