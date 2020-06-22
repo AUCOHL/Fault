@@ -253,6 +253,7 @@ func main(arguments: [String]) -> Int32 {
             cli.printUsage()
             return EX_USAGE
         }
+        print("Read \(tvSetVectors.count) vectors.")
     }
 
     let tvGenerator: TVGen = TVGen(rawValue: tvGen.value ?? defaultRandGen)!

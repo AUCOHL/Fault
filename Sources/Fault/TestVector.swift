@@ -94,25 +94,17 @@ struct TVInfoDelay: Codable {
         self.coverageList = coverageList
     }
 }
-struct TVSet: Codable {
-    var inputs: [Port]
-    var vectors: [TestVector]
-    init(
-        inputs: [Port],
-        vectors: [TestVector]
-    ) {
-        self.inputs = inputs
-        self.vectors = vectors
-    }
+class TVSet {
+
     static func readFromJson(file: String) throws -> ([TestVector], [Port]) {
 
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
-        guard let tvSet = try? JSONDecoder().decode(TVSet.self, from: data) else {
+        guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
             fputs("File '\(file)' is invalid.\n", stderr)
             exit(EX_DATAERR)
         }
-
-        return (vectors: tvSet.vectors , inputs: tvSet.inputs)
+        let vectors = tvInfo.coverageList.map{ $0.vector }
+        return (vectors: vectors , inputs: tvInfo.inputs)
     }
     static func readFromText(file: String) throws -> ([TestVector], [Port]){
         var inputs: [Port] = []

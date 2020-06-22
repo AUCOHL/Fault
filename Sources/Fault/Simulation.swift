@@ -78,10 +78,12 @@ class Simulator {
 
         var faultForces = ""    
         for fault in faultPoints {
-            faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"   
+            faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"
+            faultForces += "        #1 ; \n"   
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
             faultForces += "        #1 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
+            faultForces += "        #1 ; \n"
 
             if delayFault {
                 faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
@@ -148,7 +150,6 @@ class Simulator {
         }
 
         let output = File.read(intermediate)!
-
         defer {
             if cleanUp {
                 let _ = "rm -rf \(folderName)".sh()

@@ -270,7 +270,6 @@ class SerialVectorCreator {
         for tvcPair in tvInfo.coverageList {
             var tdi = ""
             let testVector = tvcPair.vector
-            var length = 0
             for (index, port) in testVector.enumerated() {
                 let portVector = String(port, radix: 2)
                 let offset = tvInfo.inputs[index].width - portVector.count
