@@ -119,7 +119,6 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         
         if let modelTest = verifyOpt.value {
             print("Running simulations using the compacted set...")
-            let netlist = "Netlists/s27.netlist.v.cut.v" //String(file.dropLast(8))
             let verifiedOutput = "\(output).verified.json"
             let mainArguments: [String] = [
                 arguments[0].components(separatedBy: " ")[0],
@@ -128,7 +127,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
                 "-v", "10",
                 "--tvSet", output,
                 "-o", verifiedOutput,
-                netlist
+                netlistOpt.value!
             ]
             exit(main(arguments: mainArguments))
         } 

@@ -19,10 +19,13 @@ class Compactor {
             sa1.formUnion(tvPair.coverage.sa1)
         }
 
-        // Find Essential Faults
+        // Find Essential TVs
+        print("Finding essential test vectors...")
         let result = Compactor.findEssentials(coverageList: coverageList, sa0: sa0, sa1: sa1)
+        
+        print("Found \(result.vectors.count) essential test vectors.")
 
-        // Essential Fault columns
+        // Essential TV columns
         for fault in result.faultSA0 {
             sa0Covered.insert(fault)
         }
@@ -38,6 +41,28 @@ class Compactor {
         }
 
         var vectors = result.vectors
+        
+        func sa0Exec(tvPair: TVCPair, sa0Covered: Set<String> ) -> ([String]) {
+            var sa0: [String] = []
+            if(tvPair.coverage.sa0.count != 0){
+                sa0 = tvPair.coverage.sa0.filter {
+                    !sa0Covered.contains($0)
+                }
+            }
+            return sa0
+        }
+
+        func sa1Exec(tvPair: TVCPair, sa1Covered: Set<String> ) -> [String] {
+            var sa1: [String] = []
+            if(tvPair.coverage.sa1.count != 0){
+                sa1 = tvPair.coverage.sa1.filter {
+                    !sa1Covered.contains($0)
+                }
+            }
+            return sa1
+        }
+
+        print("Performing compaction...")
 
         repeat {
             let sortedCount = rowCount.sorted { $0.1 > $1.1 }
@@ -52,18 +77,15 @@ class Compactor {
 
             // Update  Row Count
             for tvPair in coverageList {
-                var sa0: [String] = []
-                 if(tvPair.coverage.sa0.count != 0){
-                     sa0 = tvPair.coverage.sa0.filter {
-                         !sa0Covered.contains($0)
-                     }
-                 }
-                var sa1: [String] = []
-                if (tvPair.coverage.sa1.count != 0){
-                    sa1 = tvPair.coverage.sa1.filter {
-                        !sa1Covered.contains($0)
-                    }    
+                let sa0Future = Future {
+                    return sa0Exec(tvPair: tvPair, sa0Covered: sa0Covered)
                 }
+
+                let sa1Future = Future {
+                    return sa1Exec(tvPair: tvPair, sa1Covered: sa1Covered)
+                }
+                let sa0 = sa0Future.value as! [String]
+                let sa1 = sa1Future.value as! [String]
                 rowCount[tvPair.vector] = UInt(sa0.count + sa1.count)
             }
 
@@ -97,45 +119,65 @@ class Compactor {
         sa1: Set<String>
     ) -> ( vectors: Set<TestVector> , faultSA0: [String], faultSA1: [String]) {
 
-        var vectors = Set<TestVector>()
-        var faultSA0 : [String] = []
-        var faultSA1 : [String] = []
-
-        var tvRow : TestVector = []
-        var count = 0
-
-        for fault in sa0 {
-            count = 0
-            for tvPair in coverageList{
-                if (tvPair.coverage.sa0.contains(fault)){
-                    count = count + 1
-                    tvRow = tvPair.vector
+        func sa0Exec(faultPoints: Set<String>, coverageList: [TVCPair]) -> ([String], Set<TestVector>) {
+            var faultList: [String] = []
+            var vectors = Set<TestVector>()
+            var count = 0
+            var tvRow : TestVector = []
+ 
+            for fault in faultPoints {
+                count = 0
+                for tvPair in coverageList{
+                    if (tvPair.coverage.sa0.contains(fault)){
+                        count = count + 1
+                        tvRow = tvPair.vector
+                    }
+                }
+                if (count == 1){
+                    faultList.append(fault)
+                    vectors.insert(tvRow)
                 }
             }
-            if (count == 1){
-                faultSA0.append(fault)
-                vectors.insert(tvRow)
-            }
+            return (faultList, vectors)
         }
 
-        for fault in sa1 {
-            count = 0
-            for tvPair in coverageList{
-                if (tvPair.coverage.sa1.contains(fault)){
-                    count = count + 1
-                    tvRow = tvPair.vector
+        func sa1Exec(faultPoints: Set<String>, coverageList: [TVCPair]) -> ([String], Set<TestVector>) {
+            var faultList: [String] = []
+            var vectors = Set<TestVector>()
+            var count = 0
+            var tvRow : TestVector = []
+ 
+            for fault in faultPoints {
+                count = 0
+                for tvPair in coverageList{
+                    if (tvPair.coverage.sa1.contains(fault)){
+                        count = count + 1
+                        tvRow = tvPair.vector
+                    }
+                }
+                if (count == 1){
+                    faultList.append(fault)
+                    vectors.insert(tvRow)
                 }
             }
-            if (count == 1){
-                faultSA1.append(fault)
-                vectors.insert(tvRow)
-            }
+            return (faultList, vectors)
+        }      
+
+        let sa0Future = Future {
+            return sa0Exec(faultPoints: sa0, coverageList: coverageList)
         }
+
+        let sa1Future = Future {
+            return sa1Exec(faultPoints: sa1, coverageList: coverageList)
+        }   
+
+        let (sa0Faults, sa0Vectors)  = sa0Future.value as!  ([String], Set<TestVector>)
+        let (sa1Faults, sa1Vectors)  = sa1Future.value as!  ([String], Set<TestVector>)
 
         return (
-            vectors: vectors,
-            faultSA0: faultSA0,
-            faultSA1: faultSA1
+            vectors: sa0Vectors.union(sa1Vectors),
+            faultSA0: sa0Faults,
+            faultSA1: sa1Faults
         )
     }
 }

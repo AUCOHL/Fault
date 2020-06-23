@@ -79,6 +79,6 @@ do
       $env bench -c $parentdir/Tech/osu035/osu035_stdcells.v.json $sim_file
       $env -g $tvgen -b $bench -c $parentdir/Tech/osu035/osu035_stdcells.v -m 100 -v 10 -r 10 $sim_file >>$log_file
     else
-      $env -c $parentdir/Tech/osu035/osu035_stdcells.v -v 1 -r 1 -m 97 --ceiling 1 $sim_file >>$log_file
+      $env -c $parentdir/Tech/osu035/osu035_stdcells.v -v 10 -r 10 -m 97 --ceiling 5000 $sim_file >>$log_file
   fi
 done
