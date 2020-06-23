@@ -118,66 +118,77 @@ class Compactor {
         sa0: Set<String>,
         sa1: Set<String>
     ) -> ( vectors: Set<TestVector> , faultSA0: [String], faultSA1: [String]) {
+        
+        var vectors = Set<TestVector>()
+        var faultSA0 : [String] = []
+        var faultSA1 : [String] = []
 
-        func sa0Exec(faultPoints: Set<String>, coverageList: [TVCPair]) -> ([String], Set<TestVector>) {
-            var faultList: [String] = []
-            var vectors = Set<TestVector>()
+        func sa0Exec(
+            fault: String,
+            coverageList: [TVCPair]
+        ) -> (fault: String, count: Int, tvRow: TestVector) {
             var count = 0
-            var tvRow : TestVector = []
- 
-            for fault in faultPoints {
-                count = 0
-                for tvPair in coverageList{
-                    if (tvPair.coverage.sa0.contains(fault)){
-                        count = count + 1
-                        tvRow = tvPair.vector
-                    }
-                }
-                if (count == 1){
-                    faultList.append(fault)
-                    vectors.insert(tvRow)
+            var tvRow: TestVector = []
+            for tvPair in coverageList{
+                if (tvPair.coverage.sa0.contains(fault)){
+                    count = count + 1
+                    tvRow = tvPair.vector
                 }
             }
-            return (faultList, vectors)
+            return (fault: fault, count: count, tvRow: tvRow)
         }
-
-        func sa1Exec(faultPoints: Set<String>, coverageList: [TVCPair]) -> ([String], Set<TestVector>) {
-            var faultList: [String] = []
-            var vectors = Set<TestVector>()
+        
+        func sa1Exec(
+            fault: String,
+            coverageList: [TVCPair]
+        ) -> (fault: String, count: Int, tvRow: TestVector) {
             var count = 0
-            var tvRow : TestVector = []
- 
-            for fault in faultPoints {
-                count = 0
-                for tvPair in coverageList{
-                    if (tvPair.coverage.sa1.contains(fault)){
-                        count = count + 1
-                        tvRow = tvPair.vector
-                    }
-                }
-                if (count == 1){
-                    faultList.append(fault)
-                    vectors.insert(tvRow)
+            var tvRow: TestVector = []
+            for tvPair in coverageList{
+                if (tvPair.coverage.sa1.contains(fault)){
+                    count = count + 1
+                    tvRow = tvPair.vector
                 }
             }
-            return (faultList, vectors)
-        }      
-
-        let sa0Future = Future {
-            return sa0Exec(faultPoints: sa0, coverageList: coverageList)
+            return (fault: fault, count: count, tvRow: tvRow)
         }
 
-        let sa1Future = Future {
-            return sa1Exec(faultPoints: sa1, coverageList: coverageList)
-        }   
+        var sa0Futures: [Future] = []
+        for fault in sa0 {
+            let future = Future {
+                return sa0Exec(fault: fault, coverageList: coverageList)
+            }
+            sa0Futures.append(future) 
+        }
 
-        let (sa0Faults, sa0Vectors)  = sa0Future.value as!  ([String], Set<TestVector>)
-        let (sa1Faults, sa1Vectors)  = sa1Future.value as!  ([String], Set<TestVector>)
+        var sa1Futures: [Future] = []
+        for fault in sa1 {
+            let future = Future {
+                return sa1Exec(fault: fault, coverageList: coverageList)
+            }
+            sa1Futures.append(future) 
+        }
+
+        for future in sa0Futures {
+            let (fault, count, tvRow) = future.value as! (String, Int, TestVector)
+            if (count == 1){
+                faultSA0.append(fault)
+                vectors.insert(tvRow)
+            }
+        }
+        
+        for future in sa1Futures {
+            let (fault, count, tvRow) = future.value as! (String, Int, TestVector)
+            if (count == 1){
+                faultSA1.append(fault)
+                vectors.insert(tvRow)
+            }
+        }
 
         return (
-            vectors: sa0Vectors.union(sa1Vectors),
-            faultSA0: sa0Faults,
-            faultSA1: sa1Faults
+            vectors: vectors,
+            faultSA0: faultSA0,
+            faultSA1: faultSA1
         )
     }
 }
