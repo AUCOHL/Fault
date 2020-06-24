@@ -125,6 +125,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
                 "-c", modelTest,
                 "-r", "10",
                 "-v", "10",
+                "-m", "100",
                 "--tvSet", output,
                 "-o", verifiedOutput,
                 netlistOpt.value!

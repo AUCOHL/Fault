@@ -21,7 +21,8 @@ class Compactor {
 
         // Find Essential TVs
         print("Finding essential test vectors...")
-        let result = Compactor.findEssentials(coverageList: coverageList, sa0: sa0, sa1: sa1)
+        let result = 
+            Compactor.findEssentials(coverageList: coverageList, sa0: sa0, sa1: sa1)
         
         print("Found \(result.vectors.count) essential test vectors.")
 
@@ -37,29 +38,31 @@ class Compactor {
         var rowCount: [TestVector:UInt] = [TestVector:UInt]();
 
         for tvPair in coverageList {
-            rowCount[tvPair.vector] = UInt(tvPair.coverage.sa0.count + tvPair.coverage.sa1.count)
+            rowCount[tvPair.vector] = 
+                UInt(tvPair.coverage.sa0.count + tvPair.coverage.sa1.count)
         }
 
         var vectors = result.vectors
         
-        func sa0Exec(tvPair: TVCPair, sa0Covered: Set<String> ) -> ([String]) {
+        func exec(
+            tvPair: TVCPair,
+            sa0Covered: Set<String>,
+            sa1Covered: Set<String>
+        ) -> (Int, TestVector) {
             var sa0: [String] = []
+            var sa1: [String] = []
+
             if(tvPair.coverage.sa0.count != 0){
                 sa0 = tvPair.coverage.sa0.filter {
                     !sa0Covered.contains($0)
                 }
             }
-            return sa0
-        }
-
-        func sa1Exec(tvPair: TVCPair, sa1Covered: Set<String> ) -> [String] {
-            var sa1: [String] = []
             if(tvPair.coverage.sa1.count != 0){
                 sa1 = tvPair.coverage.sa1.filter {
                     !sa1Covered.contains($0)
                 }
             }
-            return sa1
+            return (covered: sa0.count + sa1.count, vector: tvPair.vector)
         }
 
         print("Performing compaction...")
@@ -75,20 +78,24 @@ class Compactor {
                 sa1Covered.insert(fault)
             }
 
+            var FutureList: [Future] = []
             // Update  Row Count
             for tvPair in coverageList {
-                let sa0Future = Future {
-                    return sa0Exec(tvPair: tvPair, sa0Covered: sa0Covered)
+                let future = Future {
+                    return exec(
+                        tvPair: tvPair,
+                        sa0Covered: sa0Covered,
+                        sa1Covered: sa1Covered
+                    )
                 }
-
-                let sa1Future = Future {
-                    return sa1Exec(tvPair: tvPair, sa1Covered: sa1Covered)
-                }
-                let sa0 = sa0Future.value as! [String]
-                let sa1 = sa1Future.value as! [String]
-                rowCount[tvPair.vector] = UInt(sa0.count + sa1.count)
+                FutureList.append(future)
             }
 
+            for future in FutureList {
+                let (count, vector) = future.value as! (Int, TestVector)
+                rowCount[vector] = UInt(count)
+            }
+            
             vectors.insert(sortedCount[0].key)
         } while ((sa0Covered.count != sa0.count) || (sa1Covered.count != sa1.count))  
 
