@@ -55,7 +55,8 @@ func assemble(arguments: [String]) -> Int32 {
     let json = jsonArgs[0]
     let netlist = vArgs[0]
 
-    let output = filePath.value ?? json + ".bin"
+    let vectorOutput = filePath.value ?? json + "_vec.bin"
+    let goldenOutput = filePath.value ?? json + "_out.bin"
 
     guard let jsonString = File.read(json) else {
         fputs("Could not read file '\(json)'\n", stderr)
@@ -89,15 +90,13 @@ func assemble(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    let order = metadata.order 
+    let order = metadata.order.filter { $0.kind != .output } 
     let inputOrder = tvinfo.inputs
     var inputMap: [String: Int] = [:]
 
     for (i, input) in inputOrder.enumerated() {
         inputMap[input.name] = i
     }
-
-    let vectors = tvinfo.coverageList.map { $0.vector }
 
     func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
         var padded = String(number, radix: radix)
@@ -110,27 +109,33 @@ func assemble(arguments: [String]) -> Int32 {
         return padded
     }
 
-    var binFile = ""
+    var binFileVec = "// test-vector \n"
+    var binFileOut = "// fault-free-response \n"
 
-    for vector in vectors {
+    for tvcPair in tvinfo.coverageList {
         var binaryString = ""
         for element in order {
             var value: BigUInt = 0
             if let locus = inputMap[element.name] {
-                value = vector[locus]
+                value = tvcPair.vector[locus]
             }
             binaryString += pad(value, digits: element.width, radix: 2)
         }
-        binFile += binaryString + "\n"
+        binFileVec += binaryString + "\n"
+        binFileOut += tvcPair.goldenOutput + " \n"
     }
 
     do {
-        try File.open(output, mode: .write) {
-            try $0.print(binFile, terminator: "")
-        }   
+        try File.open(vectorOutput, mode: .write) {
+            try $0.print(binFileVec, terminator: "")
+        }  
+        try File.open(goldenOutput, mode: .write) {
+            try $0.print(binFileOut, terminator: "")
+        } 
     } catch {
-        fputs("Could not access file \(output)", stderr)
+        fputs("Could not access file \(vectorOutput) or \(goldenOutput)", stderr)
         return EX_CANTCREAT
     }
+
     return EX_OK
 }
