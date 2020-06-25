@@ -61,11 +61,19 @@ func jtagCreate(arguments: [String]) -> Int32{
         shortFlag: "t",
         longFlag: "testVectors",
         helpMessage: 
-            " .json test vector file to generate a testbecnh for the testing. "
+            " .bin file for test vectors."
     )
     cli.addOptions(testvectors)
 
-     let ignored = StringOption(
+    let goldenOutput = StringOption(
+        shortFlag: "g",
+        longFlag: "goldenOutput",
+        helpMessage: 
+            " .bin file for golden output."
+    )
+    cli.addOptions(goldenOutput)
+
+    let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
         helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
@@ -164,15 +172,19 @@ func jtagCreate(arguments: [String]) -> Int32{
     }
 
     if let tvTest = testvectors.value {
-         if !fileManager.fileExists(atPath: tvTest) {
+        if !fileManager.fileExists(atPath: tvTest) {
             fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
-        if !tvTest.hasSuffix(".json") {
+        if !tvTest.hasSuffix(".bin") {
             fputs(
-                "Warning: Cell model file provided does not end with .json \n",
+                "Warning: Test vectors file provided does not end with .bin. \n",
                 stderr
             )
+        }
+        guard let _ = goldenOutput.value else {
+            fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
+            return EX_NOINPUT
         }
     }
 
@@ -488,9 +500,7 @@ func jtagCreate(arguments: [String]) -> Int32{
         guard let content = File.read(output) else {
             throw "Could not re-read created file."
         }
-    
-       
-       
+           
         let metadata = JTAGMetadata(
             IRLength: 4,
             boundaryCount: boundaryCount,
@@ -570,16 +580,12 @@ func jtagCreate(arguments: [String]) -> Int32{
             // MARK: Test bench
             if let tvFile = testvectors.value {
                 print("Generating testbench for test vectors...")
-                let data = try Data(contentsOf: URL(fileURLWithPath: tvFile), options: .mappedIfSafe)
-                guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
-                    fputs("File '\(tvFile)' is invalid.\n", stderr)
-                    exit(EX_DATAERR)
-                }
-                let output = (filePath.value ?? file) + ".tb.sv"
-
+                let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
+                let (outputCount, outputLength) = binMetadata.extract(file: goldenOutput.value!)
+                let testbecnh = (filePath.value ?? file) + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
-                    in: intermediate, // DEBUG
+                    in: output, // DEBUG
                     with: model,
                     ports: ports,
                     inputs: inputs,
@@ -594,9 +600,13 @@ func jtagCreate(arguments: [String]) -> Int32{
                     tck: tckName,
                     tdo: tdoName,
                     trst: trstName,
-                    coverageList: tvInfo.coverageList, 
-                    output: output,
+                    output: testbecnh,
                     internalCount: internalCount, 
+                    vecbinFile: testvectors.value!,
+                    outbinFile: goldenOutput.value!,
+                    vectorCount: vectorCount,
+                    vectorLength: vectorLength,
+                    outputLength: outputLength,
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )

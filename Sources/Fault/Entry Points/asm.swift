@@ -125,11 +125,30 @@ func assemble(arguments: [String]) -> Int32 {
         binFileOut += tvcPair.goldenOutput + " \n"
     }
 
+    let vectorCount = tvinfo.coverageList.count
+    let vectorLength = 
+        (vectorCount != 0) ? tvinfo.coverageList[0].vector.count : 0 
+    let outputLength =
+        (vectorCount != 0) ? tvinfo.coverageList[0].goldenOutput.count : 0 
+
+    let vecMetadata = binMetadata(count: vectorCount, length: vectorLength)
+    let outMetadata = binMetadata(count: vectorCount, length: outputLength)
+
+    guard let vecMetadataString = vecMetadata.toJSON() else {
+        fputs("Could not generate metadata string.", stderr)
+        return EX_SOFTWARE
+    }
+    guard let outMetadataString = outMetadata.toJSON() else {
+        fputs("Could not generate metadata string.", stderr)
+        return EX_SOFTWARE
+    }
     do {
         try File.open(vectorOutput, mode: .write) {
+            try $0.print("/* FAULT METADATA: '\(vecMetadataString)' END FAULT METADATA */")
             try $0.print(binFileVec, terminator: "")
         }  
         try File.open(goldenOutput, mode: .write) {
+            try $0.print("/* FAULT METADATA: '\(outMetadataString)' END FAULT METADATA */")
             try $0.print(binFileOut, terminator: "")
         } 
     } catch {

@@ -726,9 +726,13 @@ class Simulator {
         tck: String,
         tdo: String,
         trst: String,
-        coverageList: [TVCPair], 
         output: String,
         internalCount: Int,
+        vecbinFile: String,
+        outbinFile: String,
+        vectorCount: Int, 
+        vectorLength: Int,
+        outputLength: Int,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -747,12 +751,7 @@ class Simulator {
             inputAssignment += "        \(name) = \(behavior[i].rawValue) ;\n"
         }
 
-        let tvCount = coverageList.count
-        let vectorLength = (tvCount != 0) ? coverageList[0].vector.count : 0
         let tapPorts = [tck, trst, tdi]
-
-        var count = vectorLength - 1
-        var vectorAssignment = ""
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
@@ -763,25 +762,10 @@ class Simulator {
             else {
                 inputAssignment += "        \(name) = 0 ;\n"
                 if (input.name != clock && !tapPorts.contains(input.name)){
-                    vectorAssignment += "        \(name) = vector[\(count)] ; \n" 
-                    count -= 1
                 }
             }
         }        
-
-        var vectorInit = ""
-        for (i, tvcPair) in coverageList.enumerated() {
-            let output = tvcPair.goldenOutput
-            var vector = ""
-            for port in tvcPair.vector {
-                vector += String(port, radix: 2) 
-            }
-            vectorInit += "        vectors[\(i)] = \(vectorLength)'b \(vector) ; \n"
-            vectorInit += "        goldenOutput[\(i)] = \(output) ; \n"
-        }
-
-        let outputCount = coverageList[0].goldenOutput.count
-
+    
         var clockCreator = ""
         if !clock.isEmpty {
             clockCreator = "always #1 \(clock) = ~\(clock);"
@@ -789,6 +773,10 @@ class Simulator {
         var resetToggler = ""
         if !reset.isEmpty {
             resetToggler = "\(reset) = ~\(reset);"
+        }
+        var testStatements = ""
+        for i in 0..<vectorCount {
+            testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
         }
 
         let bench = """
@@ -808,9 +796,9 @@ class Simulator {
 
             integer i;
 
-            reg [\(outputCount - 1):0] scanInSerial;
-            reg [\(vectorLength - 1):0] vectors [0:\(tvCount - 1)];
-            reg [\(outputCount - 1):0] goldenOutput[0:\(tvCount - 1)];
+            reg [\(outputLength - 1):0] scanInSerial;
+            reg [\(vectorLength - 1):0] vectors [0:\(vectorCount - 1)];
+            reg [\(outputLength - 1):0] gmOutput[0:\(vectorCount - 1)];
 
             wire[7:0] tmsPattern = 8'b 01100110;
             wire[3:0] intest = 4'b 0100;
@@ -819,23 +807,20 @@ class Simulator {
                 $dumpfile("dut.vcd"); // DEBUG
                 $dumpvars(0, testbench);
         \(inputAssignment)
-        \(vectorInit)
+                $readmemb("\(vecbinFile)", vectors);
+                $readmemb("\(outbinFile)", gmOutput);
                 #10;
                 \(resetToggler)
                 \(trst) = 1;        
                 #2;
-                 
-                for (i = 0 ; i < \(tvCount); i = i + 1) begin
-                    test(vectors[i], goldenOutput[i]);
-                end
-
+        \(testStatements)
                 $display("SUCCESS_STRING");
                 $finish;
             end
 
             task test;
-                input [\(vectorLength - 1): 0] vector;
-                input [\(outputCount - 1): 0] goldenOutput;
+                input [\(vectorLength - 1):0] vector;
+                input [\(outputLength - 1):0] goldenOutput;
                 begin
                     shiftIR(intest);
                     enterShiftDR();
@@ -854,16 +839,16 @@ class Simulator {
                     \(tms) = 0; // capture-DR
                     #2;
                     \(tms) = 0; // shift-DR
-                    for (i = 0; i < \(internalCount); i = i + 1) begin
+                    #2;
+                    for (i = \(outputLength - 1); i >= 0; i = i - 1) begin
+                        #2;
                         \(tdi) = 0;
                         scanInSerial[i] = \(tdo);
-                        #2;
                     end
-                    #20;
                     exitDR();
 
                     if(scanInSerial != goldenOutput) begin
-                        $error("EXECUTING_SCANIN_INST_FAILED");
+                        $error("SIMULATING_TV_FAILED");
                         $finish;
                     end
                 end

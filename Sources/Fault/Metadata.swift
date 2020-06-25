@@ -1,4 +1,5 @@
 import Foundation
+import Defile
 
 struct ChainRegister: Codable {
     enum Kind: String, Codable {
@@ -70,5 +71,37 @@ struct JTAGMetadata: Codable {
         self.tck = tck
         self.tdo = tdo
         self.trst = trst
+    }
+}
+struct binMetadata: Codable {
+    var count: Int
+    var length: Int
+    init (
+        count: Int,
+        length: Int
+    ) {
+        self.count = count
+        self.length = length
+    }
+    static func extract(file: String) -> (Int, Int) {
+
+        guard let binString = File.read(file) else {
+            fputs("Could not read file '\(file)'\n", stderr)
+            exit(EX_NOINPUT)
+        }
+
+        let slice = binString.components(separatedBy: "/* FAULT METADATA: '")[1]
+        if !slice.contains("' END FAULT METADATA */") {
+            fputs("Fault metadata not terminated.\n", stderr)
+            exit(EX_NOINPUT)
+        }
+        
+        let decoder = JSONDecoder()
+        let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
+        guard let metadata = try? decoder.decode(binMetadata.self, from: metadataString.data(using: .utf8)!) else {
+            fputs("Metadata json is invalid.\n", stderr)
+            exit(EX_DATAERR)
+        }
+        return(count: metadata.count, length: metadata.length)
     }
 }
