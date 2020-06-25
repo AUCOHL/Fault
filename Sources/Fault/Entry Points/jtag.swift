@@ -245,6 +245,9 @@ func jtagCreate(arguments: [String]) -> Int32{
     let trstName = names["trst"]!.option.value 
         ?? names["trst"]!.default
     
+    let clockName = clockOpt.value ?? ""
+    let resetName = resetOpt.value ?? ""
+
     // MARK: Internal signals
     print("Adding JTAG port…")
     let definitionName = String(describing: definition.name)
@@ -319,10 +322,18 @@ func jtagCreate(arguments: [String]) -> Int32{
         for input in inputs {
             if(!scanChainPorts.contains(input.name)){
                 statements.append(Node.Input(input.name))
-                portArguments.append(Node.PortArg(
-                    input.name,
-                    Node.Identifier(input.name)
-                ))
+                if input.name == clockName {
+                    portArguments.append(Node.PortArg(
+                        input.name,
+                        Node.Identifier("scanClock")
+                    ))
+                } else {
+                    portArguments.append(Node.PortArg(
+                        input.name,
+                        Node.Identifier(input.name)
+                    ))
+                }
+                
             }
             else {
                 let portIdentifier = (input.name == sin) ? tdiName : input.name
@@ -440,11 +451,22 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.IntConst("1'b1"),
             Node.IntConst("1'b0")
         )
-        let clockAssignment = Node.Assign(
+        let clockDRAssignment = Node.Assign(
             Node.Lvalue(Node.Identifier(clockDRName)),
             Node.Rvalue(clockCond)
         )
-        statements.append(clockAssignment)
+        statements.append(clockDRAssignment)
+
+        statements.append(Node.Wire("scanClock"))
+        let scanClockAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier("scanClock")),
+            Node.Cond(
+                Node.Identifier(jtagInfo.tapStates.shift),
+                Node.Identifier(tckName),
+                Node.Identifier(clockName)
+            )
+        )
+        statements.append(scanClockAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -541,10 +563,6 @@ func jtagCreate(arguments: [String]) -> Int32{
                 return EX_DATAERR
             }
             let (ports, inputs, outputs) = try Port.extract(from: definition)
-
-            let clockName = clockOpt.value ?? ""
-            let resetName = resetOpt.value ?? ""
-
             let verified = try Simulator.simulate(
                 verifying: definitionName,
                 in: intermediate, // DEBUG
@@ -581,7 +599,7 @@ func jtagCreate(arguments: [String]) -> Int32{
             if let tvFile = testvectors.value {
                 print("Generating testbench for test vectors...")
                 let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
-                let (outputCount, outputLength) = binMetadata.extract(file: goldenOutput.value!)
+                let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
                 let testbecnh = (filePath.value ?? file) + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,

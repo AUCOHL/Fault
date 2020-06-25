@@ -13,6 +13,13 @@ func cut(arguments: [String]) -> Int32 {
     )
     cli.addOptions(help)
 
+    let dffOpt = StringOption(
+        shortFlag: "d",
+        longFlag: "dff",
+        helpMessage: "DFF cell name default (DFF)."
+    )
+    cli.addOptions(dffOpt)
+
     let filePath = StringOption(
         shortFlag: "o",
         longFlag: "output",
@@ -44,7 +51,7 @@ func cut(arguments: [String]) -> Int32 {
         fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
-
+    let dffName = dffOpt.value ?? "DFF"
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
@@ -85,7 +92,7 @@ func cut(arguments: [String]) -> Int32 {
         // Process gates
         if type == "InstanceList" {
             let instance = item.instances[0]
-            if String(describing: instance.module).starts(with: "DFF") {
+            if String(describing: instance.module).starts(with: dffName) {
                 let instanceName = String(describing: instance.name)
                 let outputName = "\\" + instanceName + ".q"
 
