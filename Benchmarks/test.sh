@@ -1,84 +1,223 @@
 #!/bin/bash
 
-if [[ $# -eq 0 ]] ; then
-    echo "./test.sh <input-folder> <tops-file> <cut> <type-of-TVGenerator> <env>"
-    exit 0
-fi
+set -e
 
-input_folder=$1       # folder that contains benchmarks to run
-top_modules=$2        # csv file that contains the top module for each benchmark
-cut=$3                # specifies to use cut option if set to true.
-tvgen=$4              # type of TV generator : swift, LFSR, podem, atalanta
+function usage() {
+  echo "Usage: $0 [-h|--help] [-i|--input] [-t|--top] [-g|--tvgen] [--cut] [-o|--output]"
+  echo "  -h, --help          print this help message"
+  echo "  -i, --input         path of the input folder containing designs to run"
+  echo "  -t, --top           .csv file describing the top module of each design"
+  echo "  --all               Runs Fault's complete flow"
+  echo "  --synth             Runs synthesis script"
+  echo "  --cut               Runs cut option on the synthesized netlist" 
+  echo "  -g, --tvgen         Runs fault simulation using the specified TV generator (swift, atalanta, LFSR, PODEM)"
+  echo "  --chain             Runs chain option on the synthesized netlist" 
+  echo "  --tap               Runs tap option on the chained netlist" 
+  echo " --area               Reports estimated area of the designs after synthesis and stitching jtag"
+  echo "  -o, --output        log file path"
 
-if [ "$3" = "true" ]
+  echo "This script runs Fault's complete flow on the input designs."
+  echo "The results are recorded in the output log file."
+}
+
+# default
+output="script.log"
+area_log="area.log"
+liberty=$PWD/Tech/osu035/osu035_stdcells.lib
+cell_models=$PWD/Tech/osu035/osu035_stdcells.v
+env="swift run Fault"
+
+# Parse Arguments
+while (( "$#" )); do
+  case "$1" in
+    -h|--help)
+      usage 2> /dev/null
+      exit
+      ;;
+    -i|--input)
+      input=$2
+      shift 2
+      ;;
+    -t|--top)
+      top=$2
+      shift 2
+      ;;
+    --all)
+      echo "Fault's complete flow is selected"
+      all="true"
+      shift
+      ;;
+    --synth)
+      echo "Synthesis is selected."
+      synth="true"
+      shift
+      ;;
+    --cut)
+      echo "Cut is selected."
+      cut="true"
+      shift
+      ;;
+    -g|--tvgen)
+      echo "Main option with $2 as TV generator is selected."
+      tvgen=$2
+      shift
+      ;;
+    --chain)
+      echo "Chain is selected."
+      chain="true"
+      shift
+      ;;
+    --tap)
+      echo "Tap is selected."
+      tap="true"
+      shift
+      ;;
+    --area)
+      area="true"
+      shift
+      ;;
+    -o|--output)
+      output=$2
+      shift
+      ;;
+    -*|--*=) 
+      echo "Error: invalid flag $1" >&2
+      usage 2> /dev/null
+      exit 1
+      ;;
+    *)
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+
+if [ ! -z "$synth" ] || [ ! -z "$chain" ] || [ ! -z "$tap" ] 
 then
-  echo "Running sequential circuits..using the cut option..."
-else
-  echo "Running combinational circuits.."
+    # check that top_modules file is specified
+    if [ -z "$top" ]
+    then
+        echo "top modules file must be specified using -t|--top o"
+        exit 99;
+    fi
+    # check that top_modules file exists
+    [ ! -f $top ] && { echo "$top file not found"; exit 99; }
+
+    # parse top file
+    declare -A top_dict
+    declare -A clock_dict
+    declare -A reset_dict
+    declare -A ignored_dict
+    while IFS=',' read -r module top_module clock reset ignored
+    do
+    top_dict[$module]=$top_module
+    clock_dict[$module]=$clock
+    reset_dict[$module]=$reset
+    ignored_dict[$module]=$ignored
+    done < $top
 fi
 
-if [ -z "$4" ]
-then
-  tvgen = "swift"
-fi
+# Navigate to Fault's directory
+#parentdir="$(dirname "$PWD")"
+#echo "Current DIR $parentdir"
 
-echo "Using the $4 as TV generator"
-
-log_file="script.log"
-
-# check that top_modules file exists
-[ ! -f $top_modules ] && { echo "$top_modules file not found"; exit 99; }
-
-# parse top file
-declare -A tops
-
-while IFS=',' read -r module top
+# Read files from the input folder
+for file in $PWD/$input*.v
 do
-  tops[$module]=$top
-done < $top_modules
-
-if [ -z "$5" ]                # $4 specifies the environment to run from : docker/fault/swift
-  then
-    echo "Running from Fault's installed environment"
-    env="swift run Fault"
-  else
-    echo "Running from $5 "
-    (( env = $5 ))
-fi
-
-parentdir="$(dirname "$PWD")"
-echo "Current DIR $parentdir"
-
-for file in $parentdir/Benchmarks/$input_folder*.v
-do
-  # SYNTHESIS
+  # Read file name 
   file_name=$( echo ${file##/*/} )
-  top_module="${tops[$file_name]}"
-  echo "Synthesizing $file_name"
-  $env synth -l $parentdir/Tech/osu035/osu035_stdcells_simple.lib -t $top_module $file &>/dev/null
-  # CUTTING IF SEQUENTIAL
-  if [ $cut = "true" ];
+  netlist=file_name
+  cut_netlist=file_name
+  # Design config
+  top_module="${top_dict[$file_name]}"
+  clock_signal="${clock_dict[$file_name]}"
+  reset_signal="${reset_dict[$file_name]}"
+  ignored_input="${ignored_dict[$file_name]}"
+  # Run Synthesis
+  if [ ! -z "$synth" ]
+  then
+    netlist=$PWD/Netlists/$top_module.netlist.v
+    echo "Synthesizing $file_name with top module as  $top_module..."
+    $env synth -l $liberty -t $top_module $file &>/dev/null
+    if [ ! -z "$area" ]
     then
-      echo "Cutting $file_name file"
-      $env cut $PWD/Netlists/$top_module.netlist.v  &>/dev/null
-      sim_file=$PWD/Netlists/$top_module.netlist.v.cut.v
-      bench=Netlists/$top_module.netlist.v.cut.v.bench
-    else
-      sim_file=$PWD/Netlists/$top_module.netlist.v
-      bench=Netlists/$top_module.netlist.v.bench
+      echo "Synthesized netlist area: $top_module" >>$area_log 
+      # run yosys
+      echo """
+      read_verilog $netlist
+      tee -a $area_log stat -liberty $liberty
+      """ | yosys &>/dev/null
+    fi
   fi
-  
-  # SIMULATIONS
-  echo "Running Simulations for $top_module"
-  printf "\n\nFile:  $file_name , Top Module: $top_module\n\n" >>$log_file
-
-  # CHECK TV Gen type
-  if [ $tvgen = "atalanta" ] || [ $tvgen = "podem" ];
+  # Run Cut
+  if [ ! -z "$cut" ]
+  then
+    cut_netlist=$netlist.cut.v
+    echo "Cutting $netlist ..."
+    $env cut $netlist  &>/dev/null
+  fi
+  # Run main
+  if [ ! -z "$tvgen" ]
+  then
+    echo "Running simulations for $cut_netlist using $tvgen..."
+    if [ ! -z "$clock_signal" ] || [ ! -z "$reset_signal" ] || [ ! -z "$ignored_input" ]
     then
-      echo "Generating bench circuit for $top_module"
-      $env bench -c $parentdir/Tech/osu035/osu035_stdcells.v.json $sim_file
-      $env -g $tvgen -b $bench -c $parentdir/Tech/osu035/osu035_stdcells.v -m 100 -v 10 -r 10 $sim_file >>$log_file
-    else
-      $env -c $parentdir/Tech/osu035/osu035_stdcells.v -v 10 -r 10 -m 97 --ceiling 5000 $sim_file >>$log_file
+        ignoring="-i $ignored_input,$clock_signal,$reset_signal"
+    fi
+    # Check tvgen type
+    if [ $tvgen = "atalanta" ] || [ $tvgen = "podem" ];
+        then
+        bench=$cut_netlist.bench
+        echo "Generating bench circuit for $cut_netlist"
+        $env bench -c $PWD/Tech/osu035/osu035_stdcells.v.json $cut_netlist
+        $env -g $tvgen -b $bench -c $cell_models $ignoring -m 100 -v 10 -r 10 $cut_netlist >>$output
+        else
+        $env -c $cell_models $ignoring -v 1 -r 1 -m 97 --ceiling 1 $cut_netlist >>$output  #-i $clock_signal,$reset_signal,$ignored_dict
+    fi
+  fi
+  # Run Chain
+  if [ ! -z "$chain" ]
+  then
+    chained_netlist=$netlist.chained.v
+    if [ ! -z "$ignored_input" ]
+    then
+        ignoring="-i $ignored_input"
+    fi
+    if [ -z "$clock_signal" ] || [ -z "$reset_signal" ]
+    then
+        echo "Clock & reset signals are required for $top_module in order to run chain."
+        exit 99
+    fi
+    echo "Running chain for $netlist..."
+    $env chain --clock $clock_signal --reset $reset_signal $ignoring -l $liberty -c $cell_models $netlist  >>$output
+    if [ ! -z "$area" ]
+    then
+      # run yosys
+      echo "Chained netlist area: $top_module" >>$area_log 
+      echo """
+      read_verilog $chained_netlist
+      tee -a $area_log stat -liberty $liberty
+      """ | yosys &>/dev/null
+    fi
+  fi
+   # Run tap
+  if [ ! -z "$tap" ]
+  then
+    if [ ! -z "$ignored_input" ]
+    then
+        ignoring="-i $ignored_input"
+    fi
+    jtag_netlist=$chained_netlist.jtag.v
+    echo "Running tap for $chained_netlist..."
+    $env tap --clock $clock_signal --reset $reset_signal $ignoring $netlist -l $liberty -c $cell_models  >>$output
+    if [ ! -z "$area" ]
+    then
+      # run yosys
+      echo "JTAG netlist area: $top_module" >>$area_log
+      echo """
+      read_verilog $jtag_netlist
+      tee -a $area_log stat -liberty $liberty
+      """ | yosys &>/dev/null
+    fi
   fi
 done

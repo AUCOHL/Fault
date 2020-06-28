@@ -1,4 +1,4 @@
-# parse log files and generate an excel file file
+# parse log files and generate an excel file
 
 import re
 import sys, getopt 
@@ -12,7 +12,6 @@ rx_dict = {
     'Coverage': re.compile(r'Simulations concluded: Coverage (?P<coverage>.*)%'),
     'Iteration': re.compile(r'\((?P<current_coverage>.*)%/(?P<min_coverage>.*)%,\) incrementing to (?P<tv_count>.*).'),
 }
-
 
 def main(argv):
 

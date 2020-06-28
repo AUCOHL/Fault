@@ -189,7 +189,7 @@ func main(arguments: [String]) -> Int32 {
     let svfOutput = "\(filePath.value  ?? file).tv.svf"
 
     let ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     let behavior
         = Array<Simulator.Behavior>(
             repeating: .holdHigh,
