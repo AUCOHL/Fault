@@ -72,6 +72,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(liberty)
 
+    let dffOpt = StringOption(
+        shortFlag: "d",
+        longFlag: "dff",
+        helpMessage: "Flip-flop cell name (Default: DFF)"
+    )
+    cli.addOptions(dffOpt)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -80,8 +87,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         ("mode", "boundary scan cell mode"),
         ("shift", "JTAG shift"),
         ("clockDR", "BS cell clock DR"),
-        ("update", "JTAG update"),
-        ("tck", "JTAG test clock"),
+        ("update", "JTAG update")
     ] {
         let option = StringOption(
             longFlag: name,
@@ -146,6 +152,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
     let bsrLocation = output + ".bsr.v"
+    let dffName = dffOpt.value ?? "DFF"
 
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
@@ -206,7 +213,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let modeName = names["mode"]!.option.value ?? names["mode"]!.default
         let clockDRName = names["clockDR"]!.option.value ?? names["clockDR"]!.default
         let updateName = names["update"]!.option.value ?? names["update"]!.default
-        let tckName = names["tck"]!.option.value ?? names["tck"]!.default
         
         let resetName = resetOpt.value ?? defaultBoundaryReset
         let clockName = clockOpt.value ?? ""
@@ -229,7 +235,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 // Process gates
                 if type == "InstanceList" {
                     let instance = itemDeclaration.instances[0]
-                    if String(describing: instance.module).starts(with: "DFF") {
+                    if String(describing: instance.module).starts(with: dffName) {
                         counter += 1
                         internalOrder.append(
                             ChainRegister(
@@ -271,9 +277,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return counter
         }()
 
+        if internalCount == 0 {
+            print("[Warning]: detected no internal flip flops. Are you sure that flip-flop cell name starts with \(dffName) ? ")
+        }
+
         if clockOpt.value == nil {
-            if (internalCount > 0){
-                fputs("Error: Clock signal name for the internal logic isn't passed.\n", stderr)
+            if internalCount > 0 {
+                fputs("[Error]: Clock signal name for the internal logic isn't passed.\n", stderr)
                 return EX_NOINPUT
             }
         }
@@ -286,10 +296,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ports.append(Node.Port(clockDRName, Python.None, Python.None, Python.None))
             ports.append(Node.Port(updateName, Python.None, Python.None, Python.None))
             ports.append(Node.Port(modeName, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
 
             if resetOpt.value == nil {
-                fputs("Warning: Reset signal isn't passed. \n", stderr)
+                fputs("[Warning]: Reset signal isn't passed. \n", stderr)
                 fputs("Adding the default reset signal to the module ports.\n", stderr)
                 ports.append(Node.Port(resetName, Python.None, Python.None, Python.None))
             }
@@ -298,7 +307,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(Node.Input(inputName))
             statements.append(Node.Output(outputName))
             statements.append(Node.Input(resetName))
-            statements.append(Node.Input(tckName))            
             statements.append(Node.Input(testingName))
             statements.append(Node.Input(clockDRName))
             statements.append(Node.Input(updateName))
@@ -311,7 +319,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
                 name: "BoundaryScanRegister",
-                clock: tckName,
+                clock: clockName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
                 clockDR: clockDRName,
@@ -572,7 +580,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 internalCount: internalCount,
                 clock: clockName,
                 reset: resetName,
-                tck: tckName,
                 sin: inputName,
                 sout: outputName,
                 resetActive: resetActiveLow.value ? .low : .high,
@@ -580,6 +587,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 clockDR: clockDRName,
                 update: updateName,
                 mode: modeName,
+                output: output + ".tb.sv",
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -609,7 +617,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 "--shift", testingName,
                 "--clockDR", clockDRName,
                 "--update", updateName,
-                "--tck", tckName,
                 output
             ]
             jtagArguments[0] = "\(jtagArguments[0]) \(jtagArguments[1])"
@@ -626,11 +633,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             }
             exit(jtagCreate(arguments: jtagArguments))
         }
-
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE
     }
-
     return EX_OK
 }

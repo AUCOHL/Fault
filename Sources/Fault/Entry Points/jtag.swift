@@ -88,7 +88,6 @@ func jtagCreate(arguments: [String]) -> Int32{
         ("shift", "boundary scan chain shift enable"),
         ("clockDR", "boundary scan chain clockDR"),
         ("update", "boundary scan chain update enable"),
-        ("extest", "boundary scan chain extest"),
         ("mode", "boundary scan cell mode select"),
         ("tms", "JTAG test mode select"),
         ("tck", "JTAG test clock"),
@@ -500,7 +499,7 @@ func jtagCreate(arguments: [String]) -> Int32{
         try File.open(intermediate, mode: .write) {
             try $0.print(Generator.visit(ast))
         }
-
+                
         let script = Synthesis.script(
             for: definitionName,
             in: [intermediate],

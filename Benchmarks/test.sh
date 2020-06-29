@@ -13,7 +13,7 @@ function usage() {
   echo "  -g, --tvgen         Runs fault simulation using the specified TV generator (swift, atalanta, LFSR, PODEM)"
   echo "  --chain             Runs chain option on the synthesized netlist" 
   echo "  --tap               Runs tap option on the chained netlist" 
-  echo " --area               Reports estimated area of the designs after synthesis and stitching jtag"
+  echo " --area               Reports estimated area of the designs after synthesis, chain, and stitching jtag"
   echo "  -o, --output        log file path"
 
   echo "This script runs Fault's complete flow on the input designs."
@@ -78,6 +78,7 @@ while (( "$#" )); do
       ;;
     -o|--output)
       output=$2
+      area_log=$2.area.log
       shift
       ;;
     -*|--*=) 
@@ -133,6 +134,24 @@ do
   clock_signal="${clock_dict[$file_name]}"
   reset_signal="${reset_dict[$file_name]}"
   ignored_input="${ignored_dict[$file_name]}"
+
+  if [ ! -z "$chain" ] || [ ! -z "$tap" ]
+  then
+    if [ -z "$clock_signal" ] 
+    then
+      echo "Warning: Clock signal isn't defined for $top_module."
+      clock_opt=""
+      else
+      clock_opt="--clock $clock_signal"
+    fi
+    if [ -z "$reset_signal" ]
+    then
+        echo "Warning: Reset signal isn't defined for $top_module."
+        reset_opt=""
+        else
+        reset_opt="--reset $reset_signal"
+    fi
+  fi
   # Run Synthesis
   if [ ! -z "$synth" ]
   then
@@ -183,13 +202,8 @@ do
     then
         ignoring="-i $ignored_input"
     fi
-    if [ -z "$clock_signal" ] || [ -z "$reset_signal" ]
-    then
-        echo "Clock & reset signals are required for $top_module in order to run chain."
-        exit 99
-    fi
     echo "Running chain for $netlist..."
-    $env chain --clock $clock_signal --reset $reset_signal $ignoring -l $liberty -c $cell_models $netlist  >>$output
+    $env chain $clock_opt $reset_opt $ignoring -l $liberty -c $cell_models $netlist  >>$output
     if [ ! -z "$area" ]
     then
       # run yosys
@@ -208,8 +222,10 @@ do
         ignoring="-i $ignored_input"
     fi
     jtag_netlist=$chained_netlist.jtag.v
+    echo $chained_netlist
+    echo $jtag_netlist
     echo "Running tap for $chained_netlist..."
-    $env tap --clock $clock_signal --reset $reset_signal $ignoring $netlist -l $liberty -c $cell_models  >>$output
+    $env tap $clock_opt $reset_opt $ignoring $chained_netlist -l $liberty -c $cell_models  >>$output
     if [ ! -z "$area" ]
     then
       # run yosys

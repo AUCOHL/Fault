@@ -16,7 +16,7 @@ func cut(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "DFF cell name default (DFF)."
+        helpMessage: "Flip-flop cell name default (DFF)."
     )
     cli.addOptions(dffOpt)
 

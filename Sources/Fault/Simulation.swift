@@ -338,7 +338,6 @@ class Simulator {
         internalCount: Int,
         clock: String,
         reset: String,
-        tck: String,
         sin: String,
         sout: String,
         resetActive: Active = .low,
@@ -346,16 +345,10 @@ class Simulator {
         clockDR: String,
         update: String,
         mode: String,
+        output: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
-        let tempDir = "\(NSTemporaryDirectory())"
-
-        let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p '\(folderName)'".sh()
-        defer {
-           let _ = "rm -rf '\(folderName)'".sh()
-        }
 
         var portWires = ""
         var portHooks = ""
@@ -392,9 +385,7 @@ class Simulator {
         `include "\(file)"
         module testbench;
         \(portWires)
-            
             \(clockCreator)
-            always #1 \(tck) = ~\(tck);
             \(module) uut(
                 \(portHooks.dropLast(2))
             );
@@ -403,7 +394,7 @@ class Simulator {
             reg[\(chainLength - 1):0] serial;
             integer i;
             initial begin
-                $dumpfile("dut.vcd"); // DEBUG
+                $dumpfile("dut.vcd");
                 $dumpvars(0, testbench);
         \(inputAssignment)
                 #10;
@@ -428,16 +419,14 @@ class Simulator {
         endmodule
         """
 
-        let tbName = "\(folderName)/tb.sv"
-        try File.open(tbName, mode: .write) {
+        try File.open(output, mode: .write) {
             try $0.print(bench)
         }
 
-        let aoutName = "\(folderName)/a.out"
+        let aoutName = "\(output).a.out"
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
-        
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
         
         if iverilogResult.terminationStatus != EX_OK {
             fputs("An iverilog error has occurred: \n", stderr)
@@ -572,7 +561,7 @@ class Simulator {
             reg [\(chainLength - 1): 0] stores;
 
             initial begin
-                $dumpfile("dut.vcd"); // DEBUG
+                $dumpfile("dut.vcd");
                 $dumpvars(0, testbench);
         \(inputInit)
                 #2;
