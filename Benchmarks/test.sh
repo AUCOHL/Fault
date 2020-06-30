@@ -11,6 +11,7 @@ function usage() {
   echo "  --synth             Runs synthesis script"
   echo "  --cut               Runs cut option on the synthesized netlist" 
   echo "  -g, --tvgen         Runs fault simulation using the specified TV generator (swift, atalanta, LFSR, PODEM)"
+  echo "  --delay             Runs the transition fault simulator" 
   echo "  --chain             Runs chain option on the synthesized netlist" 
   echo "  --tap               Runs tap option on the chained netlist" 
   echo " --area               Reports estimated area of the designs after synthesis, chain, and stitching jtag"
@@ -70,6 +71,11 @@ while (( "$#" )); do
     --tap)
       echo "Tap is selected."
       tap="true"
+      shift
+      ;;
+   --delay)
+      echo "Transition fault simulator is selected"
+      delay="--delay"
       shift
       ;;
     --area)
@@ -191,7 +197,7 @@ do
         $env bench -c $PWD/Tech/osu035/osu035_stdcells.v.json $cut_netlist
         $env -g $tvgen -b $bench -c $cell_models $ignoring -m 100 -v 10 -r 10 $cut_netlist >>$output
         else
-        $env -c $cell_models $ignoring -v 1 -r 1 -m 97 --ceiling 1 $cut_netlist >>$output  #-i $clock_signal,$reset_signal,$ignored_dict
+        $env -c $cell_models $ignoring -v 10 -r 10 -m 97 --ceiling 10 $delay $cut_netlist >>$output  #-i $clock_signal,$reset_signal,$ignored_dict
     fi
   fi
   # Run Chain
