@@ -18,7 +18,7 @@ struct ChainRegister: Codable {
     }
 }
 
-struct Metadata: Codable {
+struct ChainMetadata: Codable {
     var boundaryCount: Int
     var internalCount: Int
     var order: [ChainRegister]
@@ -40,6 +40,33 @@ struct Metadata: Codable {
         self.shift = shift
         self.sin = sin
         self.sout = sout
+    }
+    
+    static func extract(file: String) -> ([ChainRegister], Int, Int) {
+
+        guard let string = File.read(file) else {
+            fputs("Could not read file '\(file)'\n", stderr)
+            exit(EX_NOINPUT)
+        }
+
+        let slice = string.components(separatedBy: "/* FAULT METADATA: '")[1]
+        if !slice.contains("' END FAULT METADATA */") {
+            fputs("Fault metadata not terminated.\n", stderr)
+            exit(EX_NOINPUT)
+        }
+        
+        let decoder = JSONDecoder()
+        let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
+        guard let metadata = try? decoder.decode(ChainMetadata.self, from: metadataString.data(using: .utf8)!) else {
+            fputs("Metadata json is invalid.\n", stderr)
+            exit(EX_DATAERR)
+        }
+
+        return (
+            order: metadata.order,
+            boundaryCount: metadata.boundaryCount,
+            internalCount: metadata.internalCount
+        )
     }
 }
 

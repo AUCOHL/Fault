@@ -69,28 +69,8 @@ func assemble(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    guard let netlistString = File.read(netlist) else {
-        fputs("Could not read file '\(netlist)'\n", stderr)
-        return EX_NOINPUT
-    }
-
-    if !netlistString.contains("/* FAULT METADATA: '") {
-        fputs("Netlist does not contain fault metadata.\n", stderr)
-        return EX_NOINPUT
-    }
-    let slice = netlistString.components(separatedBy: "/* FAULT METADATA: '")[1]
-    if !slice.contains("' END FAULT METADATA */") {
-        fputs("Fault metadata not terminated.\n", stderr)
-        return EX_NOINPUT
-    }
-
-    let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
-    guard let metadata = try? decoder.decode(Metadata.self, from: metadataString.data(using: .utf8)!) else {
-        fputs("Metadata json is invalid.\n", stderr)
-        return EX_DATAERR
-    }
-
-    let order = metadata.order.filter { $0.kind != .output } 
+    let (chainRegister, _, _) = ChainMetadata.extract(file: netlist)
+    let order = chainRegister.filter { $0.kind != .output } 
     let inputOrder = tvinfo.inputs
     var inputMap: [String: Int] = [:]
 

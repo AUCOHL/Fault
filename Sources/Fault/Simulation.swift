@@ -87,6 +87,7 @@ class Simulator {
 
             if delayFault {
                 faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
+                faultForces += "        #1 ; \n"
             }
         }
 
@@ -370,7 +371,7 @@ class Simulator {
         let chainLength = internalCount + boundaryCount
 
         var serial = "0"
-        for _ in 0..<chainLength {
+        for _ in 0..<chainLength-1 {
             serial += "\(Int.random(in: 0...1))"
         }
 
@@ -459,17 +460,10 @@ class Simulator {
         tck: String,
         tdo: String,
         trst: String,
+        output: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
-        let tempDir = "\(NSTemporaryDirectory())"
-
-        let folderName = "\(tempDir)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p '\(folderName)'".sh()
-        defer {
-            let _ = "rm -rf '\(folderName)'".sh()
-        }
-
         var portWires = ""
         var portHooks = ""
         for (rawName, port) in ports {
@@ -480,11 +474,12 @@ class Simulator {
 
         let chainLength = internalCount + boundaryCount
         let ignored = [tck, trst, tdi, clock, tms, reset]
-        let inputCellCount = inputs.count - ignored.count
 
         var inputInit = ""
         var inputAssignment = ""
         var sampleSerializable = ""
+        var outputBoundaryCells = chainLength - internalCount - 1
+       
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
@@ -495,9 +490,12 @@ class Simulator {
             else {
                 inputInit += "        \(name) = 0 ;\n"
                 if (!ignored.contains(input.name)){
-                    let bit = Int.random(in: 0...1)
-                    inputAssignment += "        \(name) = \(bit) ;\n"
-                    sampleSerializable += "\(bit)"
+                    let bits = Int.random(in: 0...input.width)
+                    let bitString = String(bits, radix: 2)
+                    let pad = input.width - bitString.count
+                    inputAssignment += "        \(name) = \(bits) ;\n"
+                    outputBoundaryCells -= input.width 
+                    sampleSerializable += String(repeating: "0", count: pad) + bitString
                 }
             }
         }
@@ -509,10 +507,12 @@ class Simulator {
         var outputAssignment  = ""
         var count = 0
         for output in outputs {
-            if (output.name != tdo){
-                outputAssignment += "        serializable[\(boundaryCount - inputCellCount - count - 1)] = \(output.name) ; \n" 
-                sampleSerializable += "x"
-                count += 1
+            if output.name != tdo {
+                for i in (0...output.width-1).reversed() {
+                    outputAssignment += "        serializable[\(outputBoundaryCells - count)] = \(output.name)[\(i)] ; \n" 
+                    sampleSerializable += "x"
+                    count += 1
+                }
             }
         }
 
@@ -674,15 +674,13 @@ class Simulator {
             endtask
         endmodule
         """
-
-        let tbName = "\(folderName)/tb.sv"
-        try File.open(tbName, mode: .write) {
+        try File.open(output, mode: .write) {
             try $0.print(bench)
         }
 
-        let aoutName = "\(folderName)/a.out"
+        let aoutName = "output.a.out"
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
         
         if iverilogResult.terminationStatus != EX_OK {
             fputs("An iverilog error has occurred: \n", stderr)

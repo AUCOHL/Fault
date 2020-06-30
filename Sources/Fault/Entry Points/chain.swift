@@ -505,7 +505,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return counter - 1 // Accounting for skip
         }()
 
-        let metadata = Metadata(
+        let metadata = ChainMetadata(
             boundaryCount: boundaryCount,
             internalCount: internalCount,
             order: order,
@@ -513,7 +513,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             sin: inputName,
             sout: outputName
         )
-        
         guard let metadataString = metadata.toJSON() else {
             fputs("Could not generate metadata string.", stderr)
             return EX_SOFTWARE
@@ -599,6 +598,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
                 if !resetActiveLow.value {
                     print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
+                }
+                if internalCount == 0 {
+                    print("・Ensure that D flip-flop cell name starts with \(dffName).")
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }

@@ -69,7 +69,6 @@ class TFSimulator {
             }
 
             let tempDir = "\(NSTemporaryDirectory())"
-
             for vector in testVectors {
                 let future = Future {
                     do {
@@ -147,7 +146,8 @@ class TFSimulator {
                 ) 
             }
 
-            let skipped = vectorsList.count - testVectors.count
+            let skipped = 
+                (vectorsList.count > testVectors.count ) ? vectorsList.count - testVectors.count : 0
             for currIndex in 0..<vectorsList.count-skipped {
                   for i in currIndex+skipped..<vectorsList.count {
                     let (first, second) = vectorCovers.match(v1Covers: vectorsList[currIndex], v2Covers: vectorsList[i])

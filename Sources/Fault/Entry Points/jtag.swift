@@ -127,7 +127,8 @@ func jtagCreate(arguments: [String]) -> Int32{
         fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
-    
+    let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)  
+
     let ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
     let behavior
@@ -258,22 +259,6 @@ func jtagCreate(arguments: [String]) -> Int32{
         definition.name = Python.str(alteredName);
       
         let ports = Python.list(definition.portlist.ports)
-
-        let dffCount: Int = {
-            var counter = 0
-            for itemDeclaration in definition.items {
-                let type = Python.type(itemDeclaration).__name__
-                // Process gates
-                if type == "InstanceList" {
-                    let instance = itemDeclaration.instances[0]
-                    if String(describing: instance.module).starts(with: "DFF") {
-                        counter += 1
-                    }
-                }
-            }
-            return counter
-        }()
-
         let scanChainPorts = [
             sin,
             sout,
@@ -284,9 +269,6 @@ func jtagCreate(arguments: [String]) -> Int32{
             modeName
         ]
 
-        let boundaryCount = inputs.count + outputs.count - (scanChainPorts.count + ignoredCount)
-        let internalCount = dffCount - 2 * (boundaryCount - 1)
-        
         if clockOpt.value == nil {
             if (internalCount > 0){
                 fputs("Error: Clock signal name for the internal logic isn't passed.\n", stderr)
@@ -317,14 +299,15 @@ func jtagCreate(arguments: [String]) -> Int32{
         statements.append(Node.Input(trstName))
 
         let portArguments = Python.list()
-
+        let clockSource = "__clk_src__"
         for input in inputs {
             if(!scanChainPorts.contains(input.name)){
-                statements.append(Node.Input(input.name))
+                let inputStatement = Node.Input(input.name)
+
                 if input.name == clockName {
                     portArguments.append(Node.PortArg(
                         input.name,
-                        Node.Identifier("scanClock")
+                        Node.Identifier(clockSource)
                     ))
                 } else {
                     portArguments.append(Node.PortArg(
@@ -332,7 +315,15 @@ func jtagCreate(arguments: [String]) -> Int32{
                         Node.Identifier(input.name)
                     ))
                 }
-                
+
+                if input.width > 1 {
+                    let width = Node.Width(
+                        Node.Constant(input.from),
+                        Node.Constant(input.to)
+                    )
+                    inputStatement.width = width
+                }
+                statements.append(inputStatement)
             }
             else {
                 let portIdentifier = (input.name == sin) ? tdiName : input.name
@@ -345,7 +336,15 @@ func jtagCreate(arguments: [String]) -> Int32{
 
         for output in outputs {
             if(!scanChainPorts.contains(output.name)){
-                statements.append(Node.Output(output.name))
+                let outputStatement = Node.Output(output.name)
+                if output.width > 1 {
+                    let width = Node.Width(
+                        Node.Constant(output.from),
+                        Node.Constant(output.to)
+                    )
+                    outputStatement.width = width
+                }
+                statements.append(outputStatement)
             }
             portArguments.append(Node.PortArg(
                 output.name,
@@ -456,16 +455,22 @@ func jtagCreate(arguments: [String]) -> Int32{
         )
         statements.append(clockDRAssignment)
 
-        statements.append(Node.Wire("scanClock"))
-        let scanClockAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier("scanClock")),
+        statements.append(Node.Wire(clockSource))
+        let testCond = Node.Or(
+            Node.Or(Node.Identifier(jtagInfo.tapStates.shift),
+                Node.Identifier(jtagInfo.tapStates.capture)),
+            Node.Or(Node.Identifier(jtagInfo.tapStates.update),
+                Node.Identifier(jtagInfo.tapStates.pause))
+        )
+        let clkSourceAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(clockSource)),
             Node.Cond(
-                Node.Identifier(jtagInfo.tapStates.shift),
+                testCond,
                 Node.Identifier(tckName),
                 Node.Identifier(clockName)
             )
         )
-        statements.append(scanClockAssignment)
+        statements.append(clkSourceAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -579,6 +584,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 tck: tckName,
                 tdo: tdoName,
                 trst: trstName,
+                output: (filePath.value ?? file) + ".jtag.tb.sv",
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
