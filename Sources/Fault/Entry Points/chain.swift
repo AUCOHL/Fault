@@ -199,17 +199,20 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let definitionName = String(describing: definition.name)
     let alteredName = "__UNIT__UNDER__FINANGLING__"
 
-    var internalOrder: [ChainRegister] = []
-    
+    var internalOrder_1: [ChainRegister] = []
+    var internalOrder_2: [ChainRegister] = []
+
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
         let testingName = names["shift"]!.option.value ?? names["shift"]!.default
         let testingIdentifier = Node.Identifier(testingName)
         let inputName = names["sin"]!.option.value ?? names["sin"]!.default
-        let inputIdentifier = Node.Identifier(inputName)
+        let inputIdentifier_1 = Node.Identifier(inputName)
+        let inputIdentifier_2 = Node.Identifier(inputName + "_2")
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
-        let outputIdentifier = Node.Identifier(outputName)
+        let outputIdentifier_1 = Node.Identifier(outputName)
+        let outputIdentifier_2 = Node.Identifier(outputName + "_2")
         let modeName = names["mode"]!.option.value ?? names["mode"]!.default
         let clockDRName = names["clockDR"]!.option.value ?? names["clockDR"]!.default
         let updateName = names["update"]!.option.value ?? names["update"]!.default
@@ -219,7 +222,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
         // MARK: Register chaining original module
         let internalCount: Int = {
-            var previousOutput = inputIdentifier
+            var previousOutput_1 = inputIdentifier_1
+            var previousOutput_2 = inputIdentifier_2
 
             let ports = Python.list(definition.portlist.ports)
             ports.append(Node.Port(testingName, Python.None, Python.None, Python.None))
@@ -227,7 +231,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
             definition.portlist.ports = Python.tuple(ports)
 
-            var counter = 0
+            var counter_1 = 0
+            var counter_2 = 0
 
             for itemDeclaration in definition.items {
                 let type = Python.type(itemDeclaration).__name__
@@ -236,25 +241,44 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 if type == "InstanceList" {
                     let instance = itemDeclaration.instances[0]
                     if String(describing: instance.module).starts(with: dffName) {
-                        counter += 1
-                        internalOrder.append(
-                            ChainRegister(
-                                name: String(describing: instance.name),
-                                kind: .dff
-                            )
-                        )
+                        var invertedClock = false
+                    
                         for hook in instance.portlist {
+                            if hook.portname == "CLK" {
+                                invertedClock = String(describing: hook.argname) != clockName
+                            }
                             if hook.portname == "D" {
                                 let ternary = Node.Cond(
                                     testingIdentifier,
-                                    previousOutput,
+                                    (invertedClock) ? previousOutput_2 :previousOutput_1,
                                     hook.argname
                                 )
                                 hook.argname = ternary
                             }
                             if hook.portname == "Q" {
-                                previousOutput = hook.argname
+                                if invertedClock {
+                                    previousOutput_2 = hook.argname
+                                } else {
+                                    previousOutput_1 = hook.argname
+                                }
                             }
+                        }
+                        if invertedClock {
+                            counter_2 += 1
+                            internalOrder_2.append(
+                                ChainRegister(
+                                    name: String(describing: instance.name),
+                                    kind: .dff
+                                )
+                            )   
+                        } else {
+                            counter_1 += 1
+                            internalOrder_1.append(
+                                ChainRegister(
+                                    name: String(describing: instance.name),
+                                    kind: .dff
+                                )
+                            ) 
                         }
                     }
                 }
@@ -267,14 +291,30 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.extend(Python.list(definition.items))
 
             let finalAssignment = Node.Assign(
-                Node.Lvalue(outputIdentifier),
-                Node.Rvalue(previousOutput)
+                Node.Lvalue(outputIdentifier_1),
+                Node.Rvalue(previousOutput_1)
             )
             statements.append(finalAssignment)
+        
+            if counter_2 != 0 {
+                let input = inputName + "_2"
+                let output = outputName + "_2"
+                let initialAssignment = Node.Assign(
+                    Node.Lvalue(Node.Identifier(input.uniqueName(0))),
+                    Node.Rvalue(inputIdentifier_2)
+                )
+                statements.append(initialAssignment)
+                statements.append(Node.Input(input))
+                statements.append(Node.Input(output))
+                let finalAssignment = Node.Assign(
+                    Node.Lvalue(outputIdentifier_2),
+                    Node.Rvalue(previousOutput_2)
+                )
+                statements.append(finalAssignment)
+            }
             definition.items = Python.tuple(statements)
             definition.name = Python.str(alteredName)
-
-            return counter
+            return counter_1 + counter_2
         }()
 
         if internalCount == 0 {
@@ -333,9 +373,22 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             
             let initialAssignment = Node.Assign(
                 Node.Lvalue(Node.Identifier(inputName.uniqueName(0))),
-                Node.Rvalue(inputIdentifier)
+                Node.Rvalue(inputIdentifier_1)
             )
             statements.append(initialAssignment)
+
+            if internalOrder_2.count != 0 {
+                let selectCond = Node.Cond(
+                    Node.Identifier("chainSelect"),
+                    inputIdentifier_1,
+                    inputIdentifier_2
+                )
+                let sinAssignment = Node.Assign(
+                    Node.Lvalue(inputIdentifier_1),
+                    selectCond
+                )
+                statements.append(sinAssignment)
+            }
 
             for input in inputs {
                 let inputStatement = Node.Input(input.name)
@@ -405,7 +458,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ))
             
             counter += 1 // as a skip
-            order += internalOrder
+            order += internalOrder_1
 
             portArguments.append(Node.PortArg(
                 outputName,
@@ -471,11 +524,21 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 Python.tuple([submoduleInstance])
             ))
 
-            let boundaryAssignment = Node.Assign(
-                Node.Lvalue(outputIdentifier),
-                Node.Rvalue(Node.Identifier(inputName.uniqueName(counter)))
-            )
-            statements.append(boundaryAssignment)
+            if internalOrder_2.count == 0 {
+                let boundaryAssignment = Node.Assign(
+                    Node.Lvalue(outputIdentifier_1),
+                    Node.Rvalue(Node.Identifier(inputName.uniqueName(counter)))
+                )
+                statements.append(boundaryAssignment)
+
+            } else {
+                let name = inputName + "_2"
+                let boundaryAssignment = Node.Assign(
+                    Node.Lvalue(outputIdentifier_2),
+                    Node.Rvalue(Node.Identifier(name.uniqueName(counter)))
+                )
+                statements.append(boundaryAssignment)
+            }
 
             var wireDeclarations: [PythonObject] = []
             for i in 0...counter {
