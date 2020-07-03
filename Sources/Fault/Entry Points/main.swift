@@ -126,6 +126,12 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
     )
     cli.addOptions(ignored)
+    
+    let clock = StringOption(
+        longFlag: "clock",
+        helpMessage: "clock name to use for simulation in case of partial scan-chain. (Default: none)"
+    )
+    cli.addOptions(clock)
 
     let tvSet = StringOption(
         longFlag: "tvSet",
@@ -415,6 +421,7 @@ func main(arguments: [String]) -> Int32 {
                 randomGenerator: randomGenerator,
                 TVSet: tvSetVectors,
                 sampleRun: sampleRun.value,
+                clock: clock.value,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )

@@ -23,6 +23,7 @@ class Simulator {
         delayFault: Bool,
         cleanUp: Bool,
         goldenOutput: Bool,
+        clock: String,
         filePrefix: String = ".",
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -79,16 +80,21 @@ class Simulator {
         var faultForces = ""    
         for fault in faultPoints {
             faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"
-            faultForces += "        #1 ; \n"   
+            faultForces += "        #2 ; \n"   
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
-            faultForces += "        #1 ; \n"
+            faultForces += "        #2 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
-            faultForces += "        #1 ; \n"
+            faultForces += "        #2 ; \n"
 
             if delayFault {
                 faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
-                faultForces += "        #1 ; \n"
+                faultForces += "        #2 ; \n"
             }
+        }
+
+        var clockCreator = ""
+        if let clockName = clock {
+            clockCreator = "always #1 \(clock) = ~\(clock);"
         }
 
         let bench = """
@@ -102,7 +108,7 @@ class Simulator {
         module FaultTestbench;
 
         \(portWires)
-
+            \(clockCreator)
             \(module) uut(
                 \(portHooks.dropLast(2))
             );

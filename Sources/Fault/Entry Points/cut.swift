@@ -16,9 +16,15 @@ func cut(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell name default (DFF)."
+        helpMessage: "Flip-flop cell name (Default: DFF)."
     )
     cli.addOptions(dffOpt)
+
+    let clock = StringOption(
+        longFlag: "clock",
+        helpMessage: "clock name for the cut flip-flops. (Default: all flip-flops are cut)"
+    )
+    cli.addOptions(clock)
 
     let filePath = StringOption(
         shortFlag: "o",
@@ -110,6 +116,18 @@ func cut(arguments: [String]) -> Int32 {
                     if hook.portname == "Q" {
                         qArg = hook.argname
                     }
+                    if hook.portname == "CLK" {
+                        if let clockName = clock.value {
+                            include = String(describing: hook.argname) != clockName
+                        }
+                    }
+                }
+
+                if include {
+                    items.append(item)
+                    print("[Warning]: Not all flip-flops have the same clock \(clock.value!).")
+                    print("・Ensure that there is no negedge triggered flip-flops.")
+                    continue
                 }
 
                 guard let d = dArg, let q = qArg else {
