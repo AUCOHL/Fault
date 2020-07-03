@@ -23,7 +23,7 @@ class Simulator {
         delayFault: Bool,
         cleanUp: Bool,
         goldenOutput: Bool,
-        clock: String,
+        clock: String?,
         filePrefix: String = ".",
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -94,7 +94,7 @@ class Simulator {
 
         var clockCreator = ""
         if let clockName = clock {
-            clockCreator = "always #1 \(clock) = ~\(clock);"
+            clockCreator = "always #1 \(clockName) = ~\(clockName);"
         }
 
         let bench = """
@@ -188,6 +188,7 @@ class Simulator {
         randomGenerator: RNG,
         TVSet: [TestVector],
         sampleRun: Bool,
+        clock: String?,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
@@ -255,6 +256,7 @@ class Simulator {
                                 delayFault: false,
                                 cleanUp: !sampleRun,
                                 goldenOutput: true,
+                                clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
@@ -276,6 +278,7 @@ class Simulator {
                                 delayFault: false,
                                 cleanUp: !sampleRun,
                                 goldenOutput: false,
+                                clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable

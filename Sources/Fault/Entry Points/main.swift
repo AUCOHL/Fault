@@ -395,6 +395,7 @@ func main(arguments: [String]) -> Int32 {
                 ceiling: tvCeiling,
                 randomGenerator: randomGenerator,
                 sampleRun: sampleRun.value,
+                clock: clock.value,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )

@@ -20,6 +20,7 @@ class TFSimulator {
         ceiling: Int,
         randomGenerator: RNG,
         sampleRun: Bool,
+        clock: String?,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TFCPair], coverage: Float) {
@@ -88,6 +89,7 @@ class TFSimulator {
                                 delayFault: true,
                                 cleanUp: !sampleRun,
                                 goldenOutput: false,
+                                clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
@@ -109,6 +111,7 @@ class TFSimulator {
                                 delayFault: true,
                                 cleanUp: !sampleRun,
                                 goldenOutput: false,
+                                clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
