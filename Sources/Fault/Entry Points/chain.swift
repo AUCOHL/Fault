@@ -79,11 +79,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     cli.addOptions(dffOpt)
 
     // one: stitches the boundary scan to FF register 
-    // partial: stitches the boundary scan to FFs clocked by the clock signal
     // multi: creates at most 3 scan-chains: boundary scan-chain, posedge FF chain, negedge FF chain.
     let scanOpt = EnumOption<scanStructure>(
         longFlag: "scan",
-        helpMessage: "Specifies scan-chain strucutre: one, partial, multi. (Default: one) \n"
+        helpMessage: "Specifies scan-chain strucutre: one, multi. (Default: one) \n"
     )
     cli.addOptions(scanOpt)
 
@@ -93,6 +92,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         ("sin", "boundary scan register serial data in"),
         ("sout", "boundary scan register serial data out"),
         ("mode", "boundary scan cell mode"),
+        ("tck", "test clock"),
         ("shift", "JTAG shift"),
         ("clockDR", "BS cell clock DR"),
         ("update", "JTAG update")
@@ -175,7 +175,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_muxonly.lib" :
         liberty.value!
 
-
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
 
@@ -208,7 +207,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let scanStructure = scanOpt.value ?? .one
     var internalOrder: [[ChainRegister]] = [[]]
-    var chainPorts: [[String: (name: String, id: PythonObject)]] = [[:]]
+    var chainPorts: [[String: (name: String, id: PythonObject)]] = []
     var bsPorts: [String: (name: String, id: PythonObject)] = [:]
 
     do {
@@ -217,6 +216,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let testingName = names["shift"]!.option.value ?? names["shift"]!.default
         let inputName = names["sin"]!.option.value ?? names["sin"]!.default
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
+        let tckName = names["tck"]!.option.value ?? names["tck"]!.default
 
         var previousOutput: [PythonObject] =  []
         switch scanStructure {
@@ -224,7 +224,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let oneChain = [
                 "sin": (name: inputName, id: Node.Identifier(inputName)),
                 "sout": (name: outputName, id: Node.Identifier(outputName)),
-                "shift": (name: testingName, id: Node.Identifier(testingName))
+                "shift": (name: testingName, id: Node.Identifier(testingName)),
+                "clk": (name: "__clk_source__", id: Node.Identifier("__clk_source__"))
             ]
             chainPorts.append(oneChain)
             previousOutput.append(oneChain["sin"]!.id)
@@ -234,7 +235,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 let internalPorts = [
                     "sin": (name: "\(inputName)_\(i)", id: Node.Identifier("\(inputName)_\(i)")),
                     "sout": (name: "\(outputName)_\(i)", id: Node.Identifier("\(outputName)_\(i)")),
-                    "shift": (name: "\(testingName)_\(i)", id: Node.Identifier("\(testingName)_\(i)"))
+                    "shift": (name: "\(testingName)_\(i)", id: Node.Identifier("\(testingName)_\(i)")),
+                    "clk": (name: "__clk_source_\(i)__", id: Node.Identifier("__clk_source_\(i)__")) 
                 ]
                 chainPorts.append(internalPorts)
             }
@@ -254,8 +256,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let clockName = clockOpt.value ?? ""
 
         // MARK: Register chaining original module
-        let ports = Python.list(definition.portlist.ports)
         let statements = Python.list()
+        statements.append(Node.Input(tckName))
+
+        let ports = Python.list(definition.portlist.ports)
+        ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
 
         for chain in chainPorts {
             ports.append(Node.Port(chain["sin"]!.name, Python.None, Python.None, Python.None))
@@ -293,6 +298,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             else {
                                 chainIndex = 0
                             }
+                            hook.argname = chainPorts[chainIndex]["clk"]!.id
                         }
 
                         if hook.portname == "D" {
@@ -323,6 +329,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 Node.Rvalue(previousOutput[i])
             )
             statements.append(finalAssignment)
+
+            let clockCond = Node.Cond(
+                chainPorts[i]["shift"]!.id,
+                Node.Identifier(tckName),
+                Node.Identifier(clockName)
+            )
+            let clkSource = Node.Assign(
+                Node.Lvalue(chainPorts[i]["clk"]!.id),
+                Node.Rvalue(clockCond)
+            )
+            statements.append(Node.Wire(chainPorts[i]["clk"]!.name))
+            statements.append(clkSource)
         }
 
         definition.items = Python.tuple(statements)
@@ -364,6 +382,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(Node.Input(clockDRName))
             statements.append(Node.Input(updateName))
             statements.append(Node.Input(modeName))
+            statements.append(Node.Input(tckName))
 
             if scanStructure == .multi {
                 ports.append(Node.Port(bsPorts["sin"]!.name, Python.None, Python.None, Python.None))
@@ -389,7 +408,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
                 name: "BoundaryScanRegister",
-                clock: clockName,
+                clock: tckName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
                 clockDR: clockDRName,
@@ -465,6 +484,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             }
 
             // MARK: ports for chained module instance
+            portArguments.append(Node.PortArg(
+                tckName,
+                Node.Identifier(tckName)
+            ))
             for (i, chain) in chainPorts.enumerated() {
                 if i == 2 {
                     break

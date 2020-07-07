@@ -118,12 +118,12 @@ func cut(arguments: [String]) -> Int32 {
                     }
                     if hook.portname == "CLK" {
                         if let clockName = clock.value {
-                            include = String(describing: hook.argname) != clockName
+                            include = String(describing: hook.argname).starts(with: clockName) 
                         }
                     }
                 }
 
-                if include {
+                if !include {
                     items.append(item)
                     print("[Warning]: Not all flip-flops have the same clock \(clock.value!).")
                     print("・Ensure that there is no negedge triggered flip-flops.")
