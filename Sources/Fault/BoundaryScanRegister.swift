@@ -193,3 +193,107 @@ class BoundaryScanRegisterCreator {
         """
     }
 }
+
+class scanCellCreator {
+
+    var name: String
+    var counter: Int = 0
+    
+    var clock: String
+    var reset: String
+    var shift: String
+    var resetActive: Simulator.Active
+    private var Node: PythonObject
+
+    private var clockIdentifier: PythonObject
+    private var resetIdentifier: PythonObject
+    private var shiftIdentifier: PythonObject
+
+    init(
+        name: String,
+        clock: String,
+        reset: String,
+        resetActive: Simulator.Active,
+        shift: String,
+        using Node: PythonObject
+    ) {
+        self.name = name
+        self.clock = clock
+        self.clockIdentifier = Node.Identifier(clock)
+
+        self.reset = reset
+        self.resetIdentifier = Node.Identifier(reset)
+
+        self.shift = shift
+        self.shiftIdentifier = Node.Identifier(shift)
+
+        self.resetActive = resetActive
+        self.Node = Node
+
+    }
+
+    func create(
+        din: String,
+        sin: String,
+        out: String
+    ) -> PythonObject {
+        let dinIdentifier = Node.Identifier(din)
+        let sinIdentifier = Node.Identifier(sin)
+        let outIdentifier = Node.Identifier(out)
+
+        let portArguments = [
+            Node.PortArg("din", dinIdentifier),
+            Node.PortArg("out", outIdentifier),
+            Node.PortArg("sin", sinIdentifier),
+            Node.PortArg("shift", shiftIdentifier),
+            Node.PortArg("clock", clockIdentifier),
+            Node.PortArg("reset", resetIdentifier),
+        ]
+
+        let submoduleInstance = Node.Instance(
+            name,
+            "__" + name + "_" + String(describing: counter) + "__",
+            Python.tuple(portArguments),
+            Python.tuple()
+        )
+
+        counter += 1
+
+        return Node.InstanceList(
+            name,
+            Python.tuple(),
+            Python.tuple([submoduleInstance])
+        )
+    }
+
+    var cellDefinition: String {
+        return """
+         module \(name) (
+            din,     
+            out,   
+            sin, 
+            shift, 
+            clock,
+            reset
+        );
+            input din, sin, shift;
+            output out;
+            input clock, reset;
+
+            reg flip_flop;  
+        
+            always @ (posedge clock) begin
+                if (\(resetActive == .high ? "" : "~") reset) begin
+                    flip_flop <= 1'b0;
+                end else begin
+                    flip_flop <= sin;
+                end
+            end
+            
+            assign out = shift ? flip_flop : din;
+            
+        endmodule
+
+        """
+    }
+}

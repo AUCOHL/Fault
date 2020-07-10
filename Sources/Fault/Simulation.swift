@@ -340,13 +340,14 @@ class Simulator {
     static func simulate(
         verifying module: String,
         in file: String,
+        isolated hard: String?,
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        boundaryCount: Int,
-        internalCount: Int,
+        chainLength: Int,
         clock: String,
+        tck: String,
         reset: String,
         sin: String,
         sout: String,
@@ -377,7 +378,6 @@ class Simulator {
                 inputAssignment += "        \(name) = 0 ;\n"
             }
         }
-        let chainLength = internalCount + boundaryCount
 
         var serial = "0"
         for _ in 0..<chainLength-1 {
@@ -385,17 +385,25 @@ class Simulator {
         }
 
         var clockCreator = ""
+        var tckCreator = ""
         if !clock.isEmpty {
             clockCreator = "always #1 \(clock) = ~\(clock);"
+            tckCreator = "always #1 \(tck) = ~\(tck);"
+        }
+        var isolated = ""
+        if let hardModule = hard {
+            isolated = "`include \"\(hardModule)\""
         }
 
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
+        \(isolated)
         module testbench;
         \(portWires)
             \(clockCreator)
+            \(tckCreator)
             \(module) uut(
                 \(portHooks.dropLast(2))
             );
@@ -414,11 +422,11 @@ class Simulator {
                 \(update) = 1;
                 \(mode) = 0;
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    sin = serializable[i];
+                    \(sin) = serializable[i];
                     #2;
                 end
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    serial[i] = sout;
+                    serial[i] = \(sout);
                     #2;
                 end
                 if (serial == serializable) begin
