@@ -3,11 +3,6 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-enum scanStructure: String {
-    case one = "one"
-    case multi = "multi" 
-}
-
 /*
     - Add inverter to tck in case of negedge triggered
     - BB I/O ports
@@ -98,8 +93,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(isolated)
 
-    // one: stitches the boundary scan to FF register 
-    // multi: creates at most 3 scan-chains: boundary scan-chain, posedge FF chain, negedge FF chain.
     let scanOpt = EnumOption<scanStructure>(
         longFlag: "scan",
         helpMessage: "Specifies scan-chain strucutre: one, multi. (Default: one)"
@@ -249,9 +242,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let alteredName = "__UNIT__UNDER__FINANGLING__"
 
     let scanStructure = scanOpt.value ?? .one
-    var internalOrder: [[ChainRegister]] = [[],[]]
-    var chainPorts: [[String: (name: String, id: PythonObject)]] = []
-    var bsPorts: [String: (name: String, id: PythonObject)] = [:]
+    var scanChains: [ScanChain] = []
+    var bsChain: ScanChain? 
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
@@ -261,42 +253,46 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
         let tckName = names["tck"]!.option.value ?? names["tck"]!.default
 
-        var previousOutput: [PythonObject] =  []
-        switch scanStructure {
-        case .one: // stitches FFs to bs_chain with ignoring FFs that have different sensitivity list
-            let oneChain = [
-                "sin": (name: inputName, id: Node.Identifier(inputName)),
-                "sout": (name: outputName, id: Node.Identifier(outputName)),
-                "shift": (name: testingName, id: Node.Identifier(testingName)),
-                "clk": (name: "__clk_source__", id: Node.Identifier("__clk_source__"))
-            ]
-            chainPorts.append(oneChain)
-            previousOutput.append(oneChain["sin"]!.id)
-            break
-        case .multi: // seperates boundary scan cell for FFs
-            for i in 1..<3 {
-                let internalPorts = [
-                    "sin": (name: "\(inputName)_\(i)", id: Node.Identifier("\(inputName)_\(i)")),
-                    "sout": (name: "\(outputName)_\(i)", id: Node.Identifier("\(outputName)_\(i)")),
-                    "shift": (name: "\(testingName)_\(i)", id: Node.Identifier("\(testingName)_\(i)")),
-                    "clk": (name: "__clk_source_\(i)__", id: Node.Identifier("__clk_source_\(i)__")) 
-                ]
-                chainPorts.append(internalPorts)
-            }
-            bsPorts = [
-                "sin": (name: "bs_\(inputName)", id: Node.Identifier("bs_\(inputName)")),
-                "sout": (name: "bs_\(outputName)", id: Node.Identifier("bs_\(outputName)")),
-                "shift": (name: "bs_\(testingName)", id: Node.Identifier("bs_\(testingName)"))
-            ]          
-            break
-        }
-
         let modeName = names["mode"]!.option.value ?? names["mode"]!.default
         let clockDRName = names["clockDR"]!.option.value ?? names["clockDR"]!.default
         let updateName = names["update"]!.option.value ?? names["update"]!.default
         
         let resetName = resetOpt.value ?? defaultBoundaryReset
         let clockName = clockOpt.value ?? ""
+
+        switch scanStructure {
+        case .one: // stitches FFs to bs_chain with ignoring FFs that have different sensitivity list
+            scanChains.append(
+                ScanChain(
+                    sin: inputName,
+                    sout: outputName,
+                    shift: testingName,
+                    clock: "__clk_source__",
+                    using: Node
+                )
+            )
+            break
+        case .multi: // seperates boundary scan cell for FFs
+            for i in 1..<3 {
+                scanChains.append(
+                    ScanChain(
+                        sin: "\(inputName)_\(i)",
+                        sout: "\(outputName)_\(i)",
+                        shift: "\(testingName)_\(i)",
+                        clock: "__clk_source_\(i)__",
+                        using: Node
+                    )
+                )
+            }
+            bsChain = ScanChain(
+                sin: "bs_\(inputName)",
+                sout: "bs_\(outputName)",
+                shift: "bs_\(testingName)",
+                clock: tckName,
+                using: Node
+            )
+            break
+        }
 
         // MARK: Register chaining original module
         let statements = Python.list()
@@ -305,23 +301,20 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let ports = Python.list(definition.portlist.ports)
         ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
 
-        for chain in chainPorts {
-            ports.append(Node.Port(chain["sin"]!.name, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(chain["shift"]!.name, Python.None, Python.None, Python.None))
-            ports.append(Node.Port(chain["sout"]!.name, Python.None, Python.None, Python.None))
+        for chain in scanChains {
+            ports.append(Node.Port(chain.sin, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(chain.shift, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(chain.sout, Python.None, Python.None, Python.None))
 
-            previousOutput.append(chain["sin"]!.id)
-
-            statements.append(Node.Input(chain["sin"]!.name))
-            statements.append(Node.Input(chain["shift"]!.name))
-            statements.append(Node.Output(chain["sout"]!.name))
+            statements.append(Node.Input(chain.sin))
+            statements.append(Node.Input(chain.shift))
+            statements.append(Node.Output(chain.sout))
         }
         definition.portlist.ports = Python.tuple(ports)
         statements.extend(Python.list(definition.items))
 
         let partialChain = scanStructure == .one
-        var items: [PythonObject] = []
-        for itemDeclaration in definition.items {
+        instanceLoop: for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
 
             // Process gates
@@ -335,34 +328,32 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             if !String(describing: hook.argname).starts(with: clockName) {
                                 // different clk
                                 if partialChain {
-                                    continue
+                                    continue instanceLoop
                                 }
                                 chainIndex = 1
                             }
                             else {
                                 chainIndex = 0
                             }
-                            hook.argname = chainPorts[chainIndex]["clk"]!.id
+                            hook.argname = scanChains[chainIndex].clockIdentifier
                         }
 
                         if hook.portname == "D" {
                             let ternary = Node.Cond(
-                                chainPorts[chainIndex]["shift"]!.id,
-                                previousOutput[chainIndex],
+                                scanChains[chainIndex].shiftIdentifier,
+                                scanChains[chainIndex].previousOutput,
                                 hook.argname
                             )
                             hook.argname = ternary
                         }
                         if hook.portname == "Q" {
-                            previousOutput[chainIndex] = hook.argname
+                           scanChains[chainIndex].previousOutput = hook.argname
                         }
                     }
-                    internalOrder[chainIndex].append(
-                        ChainRegister(
-                            name: String(describing: instance.name),
-                            kind: .dff
-                        )
-                    ) 
+                    scanChains[chainIndex].add (
+                        name: String(describing: instance.name),
+                        kind: .dff
+                    )
                 } else if let name = isolatedName {
                     // MARK: Isolating hard blocks
                    if String(describing: instance.module) == name {
@@ -371,10 +362,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                        let inputNames = inputs.map { $0.name }
                        let scCreator = scanCellCreator(
                             name: "ScanCell",
-                            clock: chainPorts[0]["clk"]!.name,
+                            clock: scanChains[0].clock,
                             reset: resetName,
                             resetActive: resetActiveLow.value ? .low : .high,
-                            shift: chainPorts[0]["shift"]!.name,
+                            shift: scanChains[0].shift,
                             using: Node
                         )
                        for hook in instance.portlist {
@@ -394,31 +385,27 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     if input {
                                         cell = scCreator.create(
                                             din: "\(element.name)",
-                                            sin: "\(previousOutput[0])",
+                                            sin: "\(scanChains[0].previousOutput)",
                                             out: outName
                                         )
-                                        previousOutput[0] = Node.Identifier(outName)
+                                        scanChains[0].previousOutput = Node.Identifier(outName)
                                     } else {
                                         cell = scCreator.create(
                                             din: outName,
-                                            sin: "\(previousOutput[0])",
+                                            sin: "\(scanChains[0].previousOutput)",
                                             out: "\(element.name)"
                                         )
-                                        previousOutput[0] = Node.Identifier("\(element.name)")
-
+                                        scanChains[0].previousOutput = Node.Identifier("\(element.name)")
                                     }
                                     statements.append(cell)
                                     list.append(Node.Identifier(outName))
-                                    internalOrder[0].append(
-                                        ChainRegister(
-                                            name: String(describing: instance.name),
-                                            kind: .dff
-                                        )
+                                    scanChains[0].add(
+                                        name: String(describing: instance.name),
+                                        kind: .dff
                                     ) 
                                 }
                                 hook.argname.list = Python.tuple(list)
                             } else {
-
                                 if [clockName, resetName].contains("\(hook.argname)") {
                                     continue
                                 }
@@ -427,18 +414,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 statements.append(
                                     scCreator.create(
                                         din: "\(hook.argname)",
-                                        sin: "\(previousOutput[0])",
+                                        sin: "\(scanChains[0].previousOutput)",
                                         out: outName
                                     )
                                 )
                                 hook.argname = Node.Identifier(outName)
-                                previousOutput[0] = Node.Identifier(outName)
-
-                                internalOrder[0].append(
-                                    ChainRegister(
-                                        name: String(describing: instance.name),
-                                        kind: .dff
-                                    )
+                                scanChains[0].previousOutput = Node.Identifier(outName)
+                                scanChains[0].add(
+                                    name: String(describing: instance.name),
+                                    kind: .dff
                                 ) 
                             }
                        }
@@ -457,22 +441,23 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 }
             }
         }
-        for i in 0..<chainPorts.count {
+
+        for chain in scanChains {
             let finalAssignment = Node.Assign(
-                Node.Lvalue(chainPorts[i]["sout"]!.id),
-                Node.Rvalue(previousOutput[i])
+                Node.Lvalue(chain.soutIdentifier),
+                Node.Rvalue(chain.previousOutput)
             )
             statements.append(finalAssignment)
             let clockCond = Node.Cond(
-                chainPorts[i]["shift"]!.id,
+                chain.shiftIdentifier,
                 Node.Identifier(tckName),
                 Node.Identifier(clockName)
             )
             let clkSource = Node.Assign(
-                Node.Lvalue(chainPorts[i]["clk"]!.id),
+                Node.Lvalue(chain.clockIdentifier),
                 Node.Rvalue(clockCond)
             )
-            statements.append(Node.Wire(chainPorts[i]["clk"]!.name))
+            statements.append(Node.Wire(chain.clock))
             statements.append(clkSource)
         }
 
@@ -480,24 +465,24 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         definition.name = Python.str(alteredName)
 
         if clockOpt.value == nil {
-            if internalOrder[0].count > 0 {
+            if scanChains[0].length > 0 {
                 fputs("[Error]: Clock signal name for the internal logic isn't passed.\n", stderr)
                 return EX_NOINPUT
             }
         }
 
-        if internalOrder[0].count == 0 {
+        if scanChains[0].length == 0 {
             print("[Warning]: detected no internal flip flops triggered by \(clockName).Are you sure that flip-flop cell name starts with \(dffName) ? ")
         }
-        if internalOrder.count == 2 {
-            if internalOrder[1].count == 0 {
+        if scanChains.count == 2 {
+            if scanChains[1].length > 0 {
                 print("[Warning]: detected flip flops triggered by different clock. Partial scan-chain is created.")
             }
         }
 
         // MARK: Chaining boundary registers
         print("Creating and chaining boundary flip-flops…")
-        var order: [ChainRegister] = []
+
         let boundaryCount: Int = try {
             let ports = Python.list(definition.portlist.ports)
             ports.append(Node.Port(clockDRName, Python.None, Python.None, Python.None))
@@ -518,26 +503,28 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(Node.Input(tckName))
 
             if scanStructure == .multi {
-                ports.append(Node.Port(bsPorts["sin"]!.name, Python.None, Python.None, Python.None))
-                ports.append(Node.Port(bsPorts["sout"]!.name, Python.None, Python.None, Python.None))
-                ports.append(Node.Port(bsPorts["shift"]!.name, Python.None, Python.None, Python.None))
-                chainPorts.append(bsPorts)
+                if let boundaryChain = bsChain {
+                    ports.append(Node.Port(boundaryChain.sin, Python.None, Python.None, Python.None))
+                    ports.append(Node.Port(boundaryChain.sout, Python.None, Python.None, Python.None))
+                    ports.append(Node.Port(boundaryChain.shift, Python.None, Python.None, Python.None))
+                    scanChains.append(boundaryChain)
+                }
             }
 
-            for port in chainPorts {
-                statements.append(Node.Input(port["sin"]!.name))
-                statements.append(Node.Input(port["shift"]!.name))
-                statements.append(Node.Output(port["sout"]!.name))
+            for chain in scanChains {
+                statements.append(Node.Input(chain.sin))
+                statements.append(Node.Input(chain.shift))
+                statements.append(Node.Output(chain.sout))
             }
 
             if let clock = clockOpt.value {
                 statements.append(Node.Input(clock))            
             }
 
-            let inputName = chainPorts.last!["sin"]!.name
-            let inputIdentifier = chainPorts.last!["sin"]!.id
-            let outputIdentifier = chainPorts.last!["sout"]!.id
-            let shiftName = chainPorts.last!["shift"]!.name
+            let inputName = scanChains.last!.sin
+            let inputIdentifier = scanChains.last!.sinIdentifier 
+            let outputIdentifier = scanChains.last!.soutIdentifier
+            let shiftName = scanChains.last!.shift
 
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
@@ -608,12 +595,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     counter += 1
                 }
 
-                order.append(
-                    ChainRegister(
-                        name: String(describing: input.name),
-                        kind: .input,
-                        width: input.width
-                    )
+                scanChains.last!.add(
+                    name: String(describing: input.name),
+                    kind: .input,
+                    width: input.width
                 )
             }
 
@@ -622,22 +607,26 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 tckName,
                 Node.Identifier(tckName)
             ))
-            for (i, chain) in chainPorts.enumerated() {
+            for (i, chain) in scanChains.enumerated() {
                 if i == 2 {
                     break
                 }
                 portArguments.append(Node.PortArg(
-                    chain["sin"]!.name,
-                    chain["sin"]!.id
+                    chain.sin,
+                    (scanStructure == .multi) ? chain.sinIdentifier: Node.Identifier(inputName.uniqueName(counter))
                 ))
                 portArguments.append(Node.PortArg(
-                    chain["shift"]!.name,
-                    chain["shift"]!.id
+                    chain.shift,
+                    chain.shiftIdentifier
                 ))
                 portArguments.append(Node.PortArg(
-                    chain["sout"]!.name,
-                    chain["sout"]!.id
+                    chain.sout,
+                    (scanStructure == .multi) ? chain.soutIdentifier: Node.Identifier(inputName.uniqueName(counter + 1))
                 ))
+
+                if  (scanStructure == .one) {
+                    counter = counter + 1
+                }
             }
 
             for output in outputs {
@@ -677,12 +666,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     counter += 1
                 }
 
-                order.append(
-                    ChainRegister(
-                        name: String(describing: output.name),
-                        kind: .output,
-                        width: output.width
-                    )
+                scanChains.last!.add(
+                    name: String(describing: output.name),
+                    kind: .output,
+                    width: output.width
                 )
             }
 
@@ -732,11 +719,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             return counter
         }()
-
+        
         let metadata = ChainMetadata(
             boundaryCount: boundaryCount,
-            internalCount: internalOrder[0].count,
-            order: order,
+            internalCount: scanChains[0].length,
+            order: scanChains.last!.order,
             shift: "shift", 
             sin: inputName,
             sout: outputName
@@ -777,8 +764,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             try $0.print(content)
         }
 
-        // MARK: Verification
-        internalOrder.append(order)
+        // // MARK: Verification
         if let model = verifyOpt.value {
             print("Verifying scan chain integrity…")
             let ast = parse([output])[0]
@@ -795,9 +781,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 fputs("No module found.\n", stderr)
                 return EX_DATAERR
             }
-            let (ports, inputs, outputs) = try Port.extract(from: definition)
 
-            for (i, chain) in chainPorts.enumerated() {
+            let (ports, inputs, outputs) = try Port.extract(from: definition)
+            for (i, chain) in scanChains.enumerated() {
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
                     in: output, 
@@ -806,14 +792,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     ports: ports,
                     inputs: inputs,
                     outputs: outputs,
-                    chainLength: (i != chainPorts.count - 1) ? internalOrder[i].count: boundaryCount,
+                    chainLength: chain.length,
                     clock: clockName,
                     tck: tckName,
                     reset: resetName,
-                    sin: chain["sin"]!.name,
-                    sout: chain["sout"]!.name,
+                    sin: chain.sin,
+                    sout: chain.sout,
                     resetActive: resetActiveLow.value ? .low : .high,
-                    testing: chain["shift"]!.name,
+                    testing: chain.shift,
                     clockDR: clockDRName,
                     update: updateName,
                     mode: modeName,
@@ -830,12 +816,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     if !resetActiveLow.value {
                         print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
-                    if internalOrder[i].count == 0 {
+                    if chain.length == 0 {
                         print("・Ensure that D flip-flop cell name starts with \(dffName).")
                     }
                     print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
                 }
-            }
+           }
         }
         print("Done.")
 

@@ -1,6 +1,11 @@
 import Foundation
 import PythonKit
 
+enum scanStructure: String {
+    case one = "one"
+    case multi = "multi" 
+}
+
 class BoundaryScanRegisterCreator {
     var name: String
     private var inputName: String
@@ -295,5 +300,64 @@ class scanCellCreator {
         endmodule
 
         """
+    }
+}
+
+class ScanChain {
+
+    var sin: String
+    var sinIdentifier: PythonObject
+
+    var sout: String
+    var soutIdentifier: PythonObject
+
+    var shift: String
+    var shiftIdentifier: PythonObject
+
+    var clock: String
+    var clockIdentifier: PythonObject
+
+    var length: Int = 0
+    var order: [ChainRegister] = []
+
+    var previousOutput: PythonObject
+    private var Node: PythonObject
+
+    init(
+        sin:String,
+        sout: String,
+        shift: String,
+        clock: String,
+        using Node: PythonObject
+    ) {
+        self.sin = sin
+        self.sinIdentifier = Node.Identifier(sin)
+
+        self.sout = sout
+        self.soutIdentifier = Node.Identifier(sout)
+
+        self.shift = shift
+        self.shiftIdentifier = Node.Identifier(shift)
+
+        self.clock = clock
+        self.clockIdentifier = Node.Identifier(clock)
+        self.Node = Node
+
+        previousOutput = self.sinIdentifier
+    }
+
+    func add (
+        name: String,
+        kind: ChainRegister.Kind,
+        width: Int = 1
+    ) {
+        self.order.append( 
+            ChainRegister(
+                name: name,
+                kind: kind,
+                width: width
+            )
+        )
+        self.length += width
     }
 }
