@@ -18,31 +18,35 @@ struct ChainRegister: Codable {
     }
 }
 
-struct ChainMetadata: Codable {
-    var boundaryCount: Int
-    var internalCount: Int
-    var order: [ChainRegister]
-    var shift: String
+struct Chain: Codable {
     var sin: String
     var sout: String
+    var shift: String
+    var length: Int
+    var kind: ScanChain.ChainKind
 
-    init(
-        boundaryCount: Int,
-        internalCount: Int,
-        order: [ChainRegister],
-        shift: String,
-        sin: String,
-        sout: String
-    ) {
-        self.boundaryCount = boundaryCount
-        self.internalCount = internalCount
-        self.order = order
-        self.shift = shift
+    init(sin: String, sout: String, shift: String, length: Int, kind: ScanChain.ChainKind) {
         self.sin = sin
         self.sout = sout
+        self.shift = shift
+        self.length = length
+        self.kind = kind
+    }
+}
+struct ChainMetadata: Codable {
+
+    var type: scanStructure
+    var scanChains: [Chain]
+
+    init(
+        type: scanStructure,
+        scanChains: [Chain]
+    ) {
+        self.type = type
+        self.scanChains = scanChains
     }
     
-    static func extract(file: String) -> ([ChainRegister], Int, Int) {
+    static func extract(file: String) -> (scanStructure, [Chain]) {
 
         guard let string = File.read(file) else {
             fputs("Could not read file '\(file)'\n", stderr)
@@ -63,9 +67,8 @@ struct ChainMetadata: Codable {
         }
 
         return (
-            order: metadata.order,
-            boundaryCount: metadata.boundaryCount,
-            internalCount: metadata.internalCount
+            type: metadata.type,
+            scanChains: metadata.scanChains
         )
     }
 }

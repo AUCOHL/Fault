@@ -1,7 +1,7 @@
 import Foundation
 import PythonKit
 
-enum scanStructure: String {
+enum scanStructure: String, Codable {
     case one = "one"
     case multi = "multi" 
 }
@@ -304,7 +304,11 @@ class scanCellCreator {
 }
 
 class ScanChain {
-
+    enum ChainKind: String, Codable{
+        case posedge
+        case negedge
+        case boundary
+    }
     var sin: String
     var sinIdentifier: PythonObject
 
@@ -317,6 +321,8 @@ class ScanChain {
     var clock: String
     var clockIdentifier: PythonObject
 
+    var kind: ChainKind
+
     var length: Int = 0
     var order: [ChainRegister] = []
 
@@ -328,6 +334,7 @@ class ScanChain {
         sout: String,
         shift: String,
         clock: String,
+        kind: ChainKind,
         using Node: PythonObject
     ) {
         self.sin = sin
@@ -341,6 +348,8 @@ class ScanChain {
 
         self.clock = clock
         self.clockIdentifier = Node.Identifier(clock)
+
+        self.kind = kind
         self.Node = Node
 
         previousOutput = self.sinIdentifier

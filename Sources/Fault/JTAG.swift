@@ -39,10 +39,14 @@ class JTAGCreator {
             Node.Wire(selectSignals.mbist),
             Node.Wire(selectSignals.debug),
             Node.Wire(selectSignals.intest),
+            Node.Wire(selectSignals.preloadChain_1),
+            Node.Wire(selectSignals.preloadChain_2),
             Node.Wire(jtagInfo.tdoSignal),
             Node.Wire(tdiSignals.debug),
             Node.Wire(tdiSignals.bsChain),
-            Node.Wire(tdiSignals.mbist)
+            Node.Wire(tdiSignals.mbist),
+            Node.Wire(tdiSignals.chain_1),
+            Node.Wire(tdiSignals.chain_2)
         ]
 
         let portArguments = [
@@ -218,18 +222,24 @@ struct selectSignals: Codable {
     var mbist: String
     var debug: String
     var intest: String
+    var preloadChain_1: String
+    var preloadChain_2: String
     init (
         extest: String,
         samplePreload: String,
         mbist: String,
         debug: String,
-        intest: String
+        intest: String,
+        preloadChain_1: String,
+        preloadChain_2: String
     ) {
         self.extest = extest
         self.samplePreload = samplePreload
         self.mbist =  mbist
         self.debug = debug
         self.intest = intest
+        self.preloadChain_1 = preloadChain_1
+        self.preloadChain_2 = preloadChain_2
     }
 }
 
@@ -237,19 +247,24 @@ struct tdiSignals: Codable {
     var debug: String
     var bsChain: String
     var mbist: String
-    
+    var chain_1: String
+    var chain_2: String
+
     init (
         debug: String,
         bsChain: String,
         mbist: String,
-        intest: String
+        intest: String,
+        chain_1: String,
+        chain_2: String
     ) {
         self.debug = debug
         self.bsChain = bsChain
         self.mbist = mbist
+        self.chain_1 = chain_1
+        self.chain_2 = chain_2
     }
 }
-
 
 class SerialVectorCreator {
 

@@ -261,18 +261,19 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let clockName = clockOpt.value ?? ""
 
         switch scanStructure {
-        case .one: // stitches FFs to bs_chain with ignoring FFs that have different sensitivity list
+        case .one: 
             scanChains.append(
                 ScanChain(
                     sin: inputName,
                     sout: outputName,
                     shift: testingName,
                     clock: "__clk_source__",
+                    kind: .posedge,
                     using: Node
                 )
             )
             break
-        case .multi: // seperates boundary scan cell for FFs
+        case .multi:
             for i in 1..<3 {
                 scanChains.append(
                     ScanChain(
@@ -280,6 +281,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         sout: "\(outputName)_\(i)",
                         shift: "\(testingName)_\(i)",
                         clock: "__clk_source_\(i)__",
+                        kind: (i==1) ? .posedge : .negedge,
                         using: Node
                     )
                 )
@@ -289,6 +291,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 sout: "bs_\(outputName)",
                 shift: "bs_\(testingName)",
                 clock: tckName,
+                kind: .boundary,
                 using: Node
             )
             break
@@ -326,16 +329,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     for hook in instance.portlist {
                         if hook.portname == "CLK" {
                             if !String(describing: hook.argname).starts(with: clockName) {
-                                // different clk
                                 if partialChain {
                                     continue instanceLoop
                                 }
                                 chainIndex = 1
                             }
                             else {
-                                chainIndex = 0
+                                hook.argname = scanChains[chainIndex].clockIdentifier
                             }
-                            hook.argname = scanChains[chainIndex].clockIdentifier
                         }
 
                         if hook.portname == "D" {
@@ -438,6 +439,25 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         definitions.extend(scanCells)
                         description.definitions = Python.tuple(definitions)
                    }   
+                }
+                if let invertedClock = clockInv.value { 
+                    if partialChain {
+                        print("[Warning]: inverted clock is ignored in [one] scan-chain structure.")
+                        continue
+                    }
+
+                    if String(describing: instance.module) == invertedClock {
+                        for hook in instance.portlist {
+                            if String(describing: hook.argname) == clockName {
+                                let ternary = Node.Cond(
+                                    scanChains[1].shiftIdentifier,
+                                    Node.Unot(Node.Identifier(tckName)),
+                                    Node.Identifier(clockName)
+                                )
+                                hook.argname = ternary
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -720,13 +740,22 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return counter
         }()
         
+        var chainCodable: [Chain] = []
+        for chain in scanChains {
+            chainCodable.append(
+                Chain(
+                    sin: chain.sin,
+                    sout: chain.sout,
+                    shift: chain.shift,
+                    length: chain.length,
+                    kind: chain.kind
+                )
+            )
+        }
+
         let metadata = ChainMetadata(
-            boundaryCount: boundaryCount,
-            internalCount: scanChains[0].length,
-            order: scanChains.last!.order,
-            shift: "shift", 
-            sin: inputName,
-            sout: outputName
+            type: scanStructure,
+            scanChains: chainCodable
         )
         guard let metadataString = metadata.toJSON() else {
             fputs("Could not generate metadata string.", stderr)

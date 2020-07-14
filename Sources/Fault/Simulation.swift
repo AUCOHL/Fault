@@ -429,7 +429,7 @@ class Simulator {
                     serial[i] = \(sout);
                     #2;
                 end
-                if (serial == serializable) begin
+                if (serial === serializable) begin
                     $display("SUCCESS_STRING");
                 end
                 $finish;
@@ -467,8 +467,7 @@ class Simulator {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        boundaryCount: Int,
-        internalCount: Int,
+        chain: Chain,
         clock: String,
         reset: String,
         resetActive: Active = .low,
@@ -489,14 +488,14 @@ class Simulator {
             portHooks += ".\(name) ( \(name) ) , "
         }
 
-        let chainLength = internalCount + boundaryCount
+        let chainLength = chain.length
         let ignored = [tck, trst, tdi, clock, tms, reset]
 
         var inputInit = ""
         var inputAssignment = ""
         var sampleSerializable = ""
-        var outputBoundaryCells = chainLength - internalCount - 1
-       
+        let outputBoundaryCells = outputs.map{ $0.width }.reduce(0, +) - 1
+        
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
@@ -511,31 +510,25 @@ class Simulator {
                     let bitString = String(bits, radix: 2)
                     let pad = input.width - bitString.count
                     inputAssignment += "        \(name) = \(bits) ;\n"
-                    outputBoundaryCells -= input.width 
-                    sampleSerializable += String(repeating: "0", count: pad) + bitString
+                    sampleSerializable += (String(repeating: "0", count: pad) + bitString).reversed()
                 }
             }
-        }
-
-        for _ in 0..<internalCount {
-            sampleSerializable += "x"
         }
 
         var outputAssignment  = ""
-        var count = 0
-        for output in outputs {
+        for (index, output) in outputs.enumerated() {
             if output.name != tdo {
                 for i in (0...output.width-1).reversed() {
-                    outputAssignment += "        serializable[\(outputBoundaryCells - count)] = \(output.name)[\(i)] ; \n" 
+                    outputAssignment +=
+                        "        serializable[\(outputBoundaryCells - index - 1)] = \(output.name)[\(i)] ; \n" 
                     sampleSerializable += "x"
-                    count += 1
                 }
             }
         }
 
-        var boundarySerial = ""
+        var preloadSerializable = ""
         for _ in 0..<chainLength {
-            boundarySerial += "\(Int.random(in: 0...1))"
+            preloadSerializable += "\(Int.random(in: 0...1))"
         }
 
         var clockCreator = ""
@@ -547,150 +540,60 @@ class Simulator {
             resetToggler = "\(reset) = ~\(reset);"
         }
 
-        let bench = """
-        \(String.boilerplate)
-        `include "\(cells)"
-        `include "\(file)"
+        let tb = Testbench(
+            ports: ports,
+            inputs: inputs,
+            clock: clock,
+            reset: reset,
+            resetActive: resetActive,
+            in: file,
+            with: cells
+        )
+        let bench = tb.createBoundary(
+            chainLength: chain.length,
+            outputBoundaryCount: outputBoundaryCells,
+            inputs: inputs,
+            outputs: outputs,
+            tdi: tdi,
+            tdo: tdo,
+            tms: tms,
+            tck: tck,
+            trst: trst,
+            clock: clock,
+            reset: reset,
+            module: module
+        )
+        // let bench = """
+        // \(String.boilerplate)
+        // `include "\(cells)"
+        // `include "\(file)"
+        // `include "Netlists/sram_1rw1r_32_256_8_sky130.v"
 
-        module testbench;
-        \(portWires)
+        // module testbench;
+        // \(portWires)
             
-            \(clockCreator)
-            always #1 \(tck) = ~\(tck);
+        //     \(clockCreator)
+        //     always #1 \(tck) = ~\(tck);
 
-            \(module) uut(
-                \(portHooks.dropLast(2))
-            );
+        //     \(module) uut(
+        //         \(portHooks.dropLast(2))
+        //     );
 
-            integer i;
-
-            wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] extest = 4'b 0000;
-            wire[3:0] samplePreload = 4'b 0001;
-            wire[3:0] bypass = 4'b 1111;
-
-            reg[\(chainLength - 1):0] serializable =
-                \(chainLength)'b\(sampleSerializable);
-            reg[\(chainLength - 1):0] serial;
-
-            wire [\(chainLength - 1): 0] boundarySerial = 
-                \(chainLength)'b\(boundarySerial);
-            reg [\(chainLength - 1): 0] stores;
-
-            initial begin
-                $dumpfile("dut.vcd");
-                $dumpvars(0, testbench);
-        \(inputInit)
-                #2;
-                \(resetToggler)
-                \(trst) = 1;        
-                #2;
-                /*
-                    Test Sample/Preload Instruction
-                */
-                shiftIR(samplePreload);
-
-                // SAMPLE
-                \(tms) = 1;     // select-DR 
-                #2;
-                \(tms) = 0;     // capture-DR 
-        \(inputAssignment)
-                #2;
-                \(tms) = 0;     // shift-DR 
-                #2;
-        \(outputAssignment)
-                for (i = 0; i < \(chainLength); i = i + 1) begin
-                    \(tdi) = 0;
-                    serial[i] = \(tdo); 
-                    #2;
-                end
-                if(serial != serializable) begin
-                    $error("EXECUTING_SAMPLE_INST_FAILED");
-                    $finish;
-                end
-                exitDR();
-                #2;
-                // PRELOAD
-                enterShiftDR();
-                for (i = 0; i < \(chainLength); i = i + 1) begin
-                    \(tdi) = boundarySerial[i];
-                    #2;
-                end
-                for(i = 0; i< \(chainLength); i = i + 1) begin
-                    stores[i] = \(tdo);
-                    #2;
-                end 
-                if(stores != boundarySerial) begin
-                    $error("EXECUTING_PRELOAD_INST_FAILED");
-                    $finish;
-                end
-                exitDR();
-                #2;
-                /*
-                    Test BYPASS Instruction 
-                */
-                #10;
-                shiftIR(bypass);
-                enterShiftDR();
-                \(tdi) = 1;
-                #6;
-                for (i = 0; i < 10; i = i + 1) begin
-                    if (\(tdo) != 1) begin
-                        $error("ERROR_EXECUTING_BYPASS_INST");
-                        $finish;
-                    end
-                    #2;
-                end
-                exitDR();
-
-                $display("SUCCESS_STRING");
-                $finish;
-            end
-
-            task shiftIR;
-                input[3:0] instruction;
-                integer i;
-                begin
-                    for (i = 0; i< 5; i = i + 1) begin
-                        \(tms) = tmsPattern[i];
-                        #2;
-                    end
-
-                    // At shift-IR: shift new instruction on tdi line
-                    for (i = 0; i < 4; i = i + 1) begin
-                        tdi = instruction[i];
-                        if(i == 3) begin
-                            \(tms) = tmsPattern[5];     // exit-ir
-                        end
-                        #2;
-                    end
-
-                    \(tms) = tmsPattern[6];     // update-ir 
-                    #2;
-                    \(tms) = tmsPattern[7];     // run test-idle
-                    #6;
-                end
-            endtask
-
-            task enterShiftDR;
-                begin
-                    \(tms) = 1;     // select DR
-                    #2;
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
-                end
-            endtask
-
-            task exitDR;
-                begin
-                    \(tms) = 1;     // Exit DR -- update DR
-                    #4;
-                    \(tms) = 0;     // Run test-idle
-                    #2;
-                end
-            endtask
-        endmodule
-        """
+        //     \(Testbench.createBoundary(
+        //         chainLength: chainLength,
+        //         sampleSerializable: sampleSerializable,
+        //         preloadSerializable: preloadSerializable,
+        //         inputInit: inputInit,
+        //         inputAssignment: inputAssignment,
+        //         outputAssignment: outputAssignment,
+        //         tdi: tdi,
+        //         tdo: tdo,
+        //         tms: tms,
+        //         trst: trst,
+        //         resetToggler: resetToggler
+        //     ))
+        // endmodule
+        // """
         try File.open(output, mode: .write) {
             try $0.print(bench)
         }
