@@ -1,3 +1,6 @@
+import Defile
+import Foundation
+
 class Testbench {
 
     private var portWires: String = ""
@@ -83,8 +86,9 @@ class Testbench {
         for (index, output) in outputs.enumerated() {
             if output.name != tdo {
                 for i in (0...output.width-1).reversed() {
+                    let bitNumber = outputBoundaryCount - index - 1
                     outputAssignment +=
-                        "        serializable[\(outputBoundaryCount - index - 1)] = \(output.name)[\(i)] ; \n" 
+                        "        serializable[\(bitNumber)] = \(output.name)[\(i)] ; \n" 
                     sampleSerializable += "x"
                 }
             }
@@ -288,7 +292,7 @@ class Testbench {
                     \(tdi) = serializable_1[i];
                     #2;
                 end
-                for(i = 0; i< \(chainLength[0]); i = i + 1) begin
+                for(i = 0; i< \(chainLength[1]); i = i + 1) begin
                     serial_1[i] = \(tdo);
                     #2;
                 end 
@@ -307,6 +311,17 @@ class Testbench {
         endmodule
         """
     }
+
+    // func createTV(
+
+    //     vecbinFile: String,
+    //     outbinFile: String,
+    //     vectorCount: Int, 
+    //     vectorLength: Int,
+    //     outputLength: Int,
+    // ) -> String {
+
+    // }
     private static func createTasks (tms: String) -> String {
         return """
         task shiftIR;
@@ -354,4 +369,37 @@ class Testbench {
     """
     }
 
+    static func run(
+        bench: String,
+        output: String,
+        clean: Bool = true
+    ) throws -> Bool {
+        
+        try File.open(output, mode: .write) {
+            try $0.print(bench)
+        }
+
+        let aoutName = "\(output).a.out"
+        defer {
+            if clean {
+                let _ = "rm \(aoutName)".sh()
+            }
+        }
+        let iverilogResult =
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
+        
+      
+        if iverilogResult.terminationStatus != EX_OK {
+            fputs("An iverilog error has occurred: \n", stderr)
+            fputs(iverilogResult.output, stderr)
+            exit(Int32(iverilogResult.terminationStatus))
+        }
+        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
+
+        if vvpTask.terminationStatus != EX_OK {
+            throw "Failed to run vvp."
+        }
+
+        return vvpTask.output.contains("SUCCESS_STRING")
+    }
 }

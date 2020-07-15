@@ -113,6 +113,14 @@ class JTAGCreator {
                 selectSignals.intest,
                 Node.Identifier(selectSignals.intest)
             ),
+            Node.PortArg(
+                selectSignals.preloadChain_1,
+                Node.Identifier(selectSignals.preloadChain_1)
+            ),
+            Node.PortArg(
+                selectSignals.preloadChain_2,
+                Node.Identifier(selectSignals.preloadChain_2)
+            ),
             //  TDO signal that is connected to TDI of sub-modules.
             Node.PortArg(
                 jtagInfo.tdoSignal,
@@ -130,6 +138,14 @@ class JTAGCreator {
             Node.PortArg(
                 tdiSignals.mbist,
                 Node.Identifier(tdiSignals.mbist)
+            ),
+            Node.PortArg(
+                tdiSignals.chain_1,
+                Node.Identifier(tdiSignals.chain_1)
+            ),
+            Node.PortArg(
+                tdiSignals.chain_2,
+                Node.Identifier(tdiSignals.chain_2)
             )
         ]
 

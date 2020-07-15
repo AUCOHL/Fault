@@ -77,30 +77,34 @@ func cut(arguments: [String]) -> Int32 {
     let Generator =
         Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
 
-    // MARK: Parse
-    let ast = parse([file])[0]
-    let description = ast[dynamicMember: "description"]
-    var blackDefintions: [String:PythonObject] = [:]
-    var definitionOptional: PythonObject?
-    for definition in description.definitions {
-        let type = Python.type(definition).__name__
-        if type == "ModuleDef" {
-            let definitionName = String(describing: definition.name)
-            if blackboxes.contains(definitionName){
-                blackDefintions[definitionName] = definition
-            } else {
-                definitionOptional = definition
+    var isolatedOptional: PythonObject?
+    var isolatedName: String?
+    if let isolatedFile = blackbox.value {
+        let ast = parse([isolatedFile])[0]
+        let description = ast[dynamicMember: "description"]
+        for definition in description.definitions {
+            let type = Python.type(definition).__name__
+            if type == "ModuleDef" {
+                isolatedOptional = definition
+                isolatedName = String(describing: definition.name)
+                break
             }
         }
     }
 
+    var definitionOptional: PythonObject?
+    let ast = parse([file])[0]
+    let description = ast[dynamicMember: "description"]
+    for definition in description.definitions {
+        let type = Python.type(definition).__name__
+        if type == "ModuleDef" {
+            definitionOptional = definition
+            break
+        }
+    }
+    
     guard let definition = definitionOptional else {
         fputs("No module found.\n", stderr)
-        exit(EX_DATAERR)
-    }
-
-    if blackDefintions.count != blackboxes.count {
-        fputs("Missing defintions for blackboxes.\n", stderr)
         exit(EX_DATAERR)
     }
 
@@ -179,74 +183,77 @@ func cut(arguments: [String]) -> Int32 {
                     items.append(inputAssignment)
                     items.append(outputAssignment)
                     
-                } else if blackboxes.contains(instanceName) {
-                    include = false
+                } else if let blakcboxName = isolatedName {
+                    
+                    if instanceName == blakcboxName {
+                        include = false
 
-                    guard let blackboxDefinition = blackDefintions[instanceName] else {
-                        fputs("No module definition for \(instanceName)",stderr)
-                        exit(EX_DATAERR)
-                    }
-
-                    let (_, inputs, outputs) = try Port.extract(from: blackboxDefinition)
-                    let bbInputNames = inputs.map { $0.name }
-
-                    for hook in instance.portlist {
-                        let portName = String(describing: hook.portname)
-                        let hookType = Python.type(hook.argname).__name__
-
-                        var input = false
-                        if bbInputNames.contains(portName) {
-                            input = true
+                        guard let isolatedDefinition = isolatedOptional  else {
+                            fputs("No module definition for blackbox \(blakcboxName)",stderr)
+                            exit(EX_DATAERR)
                         }
 
-                        if hookType == "Concat" {
-                            let list = hook.argname.list
-                            for (i, element) in list.enumerated() {
+                        let (_, inputs, outputs) = try Port.extract(from: isolatedDefinition)
+                        let bbInputNames = inputs.map { $0.name }
+
+                        for hook in instance.portlist {
+                            let portName = String(describing: hook.portname)
+                            let hookType = Python.type(hook.argname).__name__
+
+                            var input = false
+                            if bbInputNames.contains(portName) {
+                                input = true
+                            }
+
+                            if hookType == "Concat" {
+                                let list = hook.argname.list
+                                for (i, element) in list.enumerated() {
+                                    var name = ""
+                                    var statement: PythonObject
+
+                                    if input {
+                                        name = "\\" + instanceName + ".\(portName)_\(i)"
+                                        statement = Node.Output(name)
+                                    }
+                                    else {
+                                        name =  instanceName + "\(portName)_\(i)"
+                                        statement = Node.Input(name)
+                                    }
+
+                                    let assignStatement = Node.Assign(
+                                        Node.Lvalue(Node.Identifier(name)),
+                                        Node.Rvalue(element)
+                                    )
+                                    items.append(assignStatement)
+                                    declarations.append(statement)
+                                    ports.append(Node.Port(name, Python.None, Python.None, Python.None))
+                                }
+                            } else {
+                                let argName = String(describing: hook.argname)
+                                if inputNames.contains(argName) || outputNames.contains(argName) {
+                                    continue
+                                }
                                 var name = ""
                                 var statement: PythonObject
 
                                 if input {
-                                    name = "\\" + instanceName + ".\(portName)_\(i)"
-                                    statement = Node.Output(name)
-                                }
-                                else {
-                                    name =  instanceName + "\(portName)_\(i)"
+                                    name = "\\" + instanceName + ".\(portName)"
+                                    statement = Node.Output(name) 
+                                
+                                } else {
+                                    name = instanceName + ".\(portName)"
                                     statement = Node.Input(name)
                                 }
 
-                                let assignStatement = Node.Assign(
-                                    Node.Lvalue(Node.Identifier(name)),
-                                    Node.Rvalue(element)
-                                )
-                                items.append(assignStatement)
                                 declarations.append(statement)
                                 ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                            }
-                        } else {
-                            let argName = String(describing: hook.argname)
-                            if inputNames.contains(argName) || outputNames.contains(argName) {
-                                continue
-                            }
-                            var name = ""
-                            var statement: PythonObject
-
-                            if input {
-                                name = "\\" + instanceName + ".\(portName)"
-                                statement = Node.Output(name) 
-                               
-                            } else {
-                                name = instanceName + ".\(portName)"
-                                statement = Node.Input(name)
-                            }
-
-                            declarations.append(statement)
-                            ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                            let assignStatement = Node.Assign(
-                                Node.Lvalue(Node.Identifier(name)),
-                                Node.Rvalue(hook.argname)
-                            )
-                            items.append(assignStatement)
-                        }  
+                                let assignStatement = Node.Assign(
+                                    Node.Lvalue(Node.Identifier(name)),
+                                    Node.Rvalue(hook.argname)
+                                )
+                                items.append(assignStatement)
+                            } 
+                        } 
                     }
                 }
             }

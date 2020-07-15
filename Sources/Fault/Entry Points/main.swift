@@ -20,6 +20,7 @@ let subcommands: OrderedDictionary =  [
     "compact": (func: compactTestVectors, desc: "test vector static compaction"),
     "tap": (func: jtagCreate, desc: "JTAG port"),
     "bench": (func: bench, desc: "verilog netlist to bench format conversion"),
+    "simulate": (func: simulate,  desc: "verilog netlist to bench format conversion")
 ]
 
 

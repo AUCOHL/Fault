@@ -23,13 +23,22 @@ struct Chain: Codable {
     var sout: String
     var shift: String
     var length: Int
+    var order: [ChainRegister]
     var kind: ScanChain.ChainKind
-
-    init(sin: String, sout: String, shift: String, length: Int, kind: ScanChain.ChainKind) {
+    
+    init(
+        sin: String,
+        sout: String,
+        shift: String,
+        length: Int,
+        order: [ChainRegister],
+        kind: ScanChain.ChainKind
+    ) {
         self.sin = sin
         self.sout = sout
         self.shift = shift
         self.length = length
+        self.order = order
         self.kind = kind
     }
 }

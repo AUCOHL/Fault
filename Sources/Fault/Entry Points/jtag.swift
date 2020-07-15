@@ -585,7 +585,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
-                chain: chains.last!,
+                chains: chains,
                 clock: clockName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
@@ -609,49 +609,47 @@ func jtagCreate(arguments: [String]) -> Int32{
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
+            // MARK: Test bench
+            if let tvFile = testvectors.value {
+                print("Generating testbench for test vectors...")
+                let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
+                let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
+                let testbecnh = (filePath.value ?? file) + ".tb.sv"
+                let verified = try Simulator.simulate(
+                    verifying: definitionName,
+                    in: output, // DEBUG
+                    with: model,
+                    ports: ports,
+                    inputs: inputs,
+                    ignoring: ignoredInputs,
+                    behavior: behavior,
+                    outputs: outputs,
+                    clock: clockName,
+                    reset: resetName,
+                    resetActive: resetActiveLow.value ? .low : .high,
+                    tms: tmsName,
+                    tdi: tdiName,
+                    tck: tckName,
+                    tdo: tdoName,
+                    trst: trstName,
+                    output: testbecnh,
+                    chains: chains, 
+                    vecbinFile: testvectors.value!,
+                    outbinFile: goldenOutput.value!,
+                    vectorCount: vectorCount,
+                    vectorLength: vectorLength,
+                    outputLength: outputLength,
+                    using: iverilogExecutable,
+                    with: vvpExecutable
+                )
+                print("Done.")
+                if (verified) {
+                    print("Test vectors verified successfully.")
+                } else {
+                    print("Test vector simulation failed.")
+                }  
+            }
         }
-            // // MARK: Test bench
-            // if let tvFile = testvectors.value {
-            //     print("Generating testbench for test vectors...")
-            //     let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
-            //     let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-            //     let testbecnh = (filePath.value ?? file) + ".tb.sv"
-            //     let verified = try Simulator.simulate(
-            //         verifying: definitionName,
-            //         in: output, // DEBUG
-            //         with: model,
-            //         ports: ports,
-            //         inputs: inputs,
-            //         ignoring: ignoredInputs,
-            //         behavior: behavior,
-            //         outputs: outputs,
-            //         clock: clockName,
-            //         reset: resetName,
-            //         resetActive: resetActiveLow.value ? .low : .high,
-            //         tms: tmsName,
-            //         tdi: tdiName,
-            //         tck: tckName,
-            //         tdo: tdoName,
-            //         trst: trstName,
-            //         output: testbecnh,
-            //         internalCount: internalCount, 
-            //         vecbinFile: testvectors.value!,
-            //         outbinFile: goldenOutput.value!,
-            //         vectorCount: vectorCount,
-            //         vectorLength: vectorLength,
-            //         outputLength: outputLength,
-            //         using: iverilogExecutable,
-            //         with: vvpExecutable
-            //     )
-            //     print("Done.")
-            //     if (verified) {
-            //         print("Test vectors verified successfully.")
-            //     } else {
-            //         print("Test vector simulation failed.")
-            //     }
-                
-         //  }
-       // }
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE

@@ -116,6 +116,8 @@
 `define MBIST           4'b1001
 `define BYPASS          4'b1111
 `define INTEST          4'b0100
+`define PRELOAD_CHAIN_1 4'b0011
+`define PRELOAD_CHAIN_2 4'b0110
 
 // Top module
 module tap_top(
@@ -139,14 +141,18 @@ module tap_top(
                 mbist_select_o,
                 debug_select_o,
                 intest_select_o,
-                
+                preload_chain_1_o,
+                preload_chain_2_o,
+
                 // TDO signal that is connected to TDI of sub-modules.
                 tdo_o, 
                 
                 // TDI signals from sub-modules
                 debug_tdi_i,     // from debug module
                 bs_chain_tdi_i,  // from Boundary Scan Chain
-                mbist_tdi_i    // from Mbist Chain
+                mbist_tdi_i,     // from Mbist Chain
+                chain_1_tdi_i,   // from internal chain_1
+                chain_2_tdi_i   // from internal chain_2
               );
 
 
@@ -170,6 +176,8 @@ output  sample_preload_select_o;
 output  mbist_select_o;
 output  debug_select_o;
 output  intest_select_o;
+output  preload_chain_1_o;
+output  preload_chain_2_o;
 
 // TDO signal that is connected to TDI of sub-modules.
 output  tdo_o;
@@ -178,6 +186,8 @@ output  tdo_o;
 input   debug_tdi_i;    // from debug module
 input   bs_chain_tdi_i; // from Boundary Scan Chain
 input   mbist_tdi_i;    // from Mbist Chain
+input   chain_1_tdi_i;  // from Internal Chain_1
+input   chain_2_tdi_i;  // from Internal Chain_2
 
 // Registers
 reg     test_logic_reset;
@@ -203,6 +213,8 @@ reg     mbist_select;
 reg     debug_select;
 reg     bypass_select;
 reg     intest_select;
+reg     preload_chain_1_select;
+reg     preload_chain_2_select;
 reg     tdo_pad_o;
 reg     tdo_padoe_o;
 reg     tms_q1, tms_q2, tms_q3, tms_q4;
@@ -219,6 +231,8 @@ assign sample_preload_select_o = sample_preload_select;
 assign mbist_select_o = mbist_select;
 assign debug_select_o = debug_select;
 assign intest_select_o = intest_select;
+assign preload_chain_1_o = preload_chain_1_select;
+assign preload_chain_2_o = preload_chain_2_select;
 
 always @ (posedge tck_pad_i)
 begin
@@ -589,7 +603,9 @@ begin
   mbist_select            = 1'b0;
   debug_select            = 1'b0;
   bypass_select           = 1'b0;
-  intest_select          = 1'b0;
+  intest_select           = 1'b0;
+  preload_chain_1_select  = 1'b0;
+  preload_chain_2_select  = 1'b0;
   case(latched_jtag_ir)    /* synthesis parallel_case */ 
     `EXTEST:            extest_select           = 1'b1;    // External test
     `SAMPLE_PRELOAD:    sample_preload_select   = 1'b1;    // Sample preload
@@ -597,7 +613,9 @@ begin
     `MBIST:             mbist_select            = 1'b1;    // Mbist test
     `DEBUG:             debug_select            = 1'b1;    // Debug
     `BYPASS:            bypass_select           = 1'b1;    // BYPASS
-    `INTEST:            intest_select          = 1'b1;    // Scan in
+    `INTEST:            intest_select           = 1'b1;    // Scan in
+    `PRELOAD_CHAIN_1:   preload_chain_1_select  = 1'b1;    // Preload Chain 1
+    `PRELOAD_CHAIN_2:   preload_chain_2_select  = 1'b1;    // Preload Chain 2
     default:            bypass_select           = 1'b1;    // BYPASS
   endcase
 end
@@ -610,7 +628,7 @@ end
 *                                                                                 *
 **********************************************************************************/
 always @ (shift_ir_neg or exit1_ir or instruction_tdo or latched_jtag_ir_neg or idcode_tdo or
-          debug_tdi_i or bs_chain_tdi_i or mbist_tdi_i or
+          debug_tdi_i or bs_chain_tdi_i or mbist_tdi_i or chain_1_tdi_i or chain_2_tdi_i or
           bypassed_tdo)
 begin
   if(shift_ir_neg)
@@ -623,7 +641,9 @@ begin
         `SAMPLE_PRELOAD:    tdo_pad_o = bs_chain_tdi_i;   // Sampling/Preloading
         `EXTEST:            tdo_pad_o = bs_chain_tdi_i;   // External test
         `MBIST:             tdo_pad_o = mbist_tdi_i;      // Mbist test
-        `INTEST:            tdo_pad_o = bs_chain_tdi_i;    // Intest
+        `INTEST:            tdo_pad_o = bs_chain_tdi_i;   // Intest
+        `PRELOAD_CHAIN_1:   tdo_pad_o = chain_1_tdi_i;    // Preload Chain 1
+        `PRELOAD_CHAIN_2:   tdo_pad_o = chain_2_tdi_i;    // Preload Chain 2
         default:            tdo_pad_o = bypassed_tdo;     // BYPASS instruction
       endcase
     end

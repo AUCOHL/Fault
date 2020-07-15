@@ -748,6 +748,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     sout: chain.sout,
                     shift: chain.shift,
                     length: chain.length,
+                    order: chain.order,
                     kind: chain.kind
                 )
             )

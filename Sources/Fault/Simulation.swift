@@ -100,8 +100,6 @@ class Simulator {
         let bench = """
         \(String.boilerplate)
 
-
-
         `include "\(cells)"
         `include "\(file)"
 
@@ -467,7 +465,7 @@ class Simulator {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        chain: Chain,
+        chains: [Chain],
         clock: String,
         reset: String,
         resetActive: Active = .low,
@@ -480,66 +478,7 @@ class Simulator {
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
-        var portWires = ""
-        var portHooks = ""
-        for (rawName, port) in ports {
-            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
-            portHooks += ".\(name) ( \(name) ) , "
-        }
-
-        let chainLength = chain.length
-        let ignored = [tck, trst, tdi, clock, tms, reset]
-
-        var inputInit = ""
-        var inputAssignment = ""
-        var sampleSerializable = ""
-        let outputBoundaryCells = outputs.map{ $0.width }.reduce(0, +) - 1
-        
-        for input in inputs {
-            let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
-            if input.name == reset {
-                inputInit += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
-            } else if input.name == tms {
-                inputInit += "        \(name) = 1 ;\n"
-            }
-            else {
-                inputInit += "        \(name) = 0 ;\n"
-                if (!ignored.contains(input.name)){
-                    let bits = Int.random(in: 0...input.width)
-                    let bitString = String(bits, radix: 2)
-                    let pad = input.width - bitString.count
-                    inputAssignment += "        \(name) = \(bits) ;\n"
-                    sampleSerializable += (String(repeating: "0", count: pad) + bitString).reversed()
-                }
-            }
-        }
-
-        var outputAssignment  = ""
-        for (index, output) in outputs.enumerated() {
-            if output.name != tdo {
-                for i in (0...output.width-1).reversed() {
-                    outputAssignment +=
-                        "        serializable[\(outputBoundaryCells - index - 1)] = \(output.name)[\(i)] ; \n" 
-                    sampleSerializable += "x"
-                }
-            }
-        }
-
-        var preloadSerializable = ""
-        for _ in 0..<chainLength {
-            preloadSerializable += "\(Int.random(in: 0...1))"
-        }
-
-        var clockCreator = ""
-        if !clock.isEmpty {
-            clockCreator = "always #1 \(clock) = ~\(clock);"
-        }
-        var resetToggler = ""
-        if !reset.isEmpty {
-            resetToggler = "\(reset) = ~\(reset);"
-        }
-
+        var success = true
         let tb = Testbench(
             ports: ports,
             inputs: inputs,
@@ -549,8 +488,10 @@ class Simulator {
             in: file,
             with: cells
         )
-        let bench = tb.createBoundary(
-            chainLength: chain.length,
+        let boundaryChain = chains.filter{ $0.kind == .boundary }[0]
+        let outputBoundaryCells = outputs.map{ $0.width }.reduce(0, +) - 1
+        let boundaryBench = tb.createBoundary(
+            chainLength: boundaryChain.length,
             outputBoundaryCount: outputBoundaryCells,
             inputs: inputs,
             outputs: outputs,
@@ -563,57 +504,29 @@ class Simulator {
             reset: reset,
             module: module
         )
-        // let bench = """
-        // \(String.boilerplate)
-        // `include "\(cells)"
-        // `include "\(file)"
-        // `include "Netlists/sram_1rw1r_32_256_8_sky130.v"
-
-        // module testbench;
-        // \(portWires)
-            
-        //     \(clockCreator)
-        //     always #1 \(tck) = ~\(tck);
-
-        //     \(module) uut(
-        //         \(portHooks.dropLast(2))
-        //     );
-
-        //     \(Testbench.createBoundary(
-        //         chainLength: chainLength,
-        //         sampleSerializable: sampleSerializable,
-        //         preloadSerializable: preloadSerializable,
-        //         inputInit: inputInit,
-        //         inputAssignment: inputAssignment,
-        //         outputAssignment: outputAssignment,
-        //         tdi: tdi,
-        //         tdo: tdo,
-        //         tms: tms,
-        //         trst: trst,
-        //         resetToggler: resetToggler
-        //     ))
-        // endmodule
-        // """
-        try File.open(output, mode: .write) {
-            try $0.print(bench)
+        success = try Testbench.run(bench: boundaryBench, output: "\(output)_1.sv")
+        if success {
+            print("Boundary Scan Chain verified successfuly.")
         }
 
-        let aoutName = "output.a.out"
-        let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
-        
-        if iverilogResult.terminationStatus != EX_OK {
-            fputs("An iverilog error has occurred: \n", stderr)
-            fputs(iverilogResult.output, stderr)
-            exit(Int32(iverilogResult.terminationStatus))
+        let internalChains = chains.filter { $0.kind != .boundary }
+        let internalBench = tb.createInternal(
+            chainLength: internalChains.map { $0.length },
+            tdi: tdi,
+            tdo: tdo,
+            tms: tms,
+            tck: tck,
+            trst: trst,
+            clock: clock,
+            reset: reset,
+            module: module
+        )
+        success = try Testbench.run(bench: internalBench, output: "\(output)_1.sv")
+        if success {
+            print("Internal Scan Chain verified successfuly.")
         }
-        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
-
-        if vvpTask.terminationStatus != EX_OK {
-            throw "Failed to run vvp."
-        }
-
-        return vvpTask.output.contains("SUCCESS_STRING")
+       
+        return success     
     }
 
     static func simulate(
@@ -634,7 +547,7 @@ class Simulator {
         tdo: String,
         trst: String,
         output: String,
-        internalCount: Int,
+        chains: [Chain],
         vecbinFile: String,
         outbinFile: String,
         vectorCount: Int, 
@@ -682,15 +595,32 @@ class Simulator {
             resetToggler = "\(reset) = ~\(reset);"
         }
         var testStatements = ""
-        for i in 0..<vectorCount {
+        for i in 0..<1 {  //vectorCount
             testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
         }
 
+        let boundaryOrder = chains.filter{ $0.kind == .boundary }[0]
+        var boundaryOutput = 0
+        var boundaryLength = 0
+        for element in boundaryOrder.order {
+            if element.kind != .output {
+                boundaryLength += element.width
+            } else {
+                boundaryOutput += element.width
+            }
+        }
+
+        let chainLength_1 =  chains.filter{ $0.kind != .boundary }[0].length
+        let chainLength_2 =  chains.filter{ $0.kind != .boundary }[1].length
+
+        print(boundaryLength)
+        print(chainLength_1)
+        print(chainLength_2)
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
-
+        `include "Netlists/sram_1rw1r_32_256_8_sky130.v"
         module testbench;
         \(portWires)
             
@@ -708,7 +638,9 @@ class Simulator {
             reg [\(outputLength - 1):0] gmOutput[0:\(vectorCount - 1)];
 
             wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] intest = 4'b 0100;
+            wire[3:0] samplePreload = 4'b 0001;
+            wire[3:0] preload_chain_1 = 4'b 0011;
+            wire[3:0] preload_chain_2 = 4'b 0110;
 
             initial begin
                 $dumpfile("dut.vcd"); // DEBUG
@@ -716,10 +648,10 @@ class Simulator {
         \(inputAssignment)
                 $readmemb("\(vecbinFile)", vectors);
                 $readmemb("\(outbinFile)", gmOutput);
-                #10;
+                #50;
                 \(resetToggler)
                 \(trst) = 1;        
-                #2;
+                #50;
         \(testStatements)
                 $display("SUCCESS_STRING");
                 $finish;
@@ -729,12 +661,13 @@ class Simulator {
                 input [\(vectorLength - 1):0] vector;
                 input [\(outputLength - 1):0] goldenOutput;
                 begin
-                    shiftIR(intest);
+                    // 1. Preload Boundary-Scan Chain
+                    shiftIR(samplePreload);
                     enterShiftDR();
 
-                    for (i = 0; i < \(vectorLength); i = i + 1) begin
-                        tdi = vector[i];
-                        if(i == \(vectorLength - 1)) begin
+                    for (i = 0; i < \(boundaryLength); i = i + 1) begin
+                        tdi = vector[\(vectorLength - boundaryLength) + i];
+                        if(i == \(boundaryLength - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
                         #2;
@@ -743,21 +676,128 @@ class Simulator {
                     #2;
                     \(tms) = 1; // select-DR
                     #2;
-                    \(tms) = 0; // capture-DR
+
+                    // 2. Preload Chain_1
+                    ShiftIRToSelectDR(preload_chain_1);
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                    for (i = 0; i < \(chainLength_1); i = i + 1) begin
+                        tdi = vector[\(vectorLength - boundaryLength - chainLength_1) + i];
+                        if(i == \(chainLength_1 - 1)) begin
+                            \(tms) = 1; // Exit-DR
+                        end
+                        #2;
+                    end
+
+                    \(tms) = 1; // update-DR
                     #2;
-                    \(tms) = 0; // shift-DR
+                    \(tms) = 1; // select-DR
                     #2;
-                    for (i = \(outputLength - 1); i >= 0; i = i - 1) begin
+
+                    // 3. Preload Chain_2
+                    ShiftIRToSelectDR(preload_chain_2);
+                    tms = 0;     // capture DR -- shift DR
+                    #4;
+                    for (i = 0; i < \(chainLength_2); i = i + 1) begin
+                        tdi = vector[\(vectorLength - boundaryLength - chainLength_1 - chainLength_2) + i];
+                        if(i == \(chainLength_2 - 1)) begin
+                            \(tms) = 1; // Exit-DR
+                        end
+                        #2;
+                    end
+
+                    \(tms) = 1; // update-DR
+                    #2;
+                    \(tms) = 1; // select-DR
+                    #2;
+
+                    // 4. Capture Response
+                    /* Pending adjusting internal scan-chain */
+
+                    // 5. Shift out Resonse
+
+                    //  a) Shift-out from Boundary Chain
+                    ShiftIRToSelectDR(samplePreload);
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                    for (i = 0; i< \(boundaryOutput);i = i + 1) begin
                         #2;
                         \(tdi) = 0;
                         scanInSerial[i] = \(tdo);
+                        if(i == \(boundaryOutput - 1)) begin
+                            \(tms) = 1; // Exit-DR
+                            #2;
+                        end
                     end
-                    exitDR();
+                    \(tms) = 1; // update-DR
+                    #2;
+                    \(tms) = 1; // select-DR
+                    #2;
 
-                    if(scanInSerial != goldenOutput) begin
+                    //  b) Shift-out from Internal Chain_1
+                    ShiftIRToSelectDR(preload_chain_1);
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                    for (i = 0; i < \(chainLength_1); i = i + 1) begin
+                        #2;
+                        \(tdi) = 0;
+                        scanInSerial[i + \(boundaryOutput)] = \(tdo);
+                        if(i == \(chainLength_1 - 1)) begin
+                            \(tms) = 1; // Exit-DR
+                            #2;
+                        end
+                    end
+                    \(tms) = 1; // update-DR
+                    #2;
+                    \(tms) = 1; // select-DR
+                    #2;
+
+                    // c) Shift-out from Internal Chain_2
+                    ShiftIRToSelectDR(preload_chain_2);
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #4;
+                    for (i = 0; i < \(chainLength_2); i = i + 1) begin
+                        #2;
+                        \(tdi) = 0;
+                        scanInSerial[i + \(boundaryOutput + chainLength_1)] = \(tdo);
+                        if(i == \(chainLength_2 - 1)) begin
+                            \(tms) = 1; // Exit-DR
+                            #2;
+                        end
+                    end
+                    \(tms) = 1; // update-DR
+                    #2;
+                    \(tms) = 1; // select-DR
+                    #2;
+
+                    if(scanInSerial !== goldenOutput) begin
                         $error("SIMULATING_TV_FAILED");
                         $finish;
                     end
+                end
+            endtask
+
+            task ShiftIRToSelectDR;
+                input[3:0] instruction;
+                integer i;
+                begin
+                    \(tms) = 1; // select-IR
+                    #2;
+                    \(tms) = 0; // capture-IR
+                    #2;
+                    \(tms) = 0; // shift-IR
+                    #2;
+                    for (i = 0; i < 4; i = i + 1) begin
+                        \(tdi) = instruction[i];
+                        if(i == 3) begin
+                            \(tms) = 1;     // exit-ir
+                        end
+                        #2;
+                    end 
+                    \(tms) = 1;     // update-ir 
+                    #2;
+                    \(tms) =1;     // select-DR
+                    #2;
                 end
             endtask
 
