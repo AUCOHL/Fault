@@ -22,6 +22,7 @@ struct Chain: Codable {
     var sin: String
     var sout: String
     var shift: String
+    var capture: String
     var length: Int
     var order: [ChainRegister]
     var kind: ScanChain.ChainKind
@@ -30,6 +31,7 @@ struct Chain: Codable {
         sin: String,
         sout: String,
         shift: String,
+        capture: String = "",
         length: Int,
         order: [ChainRegister],
         kind: ScanChain.ChainKind
@@ -37,6 +39,7 @@ struct Chain: Codable {
         self.sin = sin
         self.sout = sout
         self.shift = shift
+        self.capture = capture
         self.length = length
         self.order = order
         self.kind = kind

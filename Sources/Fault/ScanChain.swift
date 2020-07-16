@@ -318,6 +318,9 @@ class ScanChain {
     var shift: String
     var shiftIdentifier: PythonObject
 
+    var capture: String
+    var captureIdentifier: PythonObject
+
     var clock: String
     var clockIdentifier: PythonObject
 
@@ -333,6 +336,7 @@ class ScanChain {
         sin:String,
         sout: String,
         shift: String,
+        capture: String = "capture", 
         clock: String,
         kind: ChainKind,
         using Node: PythonObject
@@ -348,6 +352,9 @@ class ScanChain {
 
         self.clock = clock
         self.clockIdentifier = Node.Identifier(clock)
+
+        self.capture = capture
+        self.captureIdentifier = Node.Identifier(capture)
 
         self.kind = kind
         self.Node = Node

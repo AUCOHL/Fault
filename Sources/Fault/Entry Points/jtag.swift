@@ -89,6 +89,7 @@ func jtagCreate(arguments: [String]) -> Int32{
         ("clockDR", "boundary scan chain clockDR"),
         ("update", "boundary scan chain update enable"),
         ("mode", "boundary scan cell mode select"),
+        ("capture", "Internal Chains capture signal"),
         ("tms", "JTAG test mode select"),
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
@@ -244,6 +245,8 @@ func jtagCreate(arguments: [String]) -> Int32{
         ?? names["tck"]!.default
     let trstName = names["trst"]!.option.value 
         ?? names["trst"]!.default
+    let captureName = names["capture"]!.option.value 
+        ?? names["capture"]!.default
     
     let clockName = clockOpt.value ?? ""
     let resetName = resetOpt.value ?? ""
@@ -264,6 +267,7 @@ func jtagCreate(arguments: [String]) -> Int32{
             chainPorts.append(chain.sin)
             chainPorts.append(chain.sout)
             chainPorts.append(chain.shift)    
+            chainPorts.append(chain.capture)
         }
         chainPorts.append(tckName)
         chainPorts.append(updateName)
@@ -384,6 +388,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 Node.Wire(chain.sin),
                 Node.Wire(chain.sout),
                 Node.Wire(chain.shift), 
+                Node.Wire(chain.capture)
             ])
         }
         statements.append(jtagModule.tapModule)
@@ -415,12 +420,46 @@ func jtagCreate(arguments: [String]) -> Int32{
                     Node.Identifier(jtagInfo.tapStates.shift),
                     Node.Identifier(jtagInfo.selectSignals.preloadChain_1)
                 )
+                // Capture Internal Scan-chains assignment
+                let and = Node.And(
+                    Node.Or(
+                        Node.Identifier(jtagInfo.tapStates.shift),
+                        Node.Identifier(jtagInfo.tapStates.capture)
+                    ),
+                    Node.Identifier(jtagInfo.selectSignals.preloadChain_1)
+                )
+                let captureChain_1 = Node.Cond(
+                    and,
+                    Node.IntConst("1'b1"),
+                    Node.IntConst("1'b0")
+                )
+                statements.append(Node.Assign(
+                    Node.Lvalue(Node.Identifier(chain.capture)),
+                    Node.Rvalue(captureChain_1)
+                ))
             } else {
                 tdiIdentifier = Node.Identifier(jtagInfo.tdiSignals.chain_2)
                 shiftIdentifier = Node.And(
                     Node.Identifier(jtagInfo.tapStates.shift),
                     Node.Identifier(jtagInfo.selectSignals.preloadChain_2)
                 )
+                // Capture Internal Scan-chains assignment
+                let and = Node.And(
+                    Node.Or(
+                        Node.Identifier(jtagInfo.tapStates.shift),
+                        Node.Identifier(jtagInfo.tapStates.capture)
+                    ),
+                    Node.Identifier(jtagInfo.selectSignals.preloadChain_2)
+                )
+                let captureChain_2 = Node.Cond(
+                    and,
+                    Node.IntConst("1'b1"),
+                    Node.IntConst("1'b0")
+                )
+                statements.append(Node.Assign(
+                    Node.Lvalue(Node.Identifier(chain.capture)),
+                    Node.Rvalue(captureChain_2)
+                ))
             }
             // sout and tdi signals assignment
             statements.append(Node.Assign(
@@ -433,10 +472,6 @@ func jtagCreate(arguments: [String]) -> Int32{
             ))
         }
 
-        statements.append(Node.Assign(
-            Node.Rvalue(Node.Identifier(updateName)),
-            Node.Lvalue(Node.Identifier(jtagInfo.tapStates.update))
-        ))
         // TDO tri-state enable assignment
         let ternary = Node.Cond(
             Node.Identifier(jtagInfo.pads.tdoEn),
@@ -482,6 +517,19 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Rvalue(clockCond)
         )
         statements.append(clockDRAssignment)
+        
+        // Update-DR Assignment
+        let updateOr = Node.Or(
+            Node.And(Node.Identifier(jtagInfo.selectSignals.samplePreload),
+            Node.Identifier(jtagInfo.tapStates.update)),
+            Node.And( Node.Identifier(jtagInfo.selectSignals.intest),
+            Node.Identifier(jtagInfo.tapStates.update))
+        )
+        let updateAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(updateName)),
+            Node.Rvalue(updateOr)
+        )
+        statements.append(updateAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,

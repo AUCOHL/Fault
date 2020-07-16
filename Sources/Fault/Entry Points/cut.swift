@@ -208,50 +208,60 @@ func cut(arguments: [String]) -> Int32 {
                             if hookType == "Concat" {
                                 let list = hook.argname.list
                                 for (i, element) in list.enumerated() {
-                                    var name = ""
                                     var statement: PythonObject
+                                    let outputName = "\\" + instanceName + "_\(portName)_\(i)" + ".q"
+                                    let inputName = instanceName + "_\(portName)_\(i)"
 
-                                    if input {
-                                        name = "\\" + instanceName + ".\(portName)_\(i)"
-                                        statement = Node.Output(name)
-                                    }
-                                    else {
-                                        name =  instanceName + "\(portName)_\(i)"
-                                        statement = Node.Input(name)
-                                    }
+                                    let inputIdentifier = Node.Identifier(inputName)
+                                    let outputIdentifier = Node.Identifier(outputName)
+                                    
+                                    ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
+                                    ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
 
-                                    let assignStatement = Node.Assign(
-                                        Node.Lvalue(Node.Identifier(name)),
+                                    declarations.append(Node.Input(inputName))
+                                    declarations.append(Node.Output(outputName))
+
+                                    let inputAssignment = Node.Assign(
+                                        Node.Lvalue(element),
+                                        Node.Rvalue(inputIdentifier)
+                                    )
+
+                                    let outputAssignment = Node.Assign(
+                                        Node.Lvalue(outputIdentifier),
                                         Node.Rvalue(element)
                                     )
-                                    items.append(assignStatement)
-                                    declarations.append(statement)
-                                    ports.append(Node.Port(name, Python.None, Python.None, Python.None))
+                                    items.append(inputAssignment)
+                                    items.append(outputAssignment)
                                 }
                             } else {
                                 let argName = String(describing: hook.argname)
-                                if inputNames.contains(argName) || outputNames.contains(argName) {
+                                if inputNames.contains(argName) {
                                     continue
                                 }
-                                var name = ""
-                                var statement: PythonObject
+                                 var statement: PythonObject
+                                    let outputName = "\\" + instanceName + "_\(portName)" + ".q"
+                                    let inputName = instanceName + "_\(portName)"
 
-                                if input {
-                                    name = "\\" + instanceName + ".\(portName)"
-                                    statement = Node.Output(name) 
-                                
-                                } else {
-                                    name = instanceName + ".\(portName)"
-                                    statement = Node.Input(name)
-                                }
+                                    let inputIdentifier = Node.Identifier(inputName)
+                                    let outputIdentifier = Node.Identifier(outputName)
+                                    
+                                    ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
+                                    ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
 
-                                declarations.append(statement)
-                                ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                                let assignStatement = Node.Assign(
-                                    Node.Lvalue(Node.Identifier(name)),
-                                    Node.Rvalue(hook.argname)
-                                )
-                                items.append(assignStatement)
+                                    declarations.append(Node.Input(inputName))
+                                    declarations.append(Node.Output(outputName))
+
+                                    let inputAssignment = Node.Assign(
+                                        Node.Lvalue(hook.argname),
+                                        Node.Rvalue(inputIdentifier)
+                                    )
+
+                                    let outputAssignment = Node.Assign(
+                                        Node.Lvalue(outputIdentifier),
+                                        Node.Rvalue(hook.argname)
+                                    )
+                                    items.append(inputAssignment)
+                                    items.append(outputAssignment)
                             } 
                         } 
                     }

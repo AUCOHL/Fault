@@ -419,6 +419,9 @@ class Simulator {
                 \(clockDR) = 1;
                 \(update) = 1;
                 \(mode) = 0;
+                capture_1 = 1;  // Internal chains capture signals
+                capture_2 = 1;
+
                 for (i = 0; i < \(chainLength); i = i + 1) begin
                     \(sin) = serializable[i];
                     #2;

@@ -71,14 +71,14 @@ func assemble(arguments: [String]) -> Int32 {
 
     let (_, chains) = ChainMetadata.extract(file: netlist)
     let order = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .output}
-
     let inputOrder = tvinfo.inputs
     var inputMap: [String: Int] = [:]
 
     for (i, input) in inputOrder.enumerated() {
         inputMap[input.name] = i
+        print(input.name ,": ", i)
     }
-
+    
     func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
         var padded = String(number, radix: radix)
         let length = padded.count
@@ -96,9 +96,13 @@ func assemble(arguments: [String]) -> Int32 {
     for tvcPair in tvinfo.coverageList {
         var binaryString = ""
         for element in order {
+            print(element.name, " ", inputMap[element.name])
             var value: BigUInt = 0
             if let locus = inputMap[element.name] {
                 value = tvcPair.vector[locus]
+            } else {
+                print("Chain register \(element.name) not found in the TVs.")
+                return EX_DATAERR
             }
             binaryString += pad(value, digits: element.width, radix: 2)
         } 

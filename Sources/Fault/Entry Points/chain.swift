@@ -7,7 +7,6 @@ import Defile
     - Add inverter to tck in case of negedge triggered
     - BB I/O ports
     - Fix clock sources statement 2
-    - clock mux needs to get added to every flip-flop / not if we don't work with the CTS
     - insert isolating FFs check which chain are you choosing
 */
 
@@ -108,6 +107,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         ("shift", "boundary scan cell shift"),
         ("clockDR", "boundary scan cell clock DR"),
         ("update", "boundary scan cell update"),
+        ("capture", "Internal Scan-chain capture signal"),
         ("tck", "test clock")
     ] {
         let option = StringOption(
@@ -257,6 +257,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let clockDRName = names["clockDR"]!.option.value ?? names["clockDR"]!.default
         let updateName = names["update"]!.option.value ?? names["update"]!.default
         
+        let captureName = names["capture"]!.option.value ?? names["capture"]!.default
+
         let resetName = resetOpt.value ?? defaultBoundaryReset
         let clockName = clockOpt.value ?? ""
 
@@ -280,6 +282,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         sin: "\(inputName)_\(i)",
                         sout: "\(outputName)_\(i)",
                         shift: "\(testingName)_\(i)",
+                        capture: "\(captureName)_\(i)",
                         clock: "__clk_source_\(i)__",
                         kind: (i==1) ? .posedge : .negedge,
                         using: Node
@@ -308,10 +311,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             ports.append(Node.Port(chain.sin, Python.None, Python.None, Python.None))
             ports.append(Node.Port(chain.shift, Python.None, Python.None, Python.None))
             ports.append(Node.Port(chain.sout, Python.None, Python.None, Python.None))
+            ports.append(Node.Port(chain.capture, Python.None, Python.None, Python.None))
 
             statements.append(Node.Input(chain.sin))
             statements.append(Node.Input(chain.shift))
             statements.append(Node.Output(chain.sout))
+            statements.append(Node.Input(chain.capture))
+
         }
         definition.portlist.ports = Python.tuple(ports)
         statements.extend(Python.list(definition.items))
@@ -371,6 +377,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         )
                        for hook in instance.portlist {
                             let hookType = Python.type(hook.argname).__name__
+                            let instanceName = String(describing: instance.module)
                             if hookType == "Concat" {
                                 var list: [PythonObject] = []
                                 let input = inputNames.contains(String(describing: hook.portname))
@@ -383,6 +390,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     statements.append(Node.Wire(outName))
 
                                     var cell: PythonObject
+                                    var name: String
                                     if input {
                                         cell = scCreator.create(
                                             din: "\(element.name)",
@@ -401,7 +409,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     statements.append(cell)
                                     list.append(Node.Identifier(outName))
                                     scanChains[0].add(
-                                        name: String(describing: instance.name),
+                                        // Preserve same name as in the cut Netlist
+                                        name: instanceName + "_\(hook.portname)_\(i)",  
                                         kind: .dff
                                     ) 
                                 }
@@ -422,7 +431,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 hook.argname = Node.Identifier(outName)
                                 scanChains[0].previousOutput = Node.Identifier(outName)
                                 scanChains[0].add(
-                                    name: String(describing: instance.name),
+                                    name: instanceName + "_\(hook.portname)",
                                     kind: .dff
                                 ) 
                             }
@@ -449,12 +458,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     if String(describing: instance.module) == invertedClock {
                         for hook in instance.portlist {
                             if String(describing: hook.argname) == clockName {
-                                let ternary = Node.Cond(
-                                    scanChains[1].shiftIdentifier,
-                                    Node.Unot(Node.Identifier(tckName)),
-                                    Node.Identifier(clockName)
-                                )
-                                hook.argname = ternary
+                                // let ternary = Node.Cond(
+                                //     scanChains[1].shiftIdentifier,
+                                //     Node.Unot(Node.Identifier(tckName)),
+                                //     Node.Identifier(clockName)
+                                // )
+                                hook.argname = scanChains[1].clockIdentifier
                             }
                         }
                     }
@@ -468,14 +477,36 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 Node.Rvalue(chain.previousOutput)
             )
             statements.append(finalAssignment)
-            let clockCond = Node.Cond(
-                chain.shiftIdentifier,
-                Node.Identifier(tckName),
-                Node.Identifier(clockName)
-            )
+            var clockCond: PythonObject
+            var clockGate: PythonObject
+            if chain.kind == .posedge {
+                clockCond = Node.Cond(
+                    chain.shiftIdentifier,
+                    Node.Identifier(tckName),
+                    Node.Identifier(clockName)
+                )
+                // clock gate
+                clockGate = Node.And(
+                    Node.Identifier(chain.capture),
+                    clockCond
+                )
+            } else {
+                clockCond = Node.Cond(
+                    chain.shiftIdentifier,
+                    Node.Unot(Node.Identifier(tckName)),
+                    Node.Identifier(clockName)
+                )
+                // clock gate
+                clockGate = Node.And(
+                    Node.Identifier(chain.capture),
+                    clockCond
+                )
+            }
+           
+           
             let clkSource = Node.Assign(
                 Node.Lvalue(chain.clockIdentifier),
-                Node.Rvalue(clockCond)
+                Node.Rvalue(clockGate)
             )
             statements.append(Node.Wire(chain.clock))
             statements.append(clkSource)
@@ -535,6 +566,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 statements.append(Node.Input(chain.sin))
                 statements.append(Node.Input(chain.shift))
                 statements.append(Node.Output(chain.sout))
+                if chain.capture != "capture" { // if not BS chain
+                    statements.append(Node.Input(chain.capture))
+                }
             }
 
             if let clock = clockOpt.value {
@@ -638,6 +672,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 portArguments.append(Node.PortArg(
                     chain.shift,
                     chain.shiftIdentifier
+                ))
+                portArguments.append(Node.PortArg(
+                    chain.capture,
+                    chain.captureIdentifier
                 ))
                 portArguments.append(Node.PortArg(
                     chain.sout,
@@ -747,6 +785,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     sin: chain.sin,
                     sout: chain.sout,
                     shift: chain.shift,
+                    capture: chain.capture,
                     length: chain.length,
                     order: chain.order,
                     kind: chain.kind
@@ -814,6 +853,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             let (ports, inputs, outputs) = try Port.extract(from: definition)
             for (i, chain) in scanChains.enumerated() {
+                print(chain.length)
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
                     in: output, 
