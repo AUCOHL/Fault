@@ -376,4 +376,15 @@ class ScanChain {
         )
         self.length += width
     }
+
+    func order (
+        start: Int
+    ) -> Int {
+        var count: Int = start
+        for (i, _) in self.order.enumerated() {
+            self.order[i].ordinal = count
+            count += 1
+        }
+        return count
+    }
 }

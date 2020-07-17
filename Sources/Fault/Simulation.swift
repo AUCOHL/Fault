@@ -66,14 +66,22 @@ class Simulator {
         fmtString = String(fmtString.dropLast(1))
         inputList = String(inputList.dropLast(2))
 
-        var count = outputs.count - 1
+        var outputCount = 0 
         var outputComparison = ""
         var outputAssignment = ""
         for output in outputs {
             let name = (output.name.hasPrefix("\\")) ? output.name : "\\\(output.name)"
             outputComparison += " ( \(name) != \(name).gm ) || "
-            outputAssignment += "   assign goldenOutput[\(count)] = \(name).gm ; \n"
-            count -= 1
+            if output.width > 1 {
+                for i in 0..<output.width {
+                    outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(output.name)[\(i)] ; \n"
+                    outputCount += 1
+                }
+            }
+            else {
+                outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(name) ; \n"
+                outputCount += 1
+            }
         }
         outputComparison = String(outputComparison.dropLast(3))
 
@@ -115,7 +123,7 @@ class Simulator {
             );
            
             \(goldenOutput ?
-            "wire [\(outputs.count - 1):0] goldenOutput; \n \(outputAssignment)" : "")
+            "wire [\(outputCount - 1):0] goldenOutput; \n \(outputAssignment)" : "")
 
             wire difference ;
             assign difference = (\(outputComparison));
@@ -275,7 +283,7 @@ class Simulator {
                                 stuckAt: 1,
                                 delayFault: false,
                                 cleanUp: !sampleRun,
-                                goldenOutput: false,
+                                goldenOutput: true,
                                 clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,

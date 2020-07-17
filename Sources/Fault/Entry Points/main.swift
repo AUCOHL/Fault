@@ -428,7 +428,7 @@ func main(arguments: [String]) -> Int32 {
                 with: vvpExecutable
             )
             coverage = result.coverage
-            let tvInfo = TVInfo(inputs: inputsMinusIgnored,
+            let tvInfo = TVInfo(inputs: inputsMinusIgnored + outputs,
                 coverageList: result.coverageList)
             data = try encoder.encode(tvInfo)
         }

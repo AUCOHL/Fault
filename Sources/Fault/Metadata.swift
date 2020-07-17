@@ -6,14 +6,16 @@ struct ChainRegister: Codable {
         case input
         case output
         case dff
+        case bypass
     }
     var name: String
     var kind: Kind
     var width: Int
-
-    init(name: String, kind: Kind, width: Int = 1) {
+    var ordinal: Int
+    init(name: String, kind: Kind, ordinal: Int = 0, width: Int = 1) {
         self.name = name
         self.kind = kind
+        self.ordinal = ordinal
         self.width = width
     }
 }

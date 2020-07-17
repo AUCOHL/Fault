@@ -3,13 +3,6 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-/*
-    - Add inverter to tck in case of negedge triggered
-    - BB I/O ports
-    - Fix clock sources statement 2
-    - insert isolating FFs check which chain are you choosing
-*/
-
 func scanChainCreate(arguments: [String]) -> Int32 {
     let env = ProcessInfo.processInfo.environment
     let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
@@ -244,7 +237,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let scanStructure = scanOpt.value ?? .one
     var scanChains: [ScanChain] = []
     var bsChain: ScanChain? 
-
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
 
@@ -325,12 +317,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let partialChain = scanStructure == .one
         instanceLoop: for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
-
             // Process gates
             if type == "InstanceList" {
                 let instance = itemDeclaration.instances[0]
-                if String(describing: instance.module).starts(with: dffName) {
-
+                let instanceName = String(describing: instance.module)
+                if instanceName.starts(with: dffName) {
                     var chainIndex = 0
                     for hook in instance.portlist {
                         if hook.portname == "CLK" {
@@ -363,10 +354,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     )
                 } else if let name = isolatedName {
                     // MARK: Isolating hard blocks
-                   if String(describing: instance.module) == name {
+                   if instanceName == name {
                        print("Chaining hard module...")
                        let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
-                       let inputNames = inputs.map { $0.name }
+                       let isolatedInputs = inputs.map { $0.name }
+
                        let scCreator = scanCellCreator(
                             name: "ScanCell",
                             clock: scanChains[0].clock,
@@ -378,16 +370,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                        for hook in instance.portlist {
                             let hookType = Python.type(hook.argname).__name__
                             let instanceName = String(describing: instance.module)
+                            let input = isolatedInputs.contains(String(describing: hook.portname))
+
                             if hookType == "Concat" {
                                 var list: [PythonObject] = []
-                                let input = inputNames.contains(String(describing: hook.portname))
                                 for (i, element) in  hook.argname.list.enumerated() {
                                     if [clockName, resetName].contains("\(element.name)") {
                                         continue
                                     }
 
                                     let outName = "__\(hook.portname)_\(i)__"
-                                    statements.append(Node.Wire(outName))
 
                                     var cell: PythonObject
                                     var name: String
@@ -407,11 +399,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                         scanChains[0].previousOutput = Node.Identifier("\(element.name)")
                                     }
                                     statements.append(cell)
+                                    statements.append(Node.Wire(outName))
+
                                     list.append(Node.Identifier(outName))
                                     scanChains[0].add(
                                         // Preserve same name as in the cut Netlist
                                         name: instanceName + "_\(hook.portname)_\(i)",  
-                                        kind: .dff
+                                        kind: (input) ? .bypass: .dff
                                     ) 
                                 }
                                 hook.argname.list = Python.tuple(list)
@@ -432,10 +426,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 scanChains[0].previousOutput = Node.Identifier(outName)
                                 scanChains[0].add(
                                     name: instanceName + "_\(hook.portname)",
-                                    kind: .dff
+                                    kind: (input) ? .bypass: .dff
                                 ) 
                             }
-                       }
+                        }
                         let scLocation = output + ".sc_cell.v"
 
                         try File.open(scLocation, mode: .write) {
@@ -455,14 +449,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         continue
                     }
 
-                    if String(describing: instance.module) == invertedClock {
+                    if instanceName == invertedClock {
                         for hook in instance.portlist {
                             if String(describing: hook.argname) == clockName {
-                                // let ternary = Node.Cond(
-                                //     scanChains[1].shiftIdentifier,
-                                //     Node.Unot(Node.Identifier(tckName)),
-                                //     Node.Identifier(clockName)
-                                // )
                                 hook.argname = scanChains[1].clockIdentifier
                             }
                         }
@@ -777,7 +766,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             return counter
         }()
-        
+
+        var start = scanChains.last!.order(start: 0)
+        start = scanChains[0].order(start: start)
+        start = scanChains[1].order(start: start)
+
         var chainCodable: [Chain] = []
         for chain in scanChains {
             chainCodable.append(
