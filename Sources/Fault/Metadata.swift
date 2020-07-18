@@ -6,7 +6,8 @@ struct ChainRegister: Codable {
         case input
         case output
         case dff
-        case bypass
+        case bypassInput // bypass when loading the TV (loaded with zeros)
+        case bypassOutput // bypass when shifting out the response ()
     }
     var name: String
     var kind: Kind

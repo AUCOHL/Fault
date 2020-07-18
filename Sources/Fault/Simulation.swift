@@ -732,13 +732,12 @@ class Simulator {
                     \(tms) = 0;     // capture DR -- shift DR
                     #4;
                     for (i = 0; i< \(boundaryOutput);i = i + 1) begin
-                        #2;
                         \(tdi) = 0;
-                        scanInSerial[i] = \(tdo);
+                        scanInSerial[\(outputLength - 1 - boundaryOutput - 1) + i] = \(tdo);
                         if(i == \(boundaryOutput - 1)) begin
                             \(tms) = 1; // Exit-DR
-                            #2;
                         end
+                        #2;
                     end
                     \(tms) = 1; // update-DR
                     #2;
@@ -750,13 +749,12 @@ class Simulator {
                     \(tms) = 0;     // capture DR -- shift DR
                     #4;
                     for (i = 0; i < \(chainLength_1); i = i + 1) begin
-                        #2;
                         \(tdi) = 0;
-                        scanInSerial[i + \(boundaryOutput)] = \(tdo);
+                        scanInSerial[\(outputLength - 1 - boundaryOutput - chainLength_1 - 1) + i] = \(tdo);
                         if(i == \(chainLength_1 - 1)) begin
                             \(tms) = 1; // Exit-DR
-                            #2;
                         end
+                        #2;
                     end
                     \(tms) = 1; // update-DR
                     #2;
@@ -768,13 +766,12 @@ class Simulator {
                     \(tms) = 0;     // capture DR -- shift DR
                     #4;
                     for (i = 0; i < \(chainLength_2); i = i + 1) begin
-                        #2;
                         \(tdi) = 0;
-                        scanInSerial[i + \(boundaryOutput + chainLength_1)] = \(tdo);
+                        scanInSerial[\(outputLength - 1 - boundaryOutput - chainLength_1 - chainLength_2 - 1) + i] = \(tdo);
                         if(i == \(chainLength_2 - 1)) begin
                             \(tms) = 1; // Exit-DR
-                            #2;
                         end
+                        #2;
                     end
                     \(tms) = 1; // update-DR
                     #2;

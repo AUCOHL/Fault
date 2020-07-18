@@ -70,20 +70,20 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     let (_, chains) = ChainMetadata.extract(file: netlist)
-    let order = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .output}
+    let order = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .output }
+    let orderOutput = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .input }
+
     let inputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
     let outputOrder = tvinfo.inputs.filter{ $0.polarity != .input }
 
     var inputMap: [String: Int] = [:]
+    var outputMap: [String: Int] = [:]
 
-    let orderSorted = order.sorted(by: { 
-        $0.ordinal < $1.ordinal
-    })
-    for output in outputOrder {
-        print(output.name, "  ", output.ordinal)
-    }
+    let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
+    let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
+
     // Check input order 
-    let chainOrder = orderSorted.filter{ $0.kind != .bypass }
+    let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
     if chainOrder.count != inputOrder.count {
         print("[Error]: Ordinal mismatch between TV and scan-chains.")
         return EX_DATAERR
@@ -95,6 +95,15 @@ func assemble(arguments: [String]) -> Int32 {
             print("[Error]: Ordinal mismatch between TV and scan-chains.")
             return EX_DATAERR
         }
+    }
+    
+    var outputLength: Int = 0 
+    for (i, output) in outputSorted.enumerated() {
+        outputMap[output.name] = i
+        if output.kind == .bypassOutput {
+            print("Bypassing \(outputSorted[i].name)")
+        } 
+        outputLength += output.width
     }
 
     func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
@@ -118,7 +127,7 @@ func assemble(arguments: [String]) -> Int32 {
             if let locus = inputMap[element.name] {
                 value = tvcPair.vector[locus]
             } else {
-                if element.kind == .bypass {
+                if element.kind == .bypassInput {
                     value = 0 
                 } else {
                     print("Chain register \(element.name) not found in the TVs.")
@@ -127,14 +136,33 @@ func assemble(arguments: [String]) -> Int32 {
             }
             binaryString += pad(value, digits: element.width, radix: 2)
         } 
+        var pointer = 0
+        var outputBinary = ""
+        let binary = tvcPair.goldenOutput.reversed()
+        print(binary)
+        for element in outputSorted {
+            var value = ""
+            if let locus = outputMap[element.name] {   
+                if element.kind == .bypassOutput {
+                    print("Padding output with zeros")
+                    value = pad(0, digits: element.width, radix: 2) 
+                } else {
+                    let start = binary.index(binary.startIndex, offsetBy: pointer)
+                    let end = binary.index(start, offsetBy: element.width)
+                    value = String(binary[start..<end])
+                    pointer += element.width
+                }  
+                outputBinary += value
+            } else {
+            }
+        }
+
         binFileVec += binaryString + "\n"
-        binFileOut += tvcPair.goldenOutput + " \n"
+        binFileOut += outputBinary + " \n"
     }
 
     let vectorCount = tvinfo.coverageList.count
     let vectorLength = order.map{ $0.width }.reduce(0, +)
-    let outputLength =
-        (vectorCount != 0) ? tvinfo.coverageList[0].goldenOutput.count : 0 
 
     let vecMetadata = binMetadata(count: vectorCount, length: vectorLength)
     let outMetadata = binMetadata(count: vectorCount, length: outputLength)
@@ -149,10 +177,12 @@ func assemble(arguments: [String]) -> Int32 {
     }
     do {
         try File.open(vectorOutput, mode: .write) {
+            try $0.print(String.boilerplate)
             try $0.print("/* FAULT METADATA: '\(vecMetadataString)' END FAULT METADATA */")
             try $0.print(binFileVec, terminator: "")
         }  
         try File.open(goldenOutput, mode: .write) {
+            try $0.print(String.boilerplate)
             try $0.print("/* FAULT METADATA: '\(outMetadataString)' END FAULT METADATA */")
             try $0.print(binFileOut, terminator: "")
         } 

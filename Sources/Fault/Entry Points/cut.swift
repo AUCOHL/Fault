@@ -32,6 +32,13 @@ func cut(arguments: [String]) -> Int32 {
     )
     cli.addOptions(blackbox)
 
+    let ignored = StringOption(
+        shortFlag: "i",
+        longFlag: "ignoring",
+        helpMessage: "Hard module inputs to ignore when cutting seperated by commas. (Defautl: none)"
+    )
+    cli.addOptions(ignored)
+
     let filePath = StringOption(
         shortFlag: "o",
         longFlag: "output",
@@ -95,6 +102,7 @@ func cut(arguments: [String]) -> Int32 {
     var definitionOptional: PythonObject?
     let ast = parse([file])[0]
     let description = ast[dynamicMember: "description"]
+
     for definition in description.definitions {
         let type = Python.type(definition).__name__
         if type == "ModuleDef" {
@@ -107,6 +115,9 @@ func cut(arguments: [String]) -> Int32 {
         fputs("No module found.\n", stderr)
         exit(EX_DATAERR)
     }
+
+    let hardIgnoredInputs: Set<String>
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition) 
@@ -193,7 +204,7 @@ func cut(arguments: [String]) -> Int32 {
                             exit(EX_DATAERR)
                         }
 
-                        let (_, inputs, outputs) = try Port.extract(from: isolatedDefinition)
+                        let (_, inputs, _) = try Port.extract(from: isolatedDefinition)
                         let bbInputNames = inputs.map { $0.name }
 
                         for hook in instance.portlist {
@@ -226,9 +237,12 @@ func cut(arguments: [String]) -> Int32 {
                                 }
                             } else {
                                 let argName = String(describing: hook.argname)
-                                if inputNames.contains(argName) || outputNames.contains(argName) {
+                                if hardIgnoredInputs.contains(argName) {
                                     continue
                                 }
+                                // if inputNames.contains(argName) || outputNames.contains(argName) {
+                                //     continue
+                                // }
                                 var name = ""
                                 var statement: PythonObject
 

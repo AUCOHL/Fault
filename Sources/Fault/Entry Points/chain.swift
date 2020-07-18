@@ -405,7 +405,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     scanChains[0].add(
                                         // Preserve same name as in the cut Netlist
                                         name: instanceName + "_\(hook.portname)_\(i)",  
-                                        kind: (input) ? .bypass: .dff
+                                        kind: (input) ? .bypassInput: .bypassOutput
                                     ) 
                                 }
                                 hook.argname.list = Python.tuple(list)
@@ -426,7 +426,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 scanChains[0].previousOutput = Node.Identifier(outName)
                                 scanChains[0].add(
                                     name: instanceName + "_\(hook.portname)",
-                                    kind: (input) ? .bypass: .dff
+                                    kind: (input) ? .bypassInput: .bypassOutput
                                 ) 
                             }
                         }
