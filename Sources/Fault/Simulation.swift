@@ -733,7 +733,7 @@ class Simulator {
                     #4;
                     for (i = 0; i< \(boundaryOutput);i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[\(outputLength - 1 - boundaryOutput - 1) + i] = \(tdo);
+                        scanInSerial[\(outputLength - boundaryOutput) + i] = \(tdo);
                         if(i == \(boundaryOutput - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
@@ -750,7 +750,7 @@ class Simulator {
                     #4;
                     for (i = 0; i < \(chainLength_1); i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[\(outputLength - 1 - boundaryOutput - chainLength_1 - 1) + i] = \(tdo);
+                        scanInSerial[\(outputLength - boundaryOutput - chainLength_1) + i] = \(tdo);
                         if(i == \(chainLength_1 - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
@@ -767,7 +767,7 @@ class Simulator {
                     #4;
                     for (i = 0; i < \(chainLength_2); i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[\(outputLength - 1 - boundaryOutput - chainLength_1 - chainLength_2 - 1) + i] = \(tdo);
+                        scanInSerial[\(outputLength - boundaryOutput - chainLength_1 - chainLength_2) + i] = \(tdo);
                         if(i == \(chainLength_2 - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
