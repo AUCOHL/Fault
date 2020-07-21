@@ -206,7 +206,7 @@ class Testbench {
     }
 
     func createInternal(
-        chainLength: [Int],
+        chainLength: Int,
         tdi: String,
         tdo: String,
         tms: String,
@@ -216,17 +216,10 @@ class Testbench {
         reset: String,
         module: String
     ) -> String {
-        var serializables: [String] = ["", ""]
-        var serializableDecl: String = ""
-        var serialDecl: String = ""
-        for (i, length) in chainLength.enumerated() {
-            for _ in 0..<length {
-                serializables[i] += "\(Int.random(in: 0...1))"
-            }
-            serializableDecl +=
-                "reg[\(length - 1):0] serializable_\(i) = \(length)'b\(serializables[i]) ;   \n"
-            serialDecl +=
-                "reg[\(length - 1):0] serial_\(i) ; \n"
+
+        var serial: String = ""
+        for _ in 0..<chainLength {
+            serial += "\(Int.random(in: 0...1))"
         }
 
         return """
@@ -243,12 +236,12 @@ class Testbench {
 
             integer i;
 
-            wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] preload_chain_1 = 4'b 0011;
-            wire[3:0] preload_chain_2 = 4'b 0110;
+            wire[\(chainLength - 1):0] serializable =
+                \(chainLength)'b\(serial);
+            reg[\(chainLength - 1):0] serial;
 
-            \(serializableDecl)
-            \(serialDecl)
+            wire[7:0] tmsPattern = 8'b 01100110;
+            wire[3:0] preload_chain = 4'b0011;
 
             initial begin
                 $dumpfile("dut.vcd");
@@ -261,47 +254,26 @@ class Testbench {
                 #150;
 
                 /*
-                    Test Preload Chain_1 Instruction
+                    Test PreloadChain Instruction
                 */
-                shiftIR(preload_chain_1);
+                shiftIR(preload_chain);
                 enterShiftDR();
 
-                for (i = 0; i < \(chainLength[0]); i = i + 1) begin
-                    \(tdi) = serializable_0[i];
+                for (i = 0; i < \(chainLength); i = i + 1) begin
+                    \(tdi) = serializable[i];
                     #2;
                 end
-                for(i = 0; i< \(chainLength[0]); i = i + 1) begin
-                    serial_0[i] = \(tdo);
+                for(i = 0; i< \(chainLength); i = i + 1) begin
+                    serial[i] = \(tdo);
                     #2;
                 end 
 
-                if(serial_0 !== serializable_0) begin
-                    $error("EXECUTING_PRELOAD_CHAIN_1_INST_FAILED");
+                if(serial !== serializable) begin
+                    $error("EXECUTING_PRELOAD_CHAIN_INST_FAILED");
                     $finish;
                 end
                 exitDR();
                 #2;
-
-                /*
-                    Test Preload Chain_2 Instruction
-                */
-                shiftIR(preload_chain_2);
-                enterShiftDR();
-
-                for (i = 0; i < \(chainLength[1]); i = i + 1) begin
-                    \(tdi) = serializable_1[i];
-                    #2;
-                end
-                for(i = 0; i< \(chainLength[1]); i = i + 1) begin
-                    serial_1[i] = \(tdo);
-                    #2;
-                end 
-
-                if(serial_1 !== serializable_1) begin
-                    $error("EXECUTING_PRELOAD_CHAIN_2_INST_FAILED");
-                    $finish;
-                end
-                exitDR();
 
                 $display("SUCCESS_STRING");
                 $finish;
@@ -312,16 +284,6 @@ class Testbench {
         """
     }
 
-    // func createTV(
-
-    //     vecbinFile: String,
-    //     outbinFile: String,
-    //     vectorCount: Int, 
-    //     vectorLength: Int,
-    //     outputLength: Int,
-    // ) -> String {
-
-    // }
     private static func createTasks (tms: String) -> String {
         return """
         task shiftIR;

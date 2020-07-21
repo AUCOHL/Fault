@@ -1,11 +1,6 @@
 import Foundation
 import PythonKit
 
-enum scanStructure: String, Codable {
-    case one = "one"
-    case multi = "multi" 
-}
-
 class BoundaryScanRegisterCreator {
     var name: String
     private var inputName: String
@@ -205,20 +200,15 @@ class scanCellCreator {
     var counter: Int = 0
     
     var clock: String
-    var reset: String
     var shift: String
-    var resetActive: Simulator.Active
     private var Node: PythonObject
 
     private var clockIdentifier: PythonObject
-    private var resetIdentifier: PythonObject
     private var shiftIdentifier: PythonObject
 
     init(
         name: String,
         clock: String,
-        reset: String,
-        resetActive: Simulator.Active,
         shift: String,
         using Node: PythonObject
     ) {
@@ -226,15 +216,10 @@ class scanCellCreator {
         self.clock = clock
         self.clockIdentifier = Node.Identifier(clock)
 
-        self.reset = reset
-        self.resetIdentifier = Node.Identifier(reset)
-
         self.shift = shift
         self.shiftIdentifier = Node.Identifier(shift)
 
-        self.resetActive = resetActive
         self.Node = Node
-
     }
 
     func create(
@@ -252,7 +237,6 @@ class scanCellCreator {
             Node.PortArg("sin", sinIdentifier),
             Node.PortArg("shift", shiftIdentifier),
             Node.PortArg("clock", clockIdentifier),
-            Node.PortArg("reset", resetIdentifier),
         ]
 
         let submoduleInstance = Node.Instance(
@@ -278,21 +262,16 @@ class scanCellCreator {
             out,   
             sin, 
             shift, 
-            clock,
-            reset
+            clock
         );
             input din, sin, shift;
             output out;
-            input clock, reset;
+            input clock;
 
             reg flip_flop;  
         
             always @ (posedge clock) begin
-                if (\(resetActive == .high ? "" : "~") reset) begin
-                    flip_flop <= 1'b0;
-                end else begin
-                    flip_flop <= sin;
-                end
+                flip_flop <= sin;
             end
             
             assign out = shift ? flip_flop : din;

@@ -343,10 +343,10 @@ class Simulator {
         case high
     }
 
-    static func simulate(
+   static func simulate(
         verifying module: String,
         in file: String,
-        isolated hard: String?,
+        isolating blackbox: String?,
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
@@ -358,7 +358,8 @@ class Simulator {
         sin: String,
         sout: String,
         resetActive: Active = .low,
-        testing: String,
+        shift: String,
+        test: String,
         clockDR: String,
         update: String,
         mode: String,
@@ -391,25 +392,23 @@ class Simulator {
         }
 
         var clockCreator = ""
-        var tckCreator = ""
         if !clock.isEmpty {
-            clockCreator = "always #1 \(clock) = ~\(clock);"
-            tckCreator = "always #1 \(tck) = ~\(tck);"
+            clockCreator = "always #1 \(clock) = ~\(clock); \n"
+            clockCreator += "always #1 \(tck) = ~\(tck); \n"
         }
-        var isolated = ""
-        if let hardModule = hard {
-            isolated = "`include \"\(hardModule)\""
+        var include = ""
+        if let blackboxFile = blackbox {
+            include = "`include \"\(blackboxFile)\""
         }
 
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
-        \(isolated)
+        \(include)
         module testbench;
         \(portWires)
             \(clockCreator)
-            \(tckCreator)
             \(module) uut(
                 \(portHooks.dropLast(2))
             );
@@ -423,19 +422,17 @@ class Simulator {
         \(inputAssignment)
                 #10;
                 \(reset) = ~\(reset);
-                \(testing) = 1;
+                \(shift) = 1;
+                \(test) = 1;
                 \(clockDR) = 1;
                 \(update) = 1;
                 \(mode) = 0;
-                capture_1 = 1;  // Internal chains capture signals
-                capture_2 = 1;
-
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    \(sin) = serializable[i];
+                    sin = serializable[i];
                     #2;
                 end
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    serial[i] = \(sout);
+                    serial[i] = sout;
                     #2;
                 end
                 if (serial === serializable) begin
@@ -476,7 +473,7 @@ class Simulator {
         ports: [String: Port],
         inputs: [Port],
         outputs: [Port],
-        chains: [Chain],
+        chainLength: Int,
         clock: String,
         reset: String,
         resetActive: Active = .low,
@@ -489,7 +486,6 @@ class Simulator {
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
-        var success = true
         let tb = Testbench(
             ports: ports,
             inputs: inputs,
@@ -499,13 +495,8 @@ class Simulator {
             in: file,
             with: cells
         )
-        let boundaryChain = chains.filter{ $0.kind == .boundary }[0]
-        let outputBoundaryCells = outputs.map{ $0.width }.reduce(0, +) - 1
-        let boundaryBench = tb.createBoundary(
-            chainLength: boundaryChain.length,
-            outputBoundaryCount: outputBoundaryCells,
-            inputs: inputs,
-            outputs: outputs,
+        let testbench = tb.createInternal(
+            chainLength: chainLength,
             tdi: tdi,
             tdo: tdo,
             tms: tms,
@@ -515,28 +506,10 @@ class Simulator {
             reset: reset,
             module: module
         )
-        success = try Testbench.run(bench: boundaryBench, output: "\(output)_1.sv")
-        if success {
-            print("Boundary Scan Chain verified successfuly.")
-        }
-
-        let internalChains = chains.filter { $0.kind != .boundary }
-        let internalBench = tb.createInternal(
-            chainLength: internalChains.map { $0.length },
-            tdi: tdi,
-            tdo: tdo,
-            tms: tms,
-            tck: tck,
-            trst: trst,
-            clock: clock,
-            reset: reset,
-            module: module
+        let success = try Testbench.run(
+            bench: testbench,
+            output: output
         )
-        success = try Testbench.run(bench: internalBench, output: "\(output)_1.sv")
-        if success {
-            print("Internal Scan Chain verified successfuly.")
-        }
-       
         return success     
     }
 

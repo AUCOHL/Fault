@@ -20,15 +20,9 @@ func cut(arguments: [String]) -> Int32 {
     )
     cli.addOptions(dffOpt)
 
-    let clock = StringOption(
-        longFlag: "clock",
-        helpMessage: "clock name for the cut flip-flops. (Default: all flip-flops are cut)"
-    )
-    cli.addOptions(clock)
-
     let blackbox = StringOption(
         longFlag: "blackbox",
-        helpMessage: "blackbox module names seperated by commas to be exposed as input & output ports.(Default: none)"
+        helpMessage: "Blackbox module definitions (.v) seperated by commas. (Default: none)"
     )
     cli.addOptions(blackbox)
 
@@ -73,8 +67,6 @@ func cut(arguments: [String]) -> Int32 {
     let dffName = dffOpt.value ?? "DFF"
     let output = filePath.value ?? "\(file).cut.v"
 
-    let blackboxes: Set<String>
-    = Set<String>(blackbox.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     // MARK: Importing Python and Pyverilog
     
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -120,10 +112,6 @@ func cut(arguments: [String]) -> Int32 {
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
 
     do {
-        let (_, inputs, outputs) = try Port.extract(from: definition) 
-        let inputNames = inputs.map { $0.name }
-        let outputNames = outputs.map { $0.name }
-
         let ports = Python.list(definition.portlist.ports)
         var declarations: [PythonObject] = []
         var items: [PythonObject] = []
@@ -154,18 +142,6 @@ func cut(arguments: [String]) -> Int32 {
                         if hook.portname == "Q" {
                             qArg = hook.argname
                         }
-                        if hook.portname == "CLK" {
-                            if let clockName = clock.value {
-                                include = !String(describing: hook.argname).starts(with: clockName) 
-                            }
-                        }
-                    }
-
-                    if include {
-                        items.append(item)
-                        print("[Warning]: Not all flip-flops have the same clock \(clock.value!).")
-                        print("・Ensure that there is no negedge triggered flip-flops.")
-                        continue
                     }
 
                     guard let d = dArg, let q = qArg else {
@@ -194,75 +170,70 @@ func cut(arguments: [String]) -> Int32 {
                     items.append(inputAssignment)
                     items.append(outputAssignment)
                     
-                } else if let blakcboxName = isolatedName {
+                } else if let blakcboxName = isolatedName, blakcboxName == instanceName {
+                    include = false
                     
-                    if instanceName == blakcboxName {
-                        include = false
+                    guard let isolatedDefinition = isolatedOptional  else {
+                        fputs("No module definition for blackbox \(blakcboxName)",stderr)
+                        exit(EX_DATAERR)
+                    }
 
-                        guard let isolatedDefinition = isolatedOptional  else {
-                            fputs("No module definition for blackbox \(blakcboxName)",stderr)
-                            exit(EX_DATAERR)
-                        }
+                    let (_, inputs, _) = try Port.extract(from: isolatedDefinition)
+                    let bbInputNames = inputs.map { $0.name }
 
-                        let (_, inputs, _) = try Port.extract(from: isolatedDefinition)
-                        let bbInputNames = inputs.map { $0.name }
-
-                        for hook in instance.portlist {
-                            let portName = String(describing: hook.portname)
-                            let hookType = Python.type(hook.argname).__name__
-
-                            let input = bbInputNames.contains(portName)
-                            if hookType == "Concat" {
-                                let list = hook.argname.list
-                                for (i, element) in list.enumerated() {
-                                    var name = ""
-                                    var statement: PythonObject
-
-                                    if input {
-                                        name = "\\" + instanceName + "_\(portName)_\(i).q"
-                                        statement = Node.Output(name)
-                                    }
-                                    else {
-                                        name =  instanceName + "_\(portName)_\(i)"
-                                        statement = Node.Input(name)
-                                    }
-
-                                    let assignStatement = Node.Assign(
-                                        Node.Lvalue(Node.Identifier(name)),
-                                        Node.Rvalue(element)
-                                    )
-                                    items.append(assignStatement)
-                                    declarations.append(statement)
-                                    ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                                }
-                            } else {
-                                let argName = String(describing: hook.argname)
-                                if hardIgnoredInputs.contains(argName) {
-                                    continue
-                                }
-                                // if inputNames.contains(argName) || outputNames.contains(argName) {
-                                //     continue
-                                // }
+                    for hook in instance.portlist {
+                        let portName = String(describing: hook.portname)
+                        let hookType = Python.type(hook.argname).__name__
+                        let input = bbInputNames.contains(portName)
+                        
+                        if hookType == "Concat" {
+                            let list = hook.argname.list
+                            for (i, element) in list.enumerated() {
                                 var name = ""
                                 var statement: PythonObject
 
                                 if input {
-                                    name = "\\" + instanceName + "_\(portName).q" 
-                                    statement = Node.Output(name) 
-                                
-                                } else {
-                                    name = instanceName + ".\(portName)"
+                                    name = "\\" + instanceName + "_\(portName)_\(i).q"
+                                    statement = Node.Output(name)
+                                }
+                                else {
+                                    name =  instanceName + "_\(portName)_\(i)"
                                     statement = Node.Input(name)
                                 }
 
-                                declarations.append(statement)
-                                ports.append(Node.Port(name, Python.None, Python.None, Python.None))
                                 let assignStatement = Node.Assign(
                                     Node.Lvalue(Node.Identifier(name)),
-                                    Node.Rvalue(hook.argname)
+                                    Node.Rvalue(element)
                                 )
                                 items.append(assignStatement)
-                            } 
+                                declarations.append(statement)
+                                ports.append(Node.Port(name, Python.None, Python.None, Python.None))
+                            }
+                        } else {
+                            let argName = String(describing: hook.argname)
+                            if hardIgnoredInputs.contains(argName) {
+                                continue
+                            }
+
+                            var name = ""
+                            var statement: PythonObject
+
+                            if input {
+                                name = "\\" + instanceName + "_\(portName).q" 
+                                statement = Node.Output(name) 
+                            
+                            } else {
+                                name = instanceName + ".\(portName)"
+                                statement = Node.Input(name)
+                            }
+
+                            declarations.append(statement)
+                            ports.append(Node.Port(name, Python.None, Python.None, Python.None))
+                            let assignStatement = Node.Assign(
+                                Node.Lvalue(Node.Identifier(name)),
+                                Node.Rvalue(hook.argname)
+                            )
+                            items.append(assignStatement)
                         } 
                     }
                 }

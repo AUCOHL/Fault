@@ -75,6 +75,4 @@
 `define DEBUG           4'b1000
 `define MBIST           4'b1001
 `define BYPASS          4'b1111
-`define INTEST          4'b0100
-`define PRELOAD_CHAIN_1 4'b0011
-`define PRELOAD_CHAIN_2 4'b0110
+`define PRELOAD_CHAIN   4'b0011

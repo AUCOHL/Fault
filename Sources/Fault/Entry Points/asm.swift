@@ -69,9 +69,9 @@ func assemble(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    let (_, chains) = ChainMetadata.extract(file: netlist)
-    let order = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .output }
-    let orderOutput = chains.map { $0.order }.reduce([], +).filter{ $0.kind != .input }
+    let (chain, boundaryCount, internalCount) = ChainMetadata.extract(file: netlist)
+    let order = chain.filter{ $0.kind != .output }
+    let orderOutput = chain.filter{ $0.kind != .input }
 
     let inputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
     let outputOrder = tvinfo.inputs.filter{ $0.polarity != .input }
@@ -82,8 +82,11 @@ func assemble(arguments: [String]) -> Int32 {
     let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
     let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
 
-    // Check input order 
+    // // Check input order 
     let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
+    print(chainOrder.count)
+    print(inputOrder.count)
+
     if chainOrder.count != inputOrder.count {
         print("[Error]: Ordinal mismatch between TV and scan-chains.")
         return EX_DATAERR
@@ -92,6 +95,8 @@ func assemble(arguments: [String]) -> Int32 {
     for (i, input) in inputOrder.enumerated() {
         inputMap[input.name] = i
         if chainOrder[i].name != input.name {
+            print(chainOrder[i].name)
+            print(input.name)
             print("[Error]: Ordinal mismatch between TV and scan-chains.")
             return EX_DATAERR
         }

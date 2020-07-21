@@ -32,13 +32,15 @@ func jtagCreate(arguments: [String]) -> Int32{
 
     let clockOpt = StringOption(
         longFlag: "clock",
-        helpMessage: "Clock signal of core logic to use in simulation"
+        required: true,
+        helpMessage: "Clock signal of core logic to use in simulation. (Required)"
     )
     cli.addOptions(clockOpt)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        helpMessage: "Reset signal of core logic to use in simulation."
+        required: true,
+        helpMessage: "Reset signal of core logic to use in simulation. (Required)"
     )
     cli.addOptions(resetOpt)
 
@@ -57,21 +59,21 @@ func jtagCreate(arguments: [String]) -> Int32{
     )
     cli.addOptions(liberty)
 
-    let testvectors = StringOption(
-        shortFlag: "t",
-        longFlag: "testVectors",
-        helpMessage: 
-            " .bin file for test vectors."
-    )
-    cli.addOptions(testvectors)
+    // let testvectors = StringOption(
+    //     shortFlag: "t",
+    //     longFlag: "testVectors",
+    //     helpMessage: 
+    //         " .bin file for test vectors."
+    // )
+    // cli.addOptions(testvectors)
 
-    let goldenOutput = StringOption(
-        shortFlag: "g",
-        longFlag: "goldenOutput",
-        helpMessage: 
-            " .bin file for golden output."
-    )
-    cli.addOptions(goldenOutput)
+    // let goldenOutput = StringOption(
+    //     shortFlag: "g",
+    //     longFlag: "goldenOutput",
+    //     helpMessage: 
+    //         " .bin file for golden output."
+    // )
+    // cli.addOptions(goldenOutput)
 
     let ignored = StringOption(
         shortFlag: "i",
@@ -83,13 +85,13 @@ func jtagCreate(arguments: [String]) -> Int32{
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
-        ("sin", "boundary scan  chain serial data in"),
-        ("sout", "boundary scan chain serial data out"),
-        ("shift", "boundary scan chain shift enable"),
-        ("clockDR", "boundary scan chain clockDR"),
-        ("update", "boundary scan chain update enable"),
-        ("mode", "boundary scan cell mode select"),
-        ("capture", "Internal Chains capture signal"),
+        ("sin", "scan-chain serial data in"),
+        ("sout", "scan-chain serial data out"),
+        ("shift", "scan-chain shift enable"),
+        ("test", "scan-chain test enable"),
+        ("clockDR", "scan cell clockDR"),
+        ("update", "Input/Output scan-cell update enable"),
+        ("mode", "Input/Output scan-cell mode select"),
         ("tms", "JTAG test mode select"),
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
@@ -128,24 +130,17 @@ func jtagCreate(arguments: [String]) -> Int32{
         fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
-    let (type, chains) = ChainMetadata.extract(file: file)  
-
-    let ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
-    let behavior
-        = Array<Simulator.Behavior>(
-            repeating: .holdHigh,
-            count: ignoredInputs.count
-        )
-
-    var ignoredCount = ignoredInputs.count
-    if let _ = clockOpt.value {
-        ignoredCount += 1
-    }
-    if let _ = resetOpt.value {
-        ignoredCount += 1
-    }
     
+    let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)  
+    
+    let clockName = clockOpt.value!
+    let resetName = resetOpt.value!
+
+    var ignoredInputs: Set<String>
+        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+    ignoredInputs.insert(clockName)
+    ignoredInputs.insert(resetName)
+
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
             fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
@@ -172,22 +167,22 @@ func jtagCreate(arguments: [String]) -> Int32{
         }
     }
 
-    if let tvTest = testvectors.value {
-        if !fileManager.fileExists(atPath: tvTest) {
-            fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
-            return EX_NOINPUT
-        }
-        if !tvTest.hasSuffix(".bin") {
-            fputs(
-                "Warning: Test vectors file provided does not end with .bin. \n",
-                stderr
-            )
-        }
-        guard let _ = goldenOutput.value else {
-            fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
-            return EX_NOINPUT
-        }
-    }
+    // if let tvTest = testvectors.value {
+    //     if !fileManager.fileExists(atPath: tvTest) {
+    //         fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
+    //         return EX_NOINPUT
+    //     }
+    //     if !tvTest.hasSuffix(".bin") {
+    //         fputs(
+    //             "Warning: Test vectors file provided does not end with .bin. \n",
+    //             stderr
+    //         )
+    //     }
+    //     guard let _ = goldenOutput.value else {
+    //         fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
+    //         return EX_NOINPUT
+    //     }
+    // }
 
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
@@ -223,12 +218,14 @@ func jtagCreate(arguments: [String]) -> Int32{
         return EX_DATAERR
     }
 
-    let sin = names["sin"]!.option.value 
+    let sinName = names["sin"]!.option.value 
         ?? names["sin"]!.default
-    let sout = names["sout"]!.option.value
+    let soutName = names["sout"]!.option.value
         ?? names["sout"]!.default
     let shiftName = names["shift"]!.option.value
         ?? names["shift"]!.default
+    let testName = names["test"]!.option.value
+        ?? names["test"]!.default
     let clockDRName = names["clockDR"]!.option.value
         ?? names["clockDR"]!.default
     let updateName = names["update"]!.option.value
@@ -245,13 +242,8 @@ func jtagCreate(arguments: [String]) -> Int32{
         ?? names["tck"]!.default
     let trstName = names["trst"]!.option.value 
         ?? names["trst"]!.default
-    let captureName = names["capture"]!.option.value 
-        ?? names["capture"]!.default
-    
-    let clockName = clockOpt.value ?? ""
-    let resetName = resetOpt.value ?? ""
 
-    // MARK: Internal signals
+    // // MARK: Internal signals
     print("Adding JTAG port…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__DESIGN__UNDER__TEST__"
@@ -262,25 +254,16 @@ func jtagCreate(arguments: [String]) -> Int32{
         definition.name = Python.str(alteredName);
         let ports = Python.list(definition.portlist.ports)
 
-        var chainPorts: [String] = []
-        for chain in chains {
-            chainPorts.append(chain.sin)
-            chainPorts.append(chain.sout)
-            chainPorts.append(chain.shift)    
-            chainPorts.append(chain.capture)
-        }
-        chainPorts.append(tckName)
-        chainPorts.append(updateName)
-        chainPorts.append(clockDRName)
-        chainPorts.append(modeName)
-
-        if clockOpt.value == nil {
-            // if (internalCount > 0){
-            //     fputs("Error: Clock signal name for the internal logic isn't passed.\n", stderr)
-            //     return EX_NOINPUT
-            // }
-        }
-
+        let chainPorts: [String] = [
+            sinName,
+            soutName,
+            shiftName,
+            tckName,
+            updateName,
+            clockDRName,
+            modeName,
+            testName
+        ] 
         let topModulePorts = Python.list(ports.filter {
             !chainPorts.contains(String($0.name)!)
         })
@@ -304,7 +287,6 @@ func jtagCreate(arguments: [String]) -> Int32{
         statements.append(Node.Input(trstName))
 
         let portArguments = Python.list()
-        let sinPorts = chains.map{ $0.sin }
         for input in inputs {
             if(!chainPorts.contains(input.name)){
                 let inputStatement = Node.Input(input.name)
@@ -322,7 +304,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 statements.append(inputStatement)
             }
             else {
-                let portIdentifier = (sinPorts.contains(input.name)) ? tdiName : input.name
+                let portIdentifier = (input.name == sinName) ? tdiName : input.name
                 portArguments.append(Node.PortArg(
                     input.name,
                     Node.Identifier(portIdentifier)
@@ -357,16 +339,16 @@ func jtagCreate(arguments: [String]) -> Int32{
         }
         let data = try Data(contentsOf: URL(fileURLWithPath: tapConfig), options: .mappedIfSafe)
         
-        guard let jtagInfo = try? JSONDecoder().decode(JTAGInfo.self, from: data) else {
+        guard let jtagInfo = try? JSONDecoder().decode(jtagInfo.self, from: data) else {
             fputs("File '\(tapConfig)' is invalid.\n", stderr)
             return EX_DATAERR
         }
 
-        let jtagCreator = JTAGCreator(
+        let tapCreator = jtagCreator(
             name: "tap_top",
             using: Node
         )
-        let jtagModule =  jtagCreator.create(
+        let jtagModule =  tapCreator.create(
             jtagInfo: jtagInfo, 
             tms: tmsName,
             tck: tckName,
@@ -376,102 +358,39 @@ func jtagCreate(arguments: [String]) -> Int32{
         )
         var wireDeclarations = jtagModule.wires
         wireDeclarations.append(Node.Wire(trstHighName))
-        
+
         statements.extend(wireDeclarations)
         statements.extend([
             Node.Wire(clockDRName),
             Node.Wire(updateName),
-            Node.Wire(modeName)
+            Node.Wire(modeName),
+            Node.Wire(shiftName),
+            Node.Wire(testName),
+            Node.Wire(sinName),
+            Node.Wire(soutName)
         ])
-        for chain in chains {
-            statements.extend([
-                Node.Wire(chain.sin),
-                Node.Wire(chain.sout),
-                Node.Wire(chain.shift), 
-                Node.Wire(chain.capture)
-            ])
-        }
-        statements.append(jtagModule.tapModule)
 
+        statements.append(jtagModule.tapModule)
         // negate reset to make it active high
         statements.append(Node.Assign(
             Node.Lvalue(Node.Identifier(trstHighName)),
             Node.Rvalue(Node.Unot(Node.Identifier(trstName)))
         ))
 
-        for chain in chains {
-            var tdiIdentifier: PythonObject
-            var shiftIdentifier: PythonObject
-            if chain.kind == .boundary {
-                tdiIdentifier = Node.Identifier(jtagInfo.tdiSignals.bsChain)
-                shiftIdentifier = Node.And(
-                    Node.Identifier(jtagInfo.tapStates.shift),
-                    Node.Or(
-                        Node.Identifier(jtagInfo.selectSignals.samplePreload),
-                        Node.Or(
-                            Node.Identifier(jtagInfo.selectSignals.extest),
-                            Node.Identifier(jtagInfo.selectSignals.intest)
-                        )
-                    )
-                )
-            } else if chain.kind == .posedge {
-                tdiIdentifier = Node.Identifier(jtagInfo.tdiSignals.chain_1)
-                shiftIdentifier = Node.And(
-                    Node.Identifier(jtagInfo.tapStates.shift),
-                    Node.Identifier(jtagInfo.selectSignals.preloadChain_1)
-                )
-                // Capture Internal Scan-chains assignment
-                let and = Node.And(
-                    Node.Or(
-                        Node.Identifier(jtagInfo.tapStates.shift),
-                        Node.Identifier(jtagInfo.tapStates.capture)
-                    ),
-                    Node.Identifier(jtagInfo.selectSignals.preloadChain_1)
-                )
-                let captureChain_1 = Node.Cond(
-                    and,
-                    Node.IntConst("1'b1"),
-                    Node.IntConst("1'b0")
-                )
-                statements.append(Node.Assign(
-                    Node.Lvalue(Node.Identifier(chain.capture)),
-                    Node.Rvalue(captureChain_1)
-                ))
-            } else {
-                tdiIdentifier = Node.Identifier(jtagInfo.tdiSignals.chain_2)
-                shiftIdentifier = Node.And(
-                    Node.Identifier(jtagInfo.tapStates.shift),
-                    Node.Identifier(jtagInfo.selectSignals.preloadChain_2)
-                )
-                // Capture Internal Scan-chains assignment
-                let and = Node.And(
-                    Node.Or(
-                        Node.Identifier(jtagInfo.tapStates.shift),
-                        Node.Identifier(jtagInfo.tapStates.capture)
-                    ),
-                    Node.Identifier(jtagInfo.selectSignals.preloadChain_2)
-                )
-                let captureChain_2 = Node.Cond(
-                    and,
-                    Node.IntConst("1'b1"),
-                    Node.IntConst("1'b0")
-                )
-                statements.append(Node.Assign(
-                    Node.Lvalue(Node.Identifier(chain.capture)),
-                    Node.Rvalue(captureChain_2)
-                ))
-            }
-            // sout and tdi signals assignment
-            statements.append(Node.Assign(
-                Node.Rvalue(tdiIdentifier),
-                Node.Lvalue(Node.Identifier(chain.sout))
-            ))
-            statements.append(Node.Assign(
-                Node.Rvalue(Node.Identifier(chain.shift)),
-                Node.Lvalue(shiftIdentifier)
-            ))
-        }
-
+        let tdiIdentifier = Node.Identifier(jtagInfo.inputTdi.chain)
+        let shiftIdentifier = Node.And(
+            Node.Identifier(jtagInfo.states.shift),
+            Node.Identifier(jtagInfo.selects.preloadChain)
+        )
+        // sout and tdi signals assignment
+        statements.append(Node.Assign(
+            Node.Rvalue(tdiIdentifier),
+            Node.Lvalue(Node.Identifier(soutName))
+        ))
+        statements.append(Node.Assign(
+            Node.Rvalue(Node.Identifier(shiftName)),
+            Node.Lvalue(shiftIdentifier)
+        ))
         // TDO tri-state enable assignment
         let ternary = Node.Cond(
             Node.Identifier(jtagInfo.pads.tdoEn),
@@ -483,10 +402,9 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Rvalue(ternary)
         )
         statements.append(tdoAssignment)
-
         // Mode select assign statement
         let modeCond = Node.Cond(
-            Node.Identifier(jtagInfo.selectSignals.intest),
+            Node.Identifier(jtagInfo.selects.preloadChain),
             Node.IntConst("1'b1"),
             Node.IntConst("1'b0")
         )
@@ -497,18 +415,16 @@ func jtagCreate(arguments: [String]) -> Int32{
         statements.append(modeAssignment)
 
         // Clock DR assign statement
-        let or = Node.Or(
-            Node.And( Node.Identifier(jtagInfo.selectSignals.samplePreload),
-            Node.Identifier(jtagInfo.tapStates.shift)),
-            Node.And( Node.Identifier(jtagInfo.selectSignals.intest),
-            Node.Identifier(jtagInfo.tapStates.shift))
+        let and = Node.And(
+            Node.Identifier(jtagInfo.selects.preloadChain),
+            Node.Identifier(jtagInfo.states.shift)
         )
-        let and = Node.Or(
-            or,
-            Node.Identifier(jtagInfo.tapStates.capture)
+        let or = Node.Or(
+            and,
+            Node.Identifier(jtagInfo.states.capture)
         )
         let clockCond = Node.Cond(
-            and,
+            or,
             Node.IntConst("1'b1"),
             Node.IntConst("1'b0")
         )
@@ -519,17 +435,21 @@ func jtagCreate(arguments: [String]) -> Int32{
         statements.append(clockDRAssignment)
         
         // Update-DR Assignment
-        let updateOr = Node.Or(
-            Node.And(Node.Identifier(jtagInfo.selectSignals.samplePreload),
-            Node.Identifier(jtagInfo.tapStates.update)),
-            Node.And( Node.Identifier(jtagInfo.selectSignals.intest),
-            Node.Identifier(jtagInfo.tapStates.update))
+        let updateCond = Node.And(
+            Node.Identifier(jtagInfo.selects.preloadChain),
+            Node.Identifier(jtagInfo.states.update)
         )
         let updateAssignment = Node.Assign(
             Node.Lvalue(Node.Identifier(updateName)),
-            Node.Rvalue(updateOr)
+            Node.Rvalue(updateCond)
         )
         statements.append(updateAssignment)
+        // Test enable assignment
+        let testAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(testName)),
+            Node.Rvalue(Node.IntConst("1'b1"))
+        )
+        statements.append(testAssignment)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -586,21 +506,21 @@ func jtagCreate(arguments: [String]) -> Int32{
             throw "Could not re-read created file."
         }
            
-        // let metadata = JTAGMetadata(
-        //     IRLength: 4,
-        //     boundaryCount: boundaryCount,
-        //     internalCount: internalCount,
-        //     tdi: tdiName,
-        //     tms: tmsName, 
-        //     tck: tckName,
-        //     tdo: tdoName,
-        //     trst: trstName
-        // )
+    //     // let metadata = JTAGMetadata(
+    //     //     IRLength: 4,
+    //     //     boundaryCount: boundaryCount,
+    //     //     internalCount: internalCount,
+    //     //     tdi: tdiName,
+    //     //     tms: tmsName, 
+    //     //     tck: tckName,
+    //     //     tdo: tdoName,
+    //     //     trst: trstName
+    //     // )
         
-        // guard let metadataString = metadata.toJSON() else {
-        //     fputs("Could not generate metadata string.", stderr)
-        //     return EX_SOFTWARE
-        // }
+    //     // guard let metadataString = metadata.toJSON() else {
+    //     //     fputs("Could not generate metadata string.", stderr)
+    //     //     return EX_SOFTWARE
+    //     // }
 
         try File.open(output, mode: .write) {
             try $0.print(String.boilerplate)
@@ -633,7 +553,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
-                chains: chains,
+                chainLength: boundaryCount + internalCount,
                 clock: clockName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
@@ -642,7 +562,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 tck: tckName,
                 tdo: tdoName,
                 trst: trstName,
-                output: (filePath.value ?? file) + ".jtag.tb.sv",
+                output: output + ".tb.sv",
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -657,47 +577,48 @@ func jtagCreate(arguments: [String]) -> Int32{
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
-            // MARK: Test bench
-            if let tvFile = testvectors.value {
-                print("Generating testbench for test vectors...")
-                let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
-                let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-                let testbecnh = (filePath.value ?? file) + ".tb.sv"
-                let verified = try Simulator.simulate(
-                    verifying: definitionName,
-                    in: output, // DEBUG
-                    with: model,
-                    ports: ports,
-                    inputs: inputs,
-                    ignoring: ignoredInputs,
-                    behavior: behavior,
-                    outputs: outputs,
-                    clock: clockName,
-                    reset: resetName,
-                    resetActive: resetActiveLow.value ? .low : .high,
-                    tms: tmsName,
-                    tdi: tdiName,
-                    tck: tckName,
-                    tdo: tdoName,
-                    trst: trstName,
-                    output: testbecnh,
-                    chains: chains, 
-                    vecbinFile: testvectors.value!,
-                    outbinFile: goldenOutput.value!,
-                    vectorCount: vectorCount,
-                    vectorLength: vectorLength,
-                    outputLength: outputLength,
-                    using: iverilogExecutable,
-                    with: vvpExecutable
-                )
-                print("Done.")
-                if (verified) {
-                    print("Test vectors verified successfully.")
-                } else {
-                    print("Test vector simulation failed.")
-                }  
-            }
         }
+    //         // MARK: Test bench
+    //         if let tvFile = testvectors.value {
+    //             print("Generating testbench for test vectors...")
+    //             let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
+    //             let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
+    //             let testbecnh = (filePath.value ?? file) + ".tb.sv"
+    //             let verified = try Simulator.simulate(
+    //                 verifying: definitionName,
+    //                 in: output, // DEBUG
+    //                 with: model,
+    //                 ports: ports,
+    //                 inputs: inputs,
+    //                 ignoring: ignoredInputs,
+    //                 behavior: behavior,
+    //                 outputs: outputs,
+    //                 clock: clockName,
+    //                 reset: resetName,
+    //                 resetActive: resetActiveLow.value ? .low : .high,
+    //                 tms: tmsName,
+    //                 tdi: tdiName,
+    //                 tck: tckName,
+    //                 tdo: tdoName,
+    //                 trst: trstName,
+    //                 output: testbecnh,
+    //                 chains: chains, 
+    //                 vecbinFile: testvectors.value!,
+    //                 outbinFile: goldenOutput.value!,
+    //                 vectorCount: vectorCount,
+    //                 vectorLength: vectorLength,
+    //                 outputLength: outputLength,
+    //                 using: iverilogExecutable,
+    //                 with: vvpExecutable
+    //             )
+    //             print("Done.")
+    //             if (verified) {
+    //                 print("Test vectors verified successfully.")
+    //             } else {
+    //                 print("Test vector simulation failed.")
+    //             }  
+    //         }
+    //     }
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE

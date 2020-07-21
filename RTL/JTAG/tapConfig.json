@@ -7,27 +7,25 @@
         "trst": "trst_pad_i",
         "tdoEn": "tdo_padoe_o"
     },
-    "tapStates":{
+    "states":{
         "shift": "shift_dr_o",
         "pause": "pause_dr_o",
         "update": "update_dr_o",
-        "capture": "capture_dr_o"   
+        "capture": "capture_dr_o",
+        "idle": "test_logic_reset_o"  
     },
-    "selectSignals": {
+    "selects": {
         "extest": "extest_select_o",
         "samplePreload": "sample_preload_select_o",
         "mbist": "mbist_select_o",
         "debug": "debug_select_o",
-        "intest": "intest_select_o",
-        "preloadChain_1": "preload_chain_1_o",
-        "preloadChain_2": "preload_chain_2_o"
+        "preloadChain": "preload_chain_o"
     },
     "tdoSignal": "tdo_o",
-    "tdiSignals": {
+    "inputTdi": {
         "debug": "debug_tdi_i",
         "bsChain": "bs_chain_tdi_i",
         "mbist": "mbist_tdi_i",
-        "chain_1": "chain_1_tdi_i",
-        "chain_2": "chain_2_tdi_i"
+        "chain": "chain_tdi_i"
     }
 }

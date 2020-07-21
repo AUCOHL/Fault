@@ -2,10 +2,9 @@ import Foundation
 import PythonKit
 import BigInt
 
-class JTAGCreator {
+class jtagCreator {
     var name: String
     private var Node: PythonObject
-
     init(
         name: String,
         using Node: PythonObject
@@ -15,111 +14,105 @@ class JTAGCreator {
     }
 
     func create(
-        jtagInfo: JTAGInfo,
+        jtagInfo: jtagInfo,
         tms: String,
         tck: String,
         tdi: String,
         tdo: String,
         trst: String
     )-> ( tapModule: PythonObject, wires: [PythonObject]) {
-        let tapPads = jtagInfo.pads
-        let tapStates = jtagInfo.tapStates
-        let selectSignals = jtagInfo.selectSignals 
-        let tdiSignals = jtagInfo.tdiSignals
+        let pads = jtagInfo.pads
+        let states = jtagInfo.states
+        let selects = jtagInfo.selects 
+        let inputTdi = jtagInfo.inputTdi
         
         let wireDeclarations: [PythonObject] = [ 
-            Node.Wire(tapPads.tdo),
-            Node.Wire(tapPads.tdoEn),
-            Node.Wire(tapStates.shift),
-            Node.Wire(tapStates.pause),
-            Node.Wire(tapStates.update),
-            Node.Wire(tapStates.capture),
-            Node.Wire(selectSignals.extest),
-            Node.Wire(selectSignals.samplePreload),
-            Node.Wire(selectSignals.mbist),
-            Node.Wire(selectSignals.debug),
-            Node.Wire(selectSignals.intest),
-            Node.Wire(selectSignals.preloadChain_1),
-            Node.Wire(selectSignals.preloadChain_2),
+            Node.Wire(pads.tdo),
+            Node.Wire(pads.tdoEn),
+            Node.Wire(states.shift),
+            Node.Wire(states.pause),
+            Node.Wire(states.update),
+            Node.Wire(states.capture),
+            Node.Wire(states.idle),
+            Node.Wire(selects.extest),
+            Node.Wire(selects.samplePreload),
+            Node.Wire(selects.mbist),
+            Node.Wire(selects.debug),
+            Node.Wire(selects.preloadChain),
             Node.Wire(jtagInfo.tdoSignal),
-            Node.Wire(tdiSignals.debug),
-            Node.Wire(tdiSignals.bsChain),
-            Node.Wire(tdiSignals.mbist),
-            Node.Wire(tdiSignals.chain_1),
-            Node.Wire(tdiSignals.chain_2)
+            Node.Wire(inputTdi.debug),
+            Node.Wire(inputTdi.bsChain),
+            Node.Wire(inputTdi.mbist),
+            Node.Wire(inputTdi.chain)
         ]
 
         let portArguments = [
             // JTAG Pads
             Node.PortArg(
-                tapPads.tms,
+                pads.tms,
                 Node.Identifier(tms)
             ),
             Node.PortArg(
-                tapPads.tck,
+                pads.tck,
                 Node.Identifier(tck)
             ),
             Node.PortArg(
-                tapPads.trst,
+                pads.trst,
                 Node.Identifier(trst)
             ),
             Node.PortArg(
-                tapPads.tdi,
+                pads.tdi,
                 Node.Identifier(tdi)
             ),
             Node.PortArg(
-                tapPads.tdo,
-                Node.Identifier(tapPads.tdo)
+                pads.tdo,
+                Node.Identifier(pads.tdo)
             ),
             Node.PortArg(
-                tapPads.tdoEn,
-                Node.Identifier(tapPads.tdoEn)
+                pads.tdoEn,
+                Node.Identifier(pads.tdoEn)
             ),
             // TAP States
             Node.PortArg(
-                tapStates.shift,
-                Node.Identifier(tapStates.shift)
+                states.shift,
+                Node.Identifier(states.shift)
             ),
             Node.PortArg(
-                tapStates.pause,
-                Node.Identifier(tapStates.pause)
+                states.pause,
+                Node.Identifier(states.pause)
             ),
             Node.PortArg(
-                tapStates.update,
-                Node.Identifier(tapStates.update)
+                states.update,
+                Node.Identifier(states.update)
             ),
             Node.PortArg(
-                tapStates.capture,
-                Node.Identifier(tapStates.capture)
+                states.capture,
+                Node.Identifier(states.capture)
+            ),
+            Node.PortArg(
+                states.capture,
+                Node.Identifier(states.idle)
             ),
             // Select signals for boundary scan or mbist
             Node.PortArg(
-                selectSignals.extest,
-                Node.Identifier(selectSignals.extest)
+                selects.extest,
+                Node.Identifier(selects.extest)
             ),
             Node.PortArg(
-                selectSignals.samplePreload,
-                Node.Identifier(selectSignals.samplePreload)
+                selects.samplePreload,
+                Node.Identifier(selects.samplePreload)
             ),
             Node.PortArg(
-                selectSignals.mbist,
-                Node.Identifier(selectSignals.mbist)
+                selects.mbist,
+                Node.Identifier(selects.mbist)
             ),
             Node.PortArg(
-                selectSignals.debug,
-                Node.Identifier(selectSignals.debug)
+                selects.debug,
+                Node.Identifier(selects.debug)
             ),
             Node.PortArg(
-                selectSignals.intest,
-                Node.Identifier(selectSignals.intest)
-            ),
-            Node.PortArg(
-                selectSignals.preloadChain_1,
-                Node.Identifier(selectSignals.preloadChain_1)
-            ),
-            Node.PortArg(
-                selectSignals.preloadChain_2,
-                Node.Identifier(selectSignals.preloadChain_2)
+                selects.preloadChain,
+                Node.Identifier(selects.preloadChain)
             ),
             //  TDO signal that is connected to TDI of sub-modules.
             Node.PortArg(
@@ -128,24 +121,20 @@ class JTAGCreator {
             ),
             // TDI signals from sub-modules
             Node.PortArg(
-                tdiSignals.debug,
-                Node.Identifier(tdiSignals.debug)
+                inputTdi.debug,
+                Node.Identifier(inputTdi.debug)
             ),
             Node.PortArg(
-                tdiSignals.bsChain,
-                Node.Identifier(tdiSignals.bsChain)
+                inputTdi.bsChain,
+                Node.Identifier(inputTdi.bsChain)
             ),
             Node.PortArg(
-                tdiSignals.mbist,
-                Node.Identifier(tdiSignals.mbist)
+                inputTdi.mbist,
+                Node.Identifier(inputTdi.mbist)
             ),
             Node.PortArg(
-                tdiSignals.chain_1,
-                Node.Identifier(tdiSignals.chain_1)
-            ),
-            Node.PortArg(
-                tdiSignals.chain_2,
-                Node.Identifier(tdiSignals.chain_2)
+                inputTdi.chain,
+                Node.Identifier(inputTdi.chain)
             )
         ]
 
@@ -165,37 +154,36 @@ class JTAGCreator {
     }
 }
 
-struct JTAGInfo: Codable {
-    var pads: JTAGPad; 
-    var tapStates : JTAGState;
-    var selectSignals : selectSignals;
-    var tdoSignal : String;
-    var tdiSignals : tdiSignals;
+struct jtagInfo: Codable {
+    var pads: Pad
+    var states: State
+    var selects: Select
+    var tdoSignal: String
+    var inputTdi: InputTdi
 
     init(
-        pads: JTAGPad,
-        tapStates: JTAGState, 
-        selectSignals: selectSignals,
-        tdoSignal : String,
-        tdiSignals: tdiSignals
+        pads: Pad,
+        states: State, 
+        selects: Select,
+        tdoSignal: String,
+        inputTdi: InputTdi
     ) {
         self.pads = pads
-        self.tapStates = tapStates
-        self.selectSignals = selectSignals
+        self.states = states
+        self.selects = selects
         self.tdoSignal = tdoSignal
-        self.tdiSignals = tdiSignals
+        self.inputTdi = inputTdi
     }
 }
 
 
-struct JTAGPad: Codable {
+struct Pad: Codable {
     var tms: String
     var tdi: String
     var tdo: String
     var trst: String
     var tck: String
     var tdoEn: String
-
     init(
         tms: String,
         tdi: String,
@@ -213,72 +201,63 @@ struct JTAGPad: Codable {
     }
 }
 
-struct JTAGState: Codable {
+struct State: Codable {
     var shift: String
     var pause: String
     var update: String
     var capture: String
-
+    var idle: String
     init(
        shift: String,
        pause: String,
        update: String,
-       capture: String 
+       capture: String,
+       idle: String
     ) {
         self.shift = shift
         self.pause = pause
         self.update = update
         self.capture = capture
+        self.idle = idle
     }
 }
 
-struct selectSignals: Codable {
+struct Select: Codable {
     var extest: String
     var samplePreload: String
     var mbist: String
     var debug: String
-    var intest: String
-    var preloadChain_1: String
-    var preloadChain_2: String
+    var preloadChain: String
     init (
         extest: String,
         samplePreload: String,
         mbist: String,
         debug: String,
-        intest: String,
-        preloadChain_1: String,
-        preloadChain_2: String
+        preloadChain: String
     ) {
         self.extest = extest
         self.samplePreload = samplePreload
         self.mbist =  mbist
         self.debug = debug
-        self.intest = intest
-        self.preloadChain_1 = preloadChain_1
-        self.preloadChain_2 = preloadChain_2
+        self.preloadChain = preloadChain
     }
 }
 
-struct tdiSignals: Codable {
+struct InputTdi: Codable {
     var debug: String
     var bsChain: String
     var mbist: String
-    var chain_1: String
-    var chain_2: String
-
+    var chain: String
     init (
         debug: String,
         bsChain: String,
         mbist: String,
-        intest: String,
-        chain_1: String,
-        chain_2: String
+        chain: String
     ) {
         self.debug = debug
         self.bsChain = bsChain
         self.mbist = mbist
-        self.chain_1 = chain_1
-        self.chain_2 = chain_2
+        self.chain = chain
     }
 }
 
