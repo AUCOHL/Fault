@@ -59,21 +59,21 @@ func jtagCreate(arguments: [String]) -> Int32{
     )
     cli.addOptions(liberty)
 
-    // let testvectors = StringOption(
-    //     shortFlag: "t",
-    //     longFlag: "testVectors",
-    //     helpMessage: 
-    //         " .bin file for test vectors."
-    // )
-    // cli.addOptions(testvectors)
+    let testvectors = StringOption(
+        shortFlag: "t",
+        longFlag: "testVectors",
+        helpMessage: 
+            " .bin file for test vectors."
+    )
+    cli.addOptions(testvectors)
 
-    // let goldenOutput = StringOption(
-    //     shortFlag: "g",
-    //     longFlag: "goldenOutput",
-    //     helpMessage: 
-    //         " .bin file for golden output."
-    // )
-    // cli.addOptions(goldenOutput)
+    let goldenOutput = StringOption(
+        shortFlag: "g",
+        longFlag: "goldenOutput",
+        helpMessage: 
+            " .bin file for golden output."
+    )
+    cli.addOptions(goldenOutput)
 
     let ignored = StringOption(
         shortFlag: "i",
@@ -167,22 +167,22 @@ func jtagCreate(arguments: [String]) -> Int32{
         }
     }
 
-    // if let tvTest = testvectors.value {
-    //     if !fileManager.fileExists(atPath: tvTest) {
-    //         fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
-    //         return EX_NOINPUT
-    //     }
-    //     if !tvTest.hasSuffix(".bin") {
-    //         fputs(
-    //             "Warning: Test vectors file provided does not end with .bin. \n",
-    //             stderr
-    //         )
-    //     }
-    //     guard let _ = goldenOutput.value else {
-    //         fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
-    //         return EX_NOINPUT
-    //     }
-    // }
+    if let tvTest = testvectors.value {
+        if !fileManager.fileExists(atPath: tvTest) {
+            fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        if !tvTest.hasSuffix(".bin") {
+            fputs(
+                "Warning: Test vectors file provided does not end with .bin. \n",
+                stderr
+            )
+        }
+        guard let _ = goldenOutput.value else {
+            fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
+            return EX_NOINPUT
+        }
+    }
 
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
@@ -405,7 +405,7 @@ func jtagCreate(arguments: [String]) -> Int32{
         // Mode select assign statement
         let modeCond = Node.Cond(
             Node.Identifier(jtagInfo.selects.preloadChain),
-            Node.IntConst("1'b1"),
+            Node.IntConst("1'b0"),
             Node.IntConst("1'b0")
         )
         let modeAssignment = Node.Assign(
@@ -506,21 +506,21 @@ func jtagCreate(arguments: [String]) -> Int32{
             throw "Could not re-read created file."
         }
            
-    //     // let metadata = JTAGMetadata(
-    //     //     IRLength: 4,
-    //     //     boundaryCount: boundaryCount,
-    //     //     internalCount: internalCount,
-    //     //     tdi: tdiName,
-    //     //     tms: tmsName, 
-    //     //     tck: tckName,
-    //     //     tdo: tdoName,
-    //     //     trst: trstName
-    //     // )
+        // let metadata = JTAGMetadata(
+        //     IRLength: 4,
+        //     boundaryCount: boundaryCount,
+        //     internalCount: internalCount,
+        //     tdi: tdiName,
+        //     tms: tmsName, 
+        //     tck: tckName,
+        //     tdo: tdoName,
+        //     trst: trstName
+        // )
         
-    //     // guard let metadataString = metadata.toJSON() else {
-    //     //     fputs("Could not generate metadata string.", stderr)
-    //     //     return EX_SOFTWARE
-    //     // }
+        // guard let metadataString = metadata.toJSON() else {
+        //     fputs("Could not generate metadata string.", stderr)
+        //     return EX_SOFTWARE
+        // }
 
         try File.open(output, mode: .write) {
             try $0.print(String.boilerplate)
@@ -577,48 +577,53 @@ func jtagCreate(arguments: [String]) -> Int32{
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
+
+            // MARK: Test bench
+            if let tvFile = testvectors.value {
+                print("Generating testbench for test vectors...")
+                let behavior
+                    = Array<Simulator.Behavior>(
+                        repeating: .holdHigh,
+                        count: ignoredInputs.count
+                    )
+                let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
+                let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
+                let testbecnh = (filePath.value ?? file) + ".tb.sv"
+                let verified = try Simulator.simulate(
+                    verifying: definitionName,
+                    in: output, // DEBUG
+                    with: model,
+                    ports: ports,
+                    inputs: inputs,
+                    ignoring: ignoredInputs,
+                    behavior: behavior,
+                    outputs: outputs,
+                    clock: clockName,
+                    reset: resetName,
+                    resetActive: resetActiveLow.value ? .low : .high,
+                    tms: tmsName,
+                    tdi: tdiName,
+                    tck: tckName,
+                    tdo: tdoName,
+                    trst: trstName,
+                    output: testbecnh,
+                    chainLength: internalCount + boundaryCount, 
+                    vecbinFile: testvectors.value!,
+                    outbinFile: goldenOutput.value!,
+                    vectorCount: vectorCount,
+                    vectorLength: vectorLength,
+                    outputLength: outputLength,
+                    using: iverilogExecutable,
+                    with: vvpExecutable
+                )
+                print("Done.")
+                if (verified) {
+                    print("Test vectors verified successfully.")
+                } else {
+                    print("Test vector simulation failed.")
+                }  
+            }
         }
-    //         // MARK: Test bench
-    //         if let tvFile = testvectors.value {
-    //             print("Generating testbench for test vectors...")
-    //             let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
-    //             let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-    //             let testbecnh = (filePath.value ?? file) + ".tb.sv"
-    //             let verified = try Simulator.simulate(
-    //                 verifying: definitionName,
-    //                 in: output, // DEBUG
-    //                 with: model,
-    //                 ports: ports,
-    //                 inputs: inputs,
-    //                 ignoring: ignoredInputs,
-    //                 behavior: behavior,
-    //                 outputs: outputs,
-    //                 clock: clockName,
-    //                 reset: resetName,
-    //                 resetActive: resetActiveLow.value ? .low : .high,
-    //                 tms: tmsName,
-    //                 tdi: tdiName,
-    //                 tck: tckName,
-    //                 tdo: tdoName,
-    //                 trst: trstName,
-    //                 output: testbecnh,
-    //                 chains: chains, 
-    //                 vecbinFile: testvectors.value!,
-    //                 outbinFile: goldenOutput.value!,
-    //                 vectorCount: vectorCount,
-    //                 vectorLength: vectorLength,
-    //                 outputLength: outputLength,
-    //                 using: iverilogExecutable,
-    //                 with: vvpExecutable
-    //             )
-    //             print("Done.")
-    //             if (verified) {
-    //                 print("Test vectors verified successfully.")
-    //             } else {
-    //                 print("Test vector simulation failed.")
-    //             }  
-    //         }
-    //     }
     } catch {
         fputs("Internal software error: \(error)", stderr)
         return EX_SOFTWARE

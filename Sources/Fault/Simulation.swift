@@ -531,7 +531,7 @@ class Simulator {
         tdo: String,
         trst: String,
         output: String,
-        chains: [Chain],
+        chainLength: Int ,
         vecbinFile: String,
         outbinFile: String,
         vectorCount: Int, 
@@ -583,23 +583,6 @@ class Simulator {
             testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
         }
 
-        let boundaryOrder = chains.filter{ $0.kind == .boundary }[0]
-        var boundaryOutput = 0
-        var boundaryLength = 0
-        for element in boundaryOrder.order {
-            if element.kind != .output {
-                boundaryLength += element.width
-            } else {
-                boundaryOutput += element.width
-            }
-        }
-
-        let chainLength_1 =  chains.filter{ $0.kind != .boundary }[0].length
-        let chainLength_2 =  chains.filter{ $0.kind != .boundary }[1].length
-
-        print(boundaryLength)
-        print(chainLength_1)
-        print(chainLength_2)
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
@@ -622,9 +605,7 @@ class Simulator {
             reg [\(outputLength - 1):0] gmOutput[0:\(vectorCount - 1)];
 
             wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] samplePreload = 4'b 0001;
-            wire[3:0] preload_chain_1 = 4'b 0011;
-            wire[3:0] preload_chain_2 = 4'b 0110;
+            wire[3:0] preloadChain = 4'b 0011;
 
             initial begin
                 $dumpfile("dut.vcd"); // DEBUG
@@ -645,13 +626,15 @@ class Simulator {
                 input [\(vectorLength - 1):0] vector;
                 input [\(outputLength - 1):0] goldenOutput;
                 begin
-                    // 1. Preload Boundary-Scan Chain
-                    shiftIR(samplePreload);
+                   
+                    // Preload Scan-Chain with TV
+
+                    shiftIR(preloadChain);
                     enterShiftDR();
 
-                    for (i = 0; i < \(boundaryLength); i = i + 1) begin
-                        tdi = vector[\(vectorLength - boundaryLength) + i];
-                        if(i == \(boundaryLength - 1)) begin
+                    for (i = 0; i < \(vectorLength); i = i + 1) begin
+                        tdi = vector[i];
+                        if(i == \(vectorLength - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
                         #2;
@@ -661,87 +644,13 @@ class Simulator {
                     \(tms) = 1; // select-DR
                     #2;
 
-                    // 2. Preload Chain_1
-                    ShiftIRToSelectDR(preload_chain_1);
+                    // Capture & Shift-out Response
                     \(tms) = 0;     // capture DR -- shift DR
                     #4;
-                    for (i = 0; i < \(chainLength_1); i = i + 1) begin
-                        tdi = vector[\(vectorLength - boundaryLength - chainLength_1) + i];
-                        if(i == \(chainLength_1 - 1)) begin
-                            \(tms) = 1; // Exit-DR
-                        end
-                        #2;
-                    end
-
-                    \(tms) = 1; // update-DR
-                    #2;
-                    \(tms) = 1; // select-DR
-                    #2;
-
-                    // 3. Preload Chain_2
-                    ShiftIRToSelectDR(preload_chain_2);
-                    tms = 0;     // capture DR -- shift DR
-                    #4;
-                    for (i = 0; i < \(chainLength_2); i = i + 1) begin
-                        tdi = vector[\(vectorLength - boundaryLength - chainLength_1 - chainLength_2) + i];
-                        if(i == \(chainLength_2 - 1)) begin
-                            \(tms) = 1; // Exit-DR
-                        end
-                        #2;
-                    end
-
-                    \(tms) = 1; // update-DR
-                    #2;
-                    \(tms) = 1; // select-DR
-                    #2;
-
-                    // 4. Capture Response
-                    /* Pending adjusting internal scan-chain */
-
-                    // 5. Shift out Resonse
-
-                    //  a) Shift-out from Boundary Chain
-                    ShiftIRToSelectDR(samplePreload);
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
-                    for (i = 0; i< \(boundaryOutput);i = i + 1) begin
+                    for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[\(outputLength - boundaryOutput) + i] = \(tdo);
-                        if(i == \(boundaryOutput - 1)) begin
-                            \(tms) = 1; // Exit-DR
-                        end
-                        #2;
-                    end
-                    \(tms) = 1; // update-DR
-                    #2;
-                    \(tms) = 1; // select-DR
-                    #2;
-
-                    //  b) Shift-out from Internal Chain_1
-                    ShiftIRToSelectDR(preload_chain_1);
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
-                    for (i = 0; i < \(chainLength_1); i = i + 1) begin
-                        \(tdi) = 0;
-                        scanInSerial[\(outputLength - boundaryOutput - chainLength_1) + i] = \(tdo);
-                        if(i == \(chainLength_1 - 1)) begin
-                            \(tms) = 1; // Exit-DR
-                        end
-                        #2;
-                    end
-                    \(tms) = 1; // update-DR
-                    #2;
-                    \(tms) = 1; // select-DR
-                    #2;
-
-                    // c) Shift-out from Internal Chain_2
-                    ShiftIRToSelectDR(preload_chain_2);
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
-                    for (i = 0; i < \(chainLength_2); i = i + 1) begin
-                        \(tdi) = 0;
-                        scanInSerial[\(outputLength - boundaryOutput - chainLength_1 - chainLength_2) + i] = \(tdo);
-                        if(i == \(chainLength_2 - 1)) begin
+                        scanInSerial[i] = \(tdo);
+                        if(i == \(outputLength - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
                         #2;
@@ -755,30 +664,6 @@ class Simulator {
                         $error("SIMULATING_TV_FAILED");
                         $finish;
                     end
-                end
-            endtask
-
-            task ShiftIRToSelectDR;
-                input[3:0] instruction;
-                integer i;
-                begin
-                    \(tms) = 1; // select-IR
-                    #2;
-                    \(tms) = 0; // capture-IR
-                    #2;
-                    \(tms) = 0; // shift-IR
-                    #2;
-                    for (i = 0; i < 4; i = i + 1) begin
-                        \(tdi) = instruction[i];
-                        if(i == 3) begin
-                            \(tms) = 1;     // exit-ir
-                        end
-                        #2;
-                    end 
-                    \(tms) = 1;     // update-ir 
-                    #2;
-                    \(tms) =1;     // select-DR
-                    #2;
                 end
             endtask
 

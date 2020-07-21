@@ -70,11 +70,12 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     let (chain, boundaryCount, internalCount) = ChainMetadata.extract(file: netlist)
+
     let order = chain.filter{ $0.kind != .output }
     let orderOutput = chain.filter{ $0.kind != .input }
 
     let inputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
-    let outputOrder = tvinfo.inputs.filter{ $0.polarity != .input }
+    let jsOutOrder = tvinfo.inputs.filter{ $0.polarity != .input }
 
     var inputMap: [String: Int] = [:]
     var outputMap: [String: Int] = [:]
@@ -82,11 +83,8 @@ func assemble(arguments: [String]) -> Int32 {
     let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
     let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
 
-    // // Check input order 
+    // Check input order 
     let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
-    print(chainOrder.count)
-    print(inputOrder.count)
-
     if chainOrder.count != inputOrder.count {
         print("[Error]: Ordinal mismatch between TV and scan-chains.")
         return EX_DATAERR
@@ -95,16 +93,33 @@ func assemble(arguments: [String]) -> Int32 {
     for (i, input) in inputOrder.enumerated() {
         inputMap[input.name] = i
         if chainOrder[i].name != input.name {
-            print(chainOrder[i].name)
-            print(input.name)
             print("[Error]: Ordinal mismatch between TV and scan-chains.")
             return EX_DATAERR
         }
     }
-    
+
+    for (i, output) in jsOutOrder.enumerated() {
+        var name = (output.name.hasPrefix("\\")) ? String(output.name.dropFirst(1)): output.name
+        name = name.hasSuffix(".q") ? String(name.dropLast(2)): name
+        outputMap[name] = i
+    }
+
+    var outputDecimal: [[BigUInt]] = []
+    for tvcPair in tvinfo.coverageList {
+        var pointer = 0
+        var list: [BigUInt] = []
+        for (i, output) in jsOutOrder.enumerated() {
+            let start = tvcPair.goldenOutput.index(tvcPair.goldenOutput.startIndex, offsetBy: pointer)
+            let end = tvcPair.goldenOutput.index(start, offsetBy: output.width)
+            let value = String(tvcPair.goldenOutput[start..<end])
+            list.append(BigUInt(value, radix: 2)!)
+            pointer += output.width
+        }
+        outputDecimal.append(list)
+    }
+
     var outputLength: Int = 0 
     for (i, output) in outputSorted.enumerated() {
-        outputMap[output.name] = i
         if output.kind == .bypassOutput {
             print("Bypassing \(outputSorted[i].name)")
         } 
@@ -124,8 +139,9 @@ func assemble(arguments: [String]) -> Int32 {
 
     var binFileVec = "// test-vector \n"
     var binFileOut = "// fault-free-response \n"
-
-    for tvcPair in tvinfo.coverageList {
+    
+    let outputChain = orderOutput //.filter { $0.kind != .bypassOutput }
+    for (i, tvcPair) in tvinfo.coverageList.enumerated() {
         var binaryString = ""
         for element in orderSorted {
             var value: BigUInt = 0
@@ -141,31 +157,28 @@ func assemble(arguments: [String]) -> Int32 {
             }
             binaryString += pad(value, digits: element.width, radix: 2)
         } 
-        var pointer = 0
         var outputBinary = ""
-        let binary = tvcPair.goldenOutput.reversed()
-        print(binary)
-        for element in outputSorted {
-            var value = ""
-            if let locus = outputMap[element.name] {   
-                if element.kind == .bypassOutput {
-                    print("Padding output with zeros")
-                    value = pad(0, digits: element.width, radix: 2) 
-                } else {
-                    let start = binary.index(binary.startIndex, offsetBy: pointer)
-                    let end = binary.index(start, offsetBy: element.width)
-                    value = String(binary[start..<end])
-                    pointer += element.width
-                }  
-                outputBinary += value
+        for (_, element) in outputChain.enumerated() {
+            var value: BigUInt = 0
+            if let locus = outputMap[element.name] {  
+                value = outputDecimal[i][locus]
             } else {
+                if element.kind == .bypassOutput {
+                    value = 0
+                    print("Padding output with zeros")
+                } else {
+                    print("[Error]: Mismatch between output port \(element.name) and chained netlist. ")
+                    return EX_DATAERR
+                }
             }
+            print(element.name, ": ", element.width,  pad(value, digits: element.width, radix: 2))
+            outputBinary = outputBinary + pad(value, digits: element.width, radix: 2).reversed()
         }
-
         binFileVec += binaryString + "\n"
         binFileOut += outputBinary + " \n"
     }
 
+    print(outputDecimal)
     let vectorCount = tvinfo.coverageList.count
     let vectorLength = order.map{ $0.width }.reduce(0, +)
 
