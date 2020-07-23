@@ -10,13 +10,11 @@ class BoundaryScanRegisterCreator {
     var clock: String
     var reset: String
     var resetActive: Simulator.Active
-    
-    private var clockDRIdentifier: PythonObject
-    private var updateIdentifier: PythonObject
-    private var shiftIdentifier: PythonObject
+    var testing: String
+
     private var clockIdentifier: PythonObject
     private var resetIdentifier: PythonObject
-    private var modeIdentifier: PythonObject
+    private var testingIdentifier: PythonObject
 
     private var Node: PythonObject
 
@@ -25,10 +23,7 @@ class BoundaryScanRegisterCreator {
         clock: String,
         reset: String,
         resetActive: Simulator.Active,
-        clockDR: String,
-        update: String,
-        shift: String,
-        mode: String,
+        testing: String,
         using Node: PythonObject
     ) {
         self.name = name
@@ -43,10 +38,8 @@ class BoundaryScanRegisterCreator {
 
         self.resetActive = resetActive
 
-        self.clockDRIdentifier = Node.Identifier(clockDR)
-        self.updateIdentifier = Node.Identifier(update)
-        self.shiftIdentifier = Node.Identifier(shift)
-        self.modeIdentifier = Node.Identifier(mode)
+        self.testing = testing
+        self.testingIdentifier = Node.Identifier(testing)
 
         self.Node = Node
     }
@@ -63,9 +56,8 @@ class BoundaryScanRegisterCreator {
         let doutIdentifier = Node.Identifier(dout)
         let sinIdentifier = Node.Identifier(sin)
         let soutIdentifier = Node.Identifier(sout)
-
         let ordinalConstant = Node.Constant(ordinal)
-    
+
         let name = input ? inputName : outputName
         
         let portArguments = [
@@ -75,10 +67,7 @@ class BoundaryScanRegisterCreator {
             Node.PortArg("sout", soutIdentifier),
             Node.PortArg("clock", clockIdentifier),
             Node.PortArg("reset", resetIdentifier),
-            Node.PortArg("shiftDR", shiftIdentifier),
-            Node.PortArg("clockDR", clockDRIdentifier),
-            Node.PortArg("updateDR", updateIdentifier),
-            Node.PortArg("mode", modeIdentifier)
+            Node.PortArg("testing", testingIdentifier)
         ]
 
         let submoduleInstance = Node.Instance(
@@ -100,46 +89,29 @@ class BoundaryScanRegisterCreator {
     var inputDefinition: String {
         return """
         module \(inputName) (
-            din,     
-            dout,   
-            sin,  
-            sout, 
+            din,
+            dout,
+            sin,
+            sout,
             clock,
             reset,
-            shiftDR,
-            clockDR,
-            updateDR,
-            mode
+            testing
         );
             input din; output dout;
             input sin; output sout;
-            input clock, reset, shiftDR, clockDR, updateDR;
-            input mode;
+            input clock, reset, testing;
 
-            reg store;  
-            reg sout;  
-            
-            wire selectedInput = shiftDR ? sin : din;
-
+            wire testMode = 1;
+            reg store;
             always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
                 if (\(resetActive == .high ? "" : "~") reset) begin
-                    sout <= 1'b0;
-                end else begin
-                    if(clockDR) 
-                        sout <= selectedInput;
-                end
-            end
-
-            always @ (negedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
-                 if (\(resetActive == .high ? "" : "~") reset) begin
                     store <= 1'b0;
                 end else begin
-                    if(updateDR)
-                        store <= sout;
+                    store <= testing ? sin: dout;
                 end
             end
-        assign dout = mode ? store : din;
-
+            assign sout = store;
+            assign dout = testMode ? store : din;
         endmodule
             
         """
@@ -148,51 +120,33 @@ class BoundaryScanRegisterCreator {
     var outputDefinition: String {
         return """
         module \(outputName) (
-            din,     
-            dout,   
-            sin,  
-            sout, 
+            din,
+            dout,
+            sin,
+            sout,
             clock,
             reset,
-            shiftDR,
-            clockDR,
-            updateDR,
-            mode
+            testing
         );
             input din; output dout;
             input sin; output sout;
-            input clock, reset, shiftDR, clockDR, updateDR;
-            input mode;
-
-            reg store;  
-            reg sout;  
-            
-            wire selectedInput = shiftDR ? sin : din;
-
+            input clock, reset, testing;
+            reg store;
             always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
                 if (\(resetActive == .high ? "" : "~") reset) begin
-                    sout <= 1'b0;
-                end else begin
-                    if(clockDR) 
-                        sout <= selectedInput;
-                end
-            end
-
-            always @ (negedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
-                 if (\(resetActive == .high ? "" : "~") reset) begin
                     store <= 1'b0;
                 end else begin
-                    if(updateDR)
-                        store <= sout;
+                    store <= testing ? sin: din;
                 end
             end
-            assign dout = mode ? store : din;
-
+            assign sout = store;
+            assign dout = din;
         endmodule
-
+            
         """
     }
 }
+
 
 class scanCellCreator {
 

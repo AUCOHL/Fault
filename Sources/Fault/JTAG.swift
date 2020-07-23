@@ -34,6 +34,8 @@ class jtagCreator {
             Node.Wire(states.update),
             Node.Wire(states.capture),
             Node.Wire(states.idle),
+            Node.Wire(states.exit1),
+            Node.Wire(states.exit2),
             Node.Wire(selects.extest),
             Node.Wire(selects.samplePreload),
             Node.Wire(selects.mbist),
@@ -90,8 +92,16 @@ class jtagCreator {
                 Node.Identifier(states.capture)
             ),
             Node.PortArg(
-                states.capture,
+                states.idle,
                 Node.Identifier(states.idle)
+            ),
+            Node.PortArg(
+                states.exit1,
+                Node.Identifier(states.exit1)
+            ),
+            Node.PortArg(
+                states.exit2,
+                Node.Identifier(states.exit2)
             ),
             // Select signals for boundary scan or mbist
             Node.PortArg(
@@ -116,7 +126,7 @@ class jtagCreator {
             ),
             //  TDO signal that is connected to TDI of sub-modules.
             Node.PortArg(
-                jtagInfo.tdoSignal,
+                jtagInfo.tdoSignal, 
                 Node.Identifier(jtagInfo.tdoSignal)
             ),
             // TDI signals from sub-modules
@@ -207,18 +217,24 @@ struct State: Codable {
     var update: String
     var capture: String
     var idle: String
+    var exit1: String
+    var exit2: String
     init(
        shift: String,
        pause: String,
        update: String,
        capture: String,
-       idle: String
+       idle: String,
+       exit1: String,
+       exit2: String
     ) {
         self.shift = shift
         self.pause = pause
         self.update = update
         self.capture = capture
         self.idle = idle
+        self.exit1 = exit1
+        self.exit2 = exit2
     }
 }
 

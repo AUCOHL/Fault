@@ -89,9 +89,6 @@ func jtagCreate(arguments: [String]) -> Int32{
         ("sout", "scan-chain serial data out"),
         ("shift", "scan-chain shift enable"),
         ("test", "scan-chain test enable"),
-        ("clockDR", "scan cell clockDR"),
-        ("update", "Input/Output scan-cell update enable"),
-        ("mode", "Input/Output scan-cell mode select"),
         ("tms", "JTAG test mode select"),
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
@@ -226,12 +223,6 @@ func jtagCreate(arguments: [String]) -> Int32{
         ?? names["shift"]!.default
     let testName = names["test"]!.option.value
         ?? names["test"]!.default
-    let clockDRName = names["clockDR"]!.option.value
-        ?? names["clockDR"]!.default
-    let updateName = names["update"]!.option.value
-        ?? names["update"]!.default
-    let modeName = names["mode"]!.option.value
-        ?? names["mode"]!.default
     let tmsName = names["tms"]!.option.value 
         ?? names["tms"]!.default
     let tdiName = names["tdi"]!.option.value 
@@ -243,7 +234,7 @@ func jtagCreate(arguments: [String]) -> Int32{
     let trstName = names["trst"]!.option.value 
         ?? names["trst"]!.default
 
-    // // MARK: Internal signals
+    // MARK: Internal signals
     print("Adding JTAG port…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__DESIGN__UNDER__TEST__"
@@ -259,9 +250,6 @@ func jtagCreate(arguments: [String]) -> Int32{
             soutName,
             shiftName,
             tckName,
-            updateName,
-            clockDRName,
-            modeName,
             testName
         ] 
         let topModulePorts = Python.list(ports.filter {
@@ -304,7 +292,7 @@ func jtagCreate(arguments: [String]) -> Int32{
                 statements.append(inputStatement)
             }
             else {
-                let portIdentifier = (input.name == sinName) ? tdiName : input.name
+                let portIdentifier = input.name
                 portArguments.append(Node.PortArg(
                     input.name,
                     Node.Identifier(portIdentifier)
@@ -361,9 +349,6 @@ func jtagCreate(arguments: [String]) -> Int32{
 
         statements.extend(wireDeclarations)
         statements.extend([
-            Node.Wire(clockDRName),
-            Node.Wire(updateName),
-            Node.Wire(modeName),
             Node.Wire(shiftName),
             Node.Wire(testName),
             Node.Wire(sinName),
@@ -379,14 +364,16 @@ func jtagCreate(arguments: [String]) -> Int32{
 
         let tdiIdentifier = Node.Identifier(jtagInfo.inputTdi.chain)
         let shiftIdentifier = Node.And(
-            Node.Identifier(jtagInfo.states.shift),
+           Node.Or(
+                Node.Identifier(jtagInfo.states.pause),
+                Node.Or(
+                    Node.Identifier(jtagInfo.states.shift),
+                    Node.Identifier(jtagInfo.states.exit1)
+                )
+            ),
             Node.Identifier(jtagInfo.selects.preloadChain)
         )
         // sout and tdi signals assignment
-        statements.append(Node.Assign(
-            Node.Rvalue(tdiIdentifier),
-            Node.Lvalue(Node.Identifier(soutName))
-        ))
         statements.append(Node.Assign(
             Node.Rvalue(Node.Identifier(shiftName)),
             Node.Lvalue(shiftIdentifier)
@@ -402,54 +389,36 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Rvalue(ternary)
         )
         statements.append(tdoAssignment)
-        // Mode select assign statement
-        let modeCond = Node.Cond(
-            Node.Identifier(jtagInfo.selects.preloadChain),
-            Node.IntConst("1'b0"),
-            Node.IntConst("1'b0")
-        )
-        let modeAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(modeName)),
-            Node.Rvalue(modeCond)
-        )
-        statements.append(modeAssignment)
-
-        // Clock DR assign statement
-        let and = Node.And(
-            Node.Identifier(jtagInfo.selects.preloadChain),
-            Node.Identifier(jtagInfo.states.shift)
-        )
-        let or = Node.Or(
-            and,
-            Node.Identifier(jtagInfo.states.capture)
-        )
-        let clockCond = Node.Cond(
-            or,
-            Node.IntConst("1'b1"),
-            Node.IntConst("1'b0")
-        )
-        let clockDRAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(clockDRName)),
-            Node.Rvalue(clockCond)
-        )
-        statements.append(clockDRAssignment)
-        
-        // Update-DR Assignment
-        let updateCond = Node.And(
-            Node.Identifier(jtagInfo.selects.preloadChain),
-            Node.Identifier(jtagInfo.states.update)
-        )
-        let updateAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(updateName)),
-            Node.Rvalue(updateCond)
-        )
-        statements.append(updateAssignment)
         // Test enable assignment
         let testAssignment = Node.Assign(
             Node.Lvalue(Node.Identifier(testName)),
             Node.Rvalue(Node.IntConst("1'b1"))
         )
         statements.append(testAssignment)
+
+        // sin assignment
+        let sinAssignment = Node.Assign(
+            Node.Lvalue(Node.Identifier(sinName)),
+            Node.Rvalue(Node.Identifier(jtagInfo.tdoSignal))
+        )
+        statements.append(sinAssignment)
+
+        // sout negedge sample
+        let soutRegister = Node.Reg("sout_sampled")
+        let sens = Node.Sens(Node.Identifier(tckName), "negedge")
+        let senslist = Node.SensList([ sens ])
+        let statement = Node.Block([ Node.NonblockingSubstitution(
+            Node.Lvalue(Node.Identifier("sout_sampled")),
+            Node.Rvalue(Node.Identifier(soutName))
+        )])
+        let always = Node.Always(senslist, statement)
+        statements.append(soutRegister)
+        statements.append(always)
+        // chain_tdi ssignment
+        statements.append(Node.Assign(
+            Node.Rvalue(tdiIdentifier),
+            Node.Lvalue(Node.Identifier("sout_sampled"))
+        ))
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -524,7 +493,7 @@ func jtagCreate(arguments: [String]) -> Int32{
 
         try File.open(output, mode: .write) {
             try $0.print(String.boilerplate)
-           // try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
+            // try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
             try $0.print(content)
         }
 

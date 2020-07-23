@@ -263,6 +263,7 @@ class Testbench {
                     \(tdi) = serializable[i];
                     #2;
                 end
+                #1;
                 for(i = 0; i< \(chainLength); i = i + 1) begin
                     serial[i] = \(tdo);
                     #2;

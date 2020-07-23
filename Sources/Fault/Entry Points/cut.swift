@@ -191,20 +191,25 @@ func cut(arguments: [String]) -> Int32 {
                             for (i, element) in list.enumerated() {
                                 var name = ""
                                 var statement: PythonObject
-
+                                var assignStatement: PythonObject
                                 if input {
                                     name = "\\" + instanceName + "_\(portName)_\(i).q"
                                     statement = Node.Output(name)
+                                    assignStatement = Node.Assign(
+                                        Node.Lvalue(Node.Identifier(name)),
+                                        Node.Rvalue(element)
+                                    )
+                                    
                                 }
                                 else {
                                     name =  instanceName + "_\(portName)_\(i)"
                                     statement = Node.Input(name)
+                                    assignStatement = Node.Assign(
+                                        Node.Lvalue(element),
+                                        Node.Rvalue(Node.Identifier(name))
+                                    )
+                                    
                                 }
-
-                                let assignStatement = Node.Assign(
-                                    Node.Lvalue(Node.Identifier(name)),
-                                    Node.Rvalue(element)
-                                )
                                 items.append(assignStatement)
                                 declarations.append(statement)
                                 ports.append(Node.Port(name, Python.None, Python.None, Python.None))
@@ -217,23 +222,25 @@ func cut(arguments: [String]) -> Int32 {
 
                             var name = ""
                             var statement: PythonObject
-
+                            var assignStatement: PythonObject
                             if input {
                                 name = "\\" + instanceName + "_\(portName).q" 
                                 statement = Node.Output(name) 
-                            
+                                assignStatement = Node.Assign(
+                                    Node.Lvalue(Node.Identifier(name)),
+                                    Node.Rvalue(hook.argname)
+                                )
                             } else {
                                 name = instanceName + ".\(portName)"
                                 statement = Node.Input(name)
+                                assignStatement = Node.Assign(
+                                    Node.Lvalue(hook.argname),
+                                    Node.Rvalue(Node.Identifier(name))
+                                )
                             }
-
+                            items.append(assignStatement)
                             declarations.append(statement)
                             ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                            let assignStatement = Node.Assign(
-                                Node.Lvalue(Node.Identifier(name)),
-                                Node.Rvalue(hook.argname)
-                            )
-                            items.append(assignStatement)
                         } 
                     }
                 }

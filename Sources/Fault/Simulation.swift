@@ -360,9 +360,6 @@ class Simulator {
         resetActive: Active = .low,
         shift: String,
         test: String,
-        clockDR: String,
-        update: String,
-        mode: String,
         output: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -424,9 +421,6 @@ class Simulator {
                 \(reset) = ~\(reset);
                 \(shift) = 1;
                 \(test) = 1;
-                \(clockDR) = 1;
-                \(update) = 1;
-                \(mode) = 0;
                 for (i = 0; i < \(chainLength); i = i + 1) begin
                     sin = serializable[i];
                     #2;
@@ -579,7 +573,7 @@ class Simulator {
             resetToggler = "\(reset) = ~\(reset);"
         }
         var testStatements = ""
-        for i in 0..<1 {  //vectorCount
+        for i in 0..<vectorCount {  
             testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
         }
 
@@ -598,7 +592,7 @@ class Simulator {
                 \(portHooks.dropLast(2))
             );
 
-            integer i;
+            integer i, error;
 
             reg [\(outputLength - 1):0] scanInSerial;
             reg [\(vectorLength - 1):0] vectors [0:\(vectorCount - 1)];
@@ -634,22 +628,31 @@ class Simulator {
 
                     for (i = 0; i < \(vectorLength); i = i + 1) begin
                         tdi = vector[i];
-                        if(i == \(vectorLength - 1)) begin
+                        if (i == \(vectorLength - 3)) begin
                             \(tms) = 1; // Exit-DR
+                        end
+                        if (i == \(vectorLength - 2)) begin
+                            \(tms) = 0; // Pause-DR
+                        end
+                        if (i == \(vectorLength - 1)) begin
+                            \(tms) = 1; // Exit2-DR
                         end
                         #2;
                     end
-                    \(tms) = 1; // update-DR
-                    #2;
-                    \(tms) = 1; // select-DR
-                    #2;
 
-                    // Capture & Shift-out Response
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
+                    \(tms) = 0; // Shift-DR
+                    #2;
+                    // Shift-out response
+                    error = 0;
+                    #1;
                     for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
                         scanInSerial[i] = \(tdo);
+                        if (scanInSerial[i] != goldenOutput[i]) begin
+                            $display("Error simulating output response at bit number %0d    \
+                            Expected %0b, Got %0b", i, goldenOutput[i], scanInSerial[i]);
+                            error = error + 1;
+                        end
                         if(i == \(outputLength - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
@@ -661,6 +664,7 @@ class Simulator {
                     #2;
 
                     if(scanInSerial !== goldenOutput) begin
+                        $display("Simulating TV failed, number fo errors %0d : ", error);
                         $error("SIMULATING_TV_FAILED");
                         $finish;
                     end

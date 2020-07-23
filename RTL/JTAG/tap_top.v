@@ -132,6 +132,8 @@ module tap_top(
                 pause_dr_o, 
                 update_dr_o,
                 capture_dr_o,
+                exit1_dr_o,
+                exit2_dr_o,
                 
                 // Select signals for boundary scan or mbist
                 extest_select_o, 
@@ -168,6 +170,8 @@ output  pause_dr_o;
 output  update_dr_o;
 output  capture_dr_o;
 output  test_logic_reset_o;
+output  exit1_dr_o;
+output  exit2_dr_o;
 
 // Select signals for boundary scan or mbist
 output  extest_select_o;
@@ -220,6 +224,8 @@ assign pause_dr_o = pause_dr;
 assign update_dr_o = update_dr;
 assign capture_dr_o = capture_dr;
 assign test_logic_reset_o = test_logic_reset;
+assign exit1_dr_o = exit1_dr;
+assign exit2_dr_o = exit2_dr;
 
 assign extest_select_o = extest_select;
 assign sample_preload_select_o = sample_preload_select;

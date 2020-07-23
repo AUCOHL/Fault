@@ -12,7 +12,9 @@
         "pause": "pause_dr_o",
         "update": "update_dr_o",
         "capture": "capture_dr_o",
-        "idle": "test_logic_reset_o"  
+        "idle": "test_logic_reset_o",
+        "exit1": "exit1_dr_o",
+        "exit2": "exit2_dr_o"
     },
     "selects": {
         "extest": "extest_select_o",
@@ -21,7 +23,7 @@
         "debug": "debug_select_o",
         "preloadChain": "preload_chain_o"
     },
-    "tdoSignal": "tdo_o",
+    "tdoSignal": "tdo_o", 
     "inputTdi": {
         "debug": "debug_tdi_i",
         "bsChain": "bs_chain_tdi_i",

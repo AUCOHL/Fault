@@ -55,8 +55,8 @@ func assemble(arguments: [String]) -> Int32 {
     let json = jsonArgs[0]
     let netlist = vArgs[0]
 
-    let vectorOutput = filePath.value ?? json + "_vec.bin"
-    let goldenOutput = filePath.value ?? json + "_out.bin"
+    let vectorOutput = filePath.value ?? json + ".vec.bin"
+    let goldenOutput = filePath.value ?? json + ".out.bin"
 
     guard let jsonString = File.read(json) else {
         fputs("Could not read file '\(json)'\n", stderr)
@@ -69,36 +69,37 @@ func assemble(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    let (chain, boundaryCount, internalCount) = ChainMetadata.extract(file: netlist)
+    let (chain, _, _) = ChainMetadata.extract(file: netlist)
 
     let order = chain.filter{ $0.kind != .output }
-    let orderOutput = chain.filter{ $0.kind != .input }
+    let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
 
-    let inputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
-    let jsOutOrder = tvinfo.inputs.filter{ $0.polarity != .input }
+    let orderOutput = chain.filter{ $0.kind != .input }
+    let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
+
+    let jsInputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
+    let jsOutputOrder = tvinfo.inputs.filter{ $0.polarity != .input }
 
     var inputMap: [String: Int] = [:]
     var outputMap: [String: Int] = [:]
 
-    let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
-    let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
-
     // Check input order 
     let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
-    if chainOrder.count != inputOrder.count {
+
+    if chainOrder.count != jsInputOrder.count {
         print("[Error]: Ordinal mismatch between TV and scan-chains.")
         return EX_DATAERR
     }
 
-    for (i, input) in inputOrder.enumerated() {
+    for (i, input) in jsInputOrder.enumerated() {
         inputMap[input.name] = i
         if chainOrder[i].name != input.name {
-            print("[Error]: Ordinal mismatch between TV and scan-chains.")
+            print("[Error]: Ordinal mismatch between TV input \(input.name) and scan-chain register \(chainOrder[i].name).")
             return EX_DATAERR
         }
     }
 
-    for (i, output) in jsOutOrder.enumerated() {
+    for (i, output) in jsOutputOrder.enumerated() {
         var name = (output.name.hasPrefix("\\")) ? String(output.name.dropFirst(1)): output.name
         name = name.hasSuffix(".q") ? String(name.dropLast(2)): name
         outputMap[name] = i
@@ -108,10 +109,11 @@ func assemble(arguments: [String]) -> Int32 {
     for tvcPair in tvinfo.coverageList {
         var pointer = 0
         var list: [BigUInt] = []
-        for (i, output) in jsOutOrder.enumerated() {
-            let start = tvcPair.goldenOutput.index(tvcPair.goldenOutput.startIndex, offsetBy: pointer)
-            let end = tvcPair.goldenOutput.index(start, offsetBy: output.width)
-            let value = String(tvcPair.goldenOutput[start..<end])
+        let outputBinary = tvcPair.goldenOutput.reversed()
+        for (i, output) in jsOutputOrder.enumerated() {
+            let start = outputBinary.index(outputBinary.startIndex, offsetBy: pointer)
+            let end = outputBinary.index(start, offsetBy: output.width)
+            let value = String(outputBinary[start..<end])
             list.append(BigUInt(value, radix: 2)!)
             pointer += output.width
         }
@@ -139,8 +141,6 @@ func assemble(arguments: [String]) -> Int32 {
 
     var binFileVec = "// test-vector \n"
     var binFileOut = "// fault-free-response \n"
-    
-    let outputChain = orderOutput //.filter { $0.kind != .bypassOutput }
     for (i, tvcPair) in tvinfo.coverageList.enumerated() {
         var binaryString = ""
         for element in orderSorted {
@@ -149,36 +149,40 @@ func assemble(arguments: [String]) -> Int32 {
                 value = tvcPair.vector[locus]
             } else {
                 if element.kind == .bypassInput {
+                    print("Padded with zeros: ", element.name)
                     value = 0 
                 } else {
                     print("Chain register \(element.name) not found in the TVs.")
                     return EX_DATAERR
                 }
             }
-            binaryString += pad(value, digits: element.width, radix: 2)
+            binaryString += pad(value, digits: element.width, radix: 2).reversed()
         } 
         var outputBinary = ""
-        for (_, element) in outputChain.enumerated() {
+        for (j, element) in orderOutput.enumerated() {
             var value: BigUInt = 0
             if let locus = outputMap[element.name] {  
                 value = outputDecimal[i][locus]
+                outputBinary += pad(value, digits: element.width, radix: 2)
             } else {
                 if element.kind == .bypassOutput {
-                    value = 0
-                    print("Padding output with zeros")
+                    // guard let vectorLocus = inputMap[element.name] else {
+                    //     print("[Error]: Blackbox module outptut port \(element.name) not found in .json. ")
+                    //     return EX_DATAERR
+                    // }
+                    // value = tvcPair.vector[vectorLocus]
+                    outputBinary += String(repeating: "x", count: element.width)
+                    print("Output is same as the loaded TV")
                 } else {
                     print("[Error]: Mismatch between output port \(element.name) and chained netlist. ")
                     return EX_DATAERR
                 }
             }
-            print(element.name, ": ", element.width,  pad(value, digits: element.width, radix: 2))
-            outputBinary = outputBinary + pad(value, digits: element.width, radix: 2).reversed()
         }
         binFileVec += binaryString + "\n"
         binFileOut += outputBinary + " \n"
     }
 
-    print(outputDecimal)
     let vectorCount = tvinfo.coverageList.count
     let vectorLength = order.map{ $0.width }.reduce(0, +)
 
