@@ -6,7 +6,7 @@ struct ChainRegister: Codable {
         case input
         case output
         case dff
-        case bypassInput // bypass when loading the TV (loaded with zeros)
+        case bypassInput  // bypass when loading the TV (loaded with zeros)
         case bypassOutput // bypass when shifting out the response ()
     }
     var name: String
@@ -18,34 +18,6 @@ struct ChainRegister: Codable {
         self.kind = kind
         self.ordinal = ordinal
         self.width = width
-    }
-}
-
-struct Chain: Codable {
-    var sin: String
-    var sout: String
-    var shift: String
-    var capture: String
-    var length: Int
-    var order: [ChainRegister]
-    var kind: ScanChain.ChainKind
-    
-    init(
-        sin: String,
-        sout: String,
-        shift: String,
-        capture: String = "",
-        length: Int,
-        order: [ChainRegister],
-        kind: ScanChain.ChainKind
-    ) {
-        self.sin = sin
-        self.sout = sout
-        self.shift = shift
-        self.capture = capture
-        self.length = length
-        self.order = order
-        self.kind = kind
     }
 }
 
@@ -96,36 +68,6 @@ struct ChainMetadata: Codable {
     }
 }
 
-struct JTAGMetadata: Codable {
-    var IRLength: Int 
-    var boundaryCount: Int
-    var internalCount: Int
-    var tdi: String
-    var tms: String
-    var tck: String
-    var tdo: String
-    var trst: String
-
-    init (
-        IRLength: Int,
-        boundaryCount: Int,
-        internalCount: Int,
-        tdi: String,
-        tms: String, 
-        tck: String,
-        tdo: String,
-        trst: String
-    ) {
-        self.IRLength = IRLength
-        self.boundaryCount = boundaryCount
-        self.internalCount = internalCount
-        self.tdi = tdi
-        self.tms = tms
-        self.tck = tck
-        self.tdo = tdo
-        self.trst = trst
-    }
-}
 struct binMetadata: Codable {
     var count: Int
     var length: Int

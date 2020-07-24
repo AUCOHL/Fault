@@ -34,6 +34,7 @@ class jtagCreator {
             Node.Wire(states.update),
             Node.Wire(states.capture),
             Node.Wire(states.idle),
+            Node.Wire(states.reset),
             Node.Wire(states.exit1),
             Node.Wire(states.exit2),
             Node.Wire(selects.extest),
@@ -94,6 +95,10 @@ class jtagCreator {
             Node.PortArg(
                 states.idle,
                 Node.Identifier(states.idle)
+            ),
+            Node.PortArg(
+                states.reset,
+                Node.Identifier(states.reset)
             ),
             Node.PortArg(
                 states.exit1,
@@ -217,6 +222,7 @@ struct State: Codable {
     var update: String
     var capture: String
     var idle: String
+    var reset: String
     var exit1: String
     var exit2: String
     init(
@@ -225,6 +231,7 @@ struct State: Codable {
        update: String,
        capture: String,
        idle: String,
+       reset: String,
        exit1: String,
        exit2: String
     ) {
@@ -233,6 +240,7 @@ struct State: Codable {
         self.update = update
         self.capture = capture
         self.idle = idle
+        self.reset = reset
         self.exit1 = exit1
         self.exit2 = exit2
     }

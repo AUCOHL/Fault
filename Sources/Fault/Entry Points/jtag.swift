@@ -3,7 +3,7 @@ import CommandLineKit
 import PythonKit
 import Defile
 
-func jtagCreate(arguments: [String]) -> Int32{
+func jtagCreate(arguments: [String]) -> Int32 {
     let env = ProcessInfo.processInfo.environment
     let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
 
@@ -81,6 +81,12 @@ func jtagCreate(arguments: [String]) -> Int32{
         helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
     )
     cli.addOptions(ignored)
+
+    let blackbox = StringOption(
+        longFlag: "blackbox",
+        helpMessage: "Blackbox module (.v) to use for simulation. (Default: none)"
+    )
+    cli.addOptions(blackbox)
 
     var names: [String: (default: String, option: StringOption)] = [:]
 
@@ -389,10 +395,16 @@ func jtagCreate(arguments: [String]) -> Int32{
             Node.Rvalue(ternary)
         )
         statements.append(tdoAssignment)
-        // Test enable assignment
+        // Test mode assignment
+        let testCondition = Node.Unot(
+            Node.Or(
+                Node.Identifier(jtagInfo.states.idle), 
+                Node.Identifier(jtagInfo.states.reset)
+            )
+        )
         let testAssignment = Node.Assign(
             Node.Lvalue(Node.Identifier(testName)),
-            Node.Rvalue(Node.IntConst("1'b1"))
+            Node.Rvalue(testCondition)
         )
         statements.append(testAssignment)
 
@@ -474,26 +486,9 @@ func jtagCreate(arguments: [String]) -> Int32{
         guard let content = File.read(output) else {
             throw "Could not re-read created file."
         }
-           
-        // let metadata = JTAGMetadata(
-        //     IRLength: 4,
-        //     boundaryCount: boundaryCount,
-        //     internalCount: internalCount,
-        //     tdi: tdiName,
-        //     tms: tmsName, 
-        //     tck: tckName,
-        //     tdo: tdoName,
-        //     trst: trstName
-        // )
-        
-        // guard let metadataString = metadata.toJSON() else {
-        //     fputs("Could not generate metadata string.", stderr)
-        //     return EX_SOFTWARE
-        // }
 
         try File.open(output, mode: .write) {
             try $0.print(String.boilerplate)
-            // try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
             try $0.print(content)
         }
 

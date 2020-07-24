@@ -12,7 +12,8 @@
         "pause": "pause_dr_o",
         "update": "update_dr_o",
         "capture": "capture_dr_o",
-        "idle": "test_logic_reset_o",
+        "reset": "test_logic_reset_o",
+        "idle": "run_test_idle_o",
         "exit1": "exit1_dr_o",
         "exit2": "exit2_dr_o"
     },

@@ -93,10 +93,7 @@
 //
 // Revision 1.1  2002/03/08 15:28:16  mohor
 // Structure changed. Hooks for jtag chain added.
-//
-//
-//
-//
+
 
 // Define IDCODE Value
 `define IDCODE_VALUE  32'h149511c3
@@ -134,14 +131,15 @@ module tap_top(
                 capture_dr_o,
                 exit1_dr_o,
                 exit2_dr_o,
-                
+                test_logic_reset_o,
+                run_test_idle_o,
+
                 // Select signals for boundary scan or mbist
                 extest_select_o, 
                 sample_preload_select_o,
                 mbist_select_o,
                 debug_select_o,
-                test_logic_reset_o,
-                
+              
                 // Select signals for internal scan-chain 
                 preload_chain_o,
 
@@ -170,6 +168,7 @@ output  pause_dr_o;
 output  update_dr_o;
 output  capture_dr_o;
 output  test_logic_reset_o;
+output  run_test_idle_o;
 output  exit1_dr_o;
 output  exit2_dr_o;
 
@@ -224,6 +223,7 @@ assign pause_dr_o = pause_dr;
 assign update_dr_o = update_dr;
 assign capture_dr_o = capture_dr;
 assign test_logic_reset_o = test_logic_reset;
+assign run_test_idle_o = run_test_idle;
 assign exit1_dr_o = exit1_dr;
 assign exit2_dr_o = exit2_dr;
 

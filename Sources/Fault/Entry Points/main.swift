@@ -127,6 +127,12 @@ func main(arguments: [String]) -> Int32 {
     )
     cli.addOptions(ignored)
     
+    let holdLow = BoolOption(
+        longFlag: "holdLow",
+        helpMessage: "Hold ignored inputs to low in the simulation instead of high. (Default: holdHigh)"
+    )
+    cli.addOptions(holdLow)
+
     let clock = StringOption(
         longFlag: "clock",
         helpMessage: "clock name to use for simulation in case of partial scan-chain. (Default: none)"
@@ -198,7 +204,7 @@ func main(arguments: [String]) -> Int32 {
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     let behavior
         = Array<Simulator.Behavior>(
-            repeating: .holdHigh,
+            repeating: holdLow.value ? .holdLow : .holdHigh,
             count: ignoredInputs.count
         )
 

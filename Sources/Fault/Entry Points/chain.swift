@@ -310,17 +310,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
                 } else if let name = isolatedName, name == instanceName {
                     // MARK: Isolating hard blocks
-                    print("Chaining hard module...")
+                    print("Chaining blackbox module...")
                     let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
                     let isolatedInputs = inputs.map { $0.name }
                     var counter = 0
 
                     let scCreator = BoundaryScanRegisterCreator(
                         name: "BoundaryScanRegister",
-                        clock: clockName,
+                        clock: tckName,
                         reset: resetName,
                         resetActive: resetActiveLow.value ? .low : .high,                
-                        testing: shiftName,
+                        testing: testName,
+                        shift: shiftName,
                         using: Node
                     )
 
@@ -337,27 +338,45 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     continue
                                 }
 
-                                let doutName = elementName + "_\(i)" + "__dout"
-                                let doutStatement = Node.Wire(doutName)
-                                statements.append(doutStatement)
-                                list.append(Node.Identifier(doutName))
-                                
                                 var kind: ChainRegister.Kind
                                 if input {
-                                    kind = .bypassInput                              
+                                    let doutName = elementName + "_\(i)" + "__dout"
+                                    let doutStatement = Node.Wire(doutName)
+
+                                    statements.append(doutStatement)
+                                    list.append(Node.Identifier(doutName))   
+                                    
+                                    statements.append(
+                                        scCreator.create(
+                                            ordinal: 0,
+                                            din: elementName,
+                                            dout: doutName,
+                                            sin: "\(previousOutput)",
+                                            sout: inputName.uniqueName(counter + 1),
+                                            input: !input
+                                        )
+                                    )
+                                    kind = .bypassInput  
+
                                 } else {
+                                    let dinName = elementName + "_\(i)" + "__din"
+                                    let dinStatement = Node.Wire(dinName)
+
+                                    statements.append(dinStatement)
+                                    list.append(Node.Identifier(dinName))   
+                                    
+                                    statements.append(
+                                        scCreator.create(
+                                            ordinal: 0,
+                                            din: dinName,
+                                            dout: elementName,
+                                            sin: "\(previousOutput)",
+                                            sout: inputName.uniqueName(counter + 1),
+                                            input: !input
+                                        )
+                                    )
                                     kind = .bypassOutput
                                 }
-                                statements.append(
-                                    scCreator.create(
-                                        ordinal: 0,
-                                        din: elementName,
-                                        dout: doutName,
-                                        sin: "\(previousOutput)",
-                                        sout: inputName.uniqueName(counter + 1),
-                                        input: !input
-                                    )
-                                 )
                                 internalOrder.append(
                                     ChainRegister(
                                         name: instanceName + "_\(portName)_\(i)",  
@@ -374,29 +393,46 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             if ignoredInputs.contains(argName) {
                                 continue
                             }
-                            
-                            let doutName = argName + "__dout"
-                            let doutStatement = Node.Wire(doutName)
-                            statements.append(doutStatement)
-
-                            hook.argname = Node.Identifier(doutName)
-
+                        
                             var kind: ChainRegister.Kind
                             if input {
-                                kind = .bypassInput
-                            } else { 
-                                kind = .bypassOutput                         
-                            }
-                            statements.append(
-                                scCreator.create(
-                                    ordinal: 0,
-                                    din: argName,
-                                    dout: doutName,
-                                    sin: "\(previousOutput)",
-                                    sout: inputName.uniqueName(counter + 1),
-                                    input: !input
+                                let doutName = argName + "__dout"
+                                let doutStatement = Node.Wire(doutName)
+
+                                statements.append(doutStatement)
+                                hook.argname = Node.Identifier(doutName)
+                                    
+                                statements.append(
+                                    scCreator.create(
+                                        ordinal: 0,
+                                        din: argName,
+                                        dout: doutName,
+                                        sin: "\(previousOutput)",
+                                        sout: inputName.uniqueName(counter + 1),
+                                        input: !input
+                                    )
                                 )
-                            )
+                                kind = .bypassInput 
+                            } else { 
+                                let dinName = argName + "__din"
+                                let dinStatement = Node.Wire(dinName)
+
+                                statements.append(dinStatement)
+                                hook.argname = Node.Identifier(dinName)
+                                    
+                                statements.append(
+                                    scCreator.create(
+                                        ordinal: 0,
+                                        din: dinName,
+                                        dout: argName,
+                                        sin: "\(previousOutput)",
+                                        sout: inputName.uniqueName(counter + 1),
+                                        input: !input
+                                    )
+                                )
+                                kind = .bypassOutput
+                            }
+                           
                             internalOrder.append(
                                 ChainRegister(
                                     name: instanceName + "_\(hook.portname)",
@@ -489,10 +525,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let portArguments = Python.list()
             let bsrCreator = BoundaryScanRegisterCreator(
                 name: "BoundaryScanRegister",
-                clock: clockName,
+                clock: tckName,
                 reset: resetName,
                 resetActive: resetActiveLow.value ? .low : .high,
-                testing: shiftName,
+                testing: testName,
+                shift: shiftName,
                 using: Node
             )
 

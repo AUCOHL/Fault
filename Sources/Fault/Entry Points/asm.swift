@@ -55,8 +55,8 @@ func assemble(arguments: [String]) -> Int32 {
     let json = jsonArgs[0]
     let netlist = vArgs[0]
 
-    let vectorOutput = filePath.value ?? json + ".vec.bin"
-    let goldenOutput = filePath.value ?? json + ".out.bin"
+    let vectorOutput = (filePath.value ?? json) + ".vec.bin"
+    let goldenOutput = (filePath.value ?? json) + ".out.bin"
 
     guard let jsonString = File.read(json) else {
         fputs("Could not read file '\(json)'\n", stderr)
@@ -166,11 +166,6 @@ func assemble(arguments: [String]) -> Int32 {
                 outputBinary += pad(value, digits: element.width, radix: 2)
             } else {
                 if element.kind == .bypassOutput {
-                    // guard let vectorLocus = inputMap[element.name] else {
-                    //     print("[Error]: Blackbox module outptut port \(element.name) not found in .json. ")
-                    //     return EX_DATAERR
-                    // }
-                    // value = tvcPair.vector[vectorLocus]
                     outputBinary += String(repeating: "x", count: element.width)
                     print("Output is same as the loaded TV")
                 } else {

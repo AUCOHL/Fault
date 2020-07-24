@@ -663,7 +663,7 @@ class Simulator {
                     \(tms) = 1; // select-DR
                     #2;
 
-                    if(scanInSerial !== goldenOutput) begin
+                    if(scanInSerial != goldenOutput) begin
                         $display("Simulating TV failed, number fo errors %0d : ", error);
                         $error("SIMULATING_TV_FAILED");
                         $finish;
