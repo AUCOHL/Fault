@@ -18,7 +18,7 @@ let subcommands: OrderedDictionary =  [
     "cut": (func: cut, desc: "cutting"),
     "asm": (func: assemble, desc: "test vector assembly"),
     "compact": (func: compactTestVectors, desc: "test vector static compaction"),
-    "tap": (func: jtagCreate, desc: "JTAG port"),
+    "tap": (func: jtagCreate, desc: "JTAG port insertion"),
     "bench": (func: bench, desc: "verilog netlist to bench format conversion")
 ]
 
@@ -382,8 +382,6 @@ func main(arguments: [String]) -> Int32 {
 
         print("Performing simulations…")
 
-        var coverage: Float
-        var data: Data
         if delayModel.value {
             let result = try TFSimulator.simulate(
                 for: faultPoints,
@@ -405,10 +403,26 @@ func main(arguments: [String]) -> Int32 {
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
-            coverage = result.coverage
-            let tvInfo = TVInfoDelay(inputs: inputsMinusIgnored,
-                coverageList: result.coverageList)
-            data = try encoder.encode(tvInfo)
+            let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+            print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
+
+            print("Simulations concluded: Coverage \(result.coverage * 100)%")
+            
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(
+                TVInfoDelay(
+                    inputs: inputsMinusIgnored,
+                    coverageList: result.coverageList
+                )
+            )
+            guard let string = String(data: data, encoding: .utf8)
+            else {
+                throw "Could not create utf8 string."
+            }
+            try File.open(jsonOutput, mode: .write) {
+                try $0.print(string)
+            }
         }
         else {
             let result = try Simulator.simulate(
@@ -432,24 +446,29 @@ func main(arguments: [String]) -> Int32 {
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
-            coverage = result.coverage
-            let tvInfo = TVInfo(inputs: inputsMinusIgnored + outputs,
-                coverageList: result.coverageList)
-            data = try encoder.encode(tvInfo)
-        }
-        print("Simulations concluded: Coverage \(coverage * 100)%")
-        
-        let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
-        print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
-        
-        guard let string = String(data: data, encoding: .utf8)
-        else {
-            throw "Could not create utf8 string."
-        }
+            
+            let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
+            print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
-        try File.open(jsonOutput, mode: .write) {
-            try $0.print(string)
-        }    
+            print("Simulations concluded: Coverage \(result.coverage * 100)%")
+            
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+
+            let data = try encoder.encode(
+                TVInfo(
+                    inputs: inputsMinusIgnored,
+                    coverageList: result.coverageList
+                )
+            )
+            guard let string = String(data: data, encoding: .utf8)
+            else {
+                throw "Could not create utf8 string."
+            }
+            try File.open(jsonOutput, mode: .write) {
+                try $0.print(string)
+            }
+        }
     } catch {
         fputs("Internal error: \(error)", stderr)
         return EX_SOFTWARE

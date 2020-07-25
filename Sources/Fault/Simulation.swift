@@ -1,6 +1,7 @@
 import Foundation
 import Defile
 import PythonKit
+import BigInt
 
 class Simulator {
     enum Behavior: Int {
@@ -88,15 +89,15 @@ class Simulator {
         var faultForces = ""    
         for fault in faultPoints {
             faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"
-            faultForces += "        #2 ; \n"   
+            faultForces += "        #1 ; \n"   
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
-            faultForces += "        #2 ; \n"
+            faultForces += "        #1 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
-            faultForces += "        #2 ; \n"
+            faultForces += "        #1 ; \n"
 
             if delayFault {
                 faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
-                faultForces += "        #2 ; \n"
+                faultForces += "        #1; \n"
             }
         }
 
@@ -172,8 +173,16 @@ class Simulator {
         var faults = output.components(separatedBy: "\n").filter {
             !$0.trimmingCharacters(in: .whitespaces).isEmpty
         }
-
-        let gmOutput = goldenOutput ? faults.removeLast() : ""
+        var gmOutput = ""
+        if goldenOutput {
+            let last = faults.removeLast()
+            if let bin = BigUInt(last, radix: 2) {
+                gmOutput = String(bin, radix: 16)
+            } else {
+                print("[Warning]: golden output contains x or z.")
+            }
+        }
+       
         return (faults: faults, goldenOutput: gmOutput)
     }
 
@@ -283,7 +292,7 @@ class Simulator {
                                 stuckAt: 1,
                                 delayFault: false,
                                 cleanUp: !sampleRun,
-                                goldenOutput: true,
+                                goldenOutput: false,
                                 clock: clock,
                                 filePrefix: tempDir,
                                 using: iverilogExecutable,
