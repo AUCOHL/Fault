@@ -513,6 +513,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             let verified = try Simulator.simulate(
                 verifying: definitionName,
                 in: output, // DEBUG
+                isolating: blackbox.value,
                 with: model,
                 ports: ports,
                 inputs: inputs,
@@ -552,10 +553,11 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     )
                 let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
                 let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-                let testbecnh = (filePath.value ?? file) + ".tb.sv"
+                let testbecnh = output + ".tv" + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
                     in: output, // DEBUG
+                    isolating: blackbox.value,
                     with: model,
                     ports: ports,
                     inputs: inputs,
@@ -585,6 +587,9 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     print("Test vectors verified successfully.")
                 } else {
                     print("Test vector simulation failed.")
+                    if !resetActiveLow.value { // default is ignored inputs are held high
+                        print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
+                    }
                 }  
             }
         }

@@ -87,7 +87,8 @@ func assemble(arguments: [String]) -> Int32 {
     let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
 
     if chainOrder.count != jsInputOrder.count {
-        print("[Error]: Ordinal mismatch between TV and scan-chains.")
+        print("[Error]: number of inputs in the json \(jsInputOrder.count) doesn't equal to the scan-chain registers \(chainOrder.count).")
+        print("Make sure you ignored clock & reset signals in the TV generation.")
         return EX_DATAERR
     }
 
@@ -105,11 +106,33 @@ func assemble(arguments: [String]) -> Int32 {
         outputMap[name] = i
     }
 
+    func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
+        var padded = String(number, radix: radix)
+        let length = padded.count
+        if digits > length {
+            for _ in 0..<(digits - length) {
+                padded = "0" + padded
+            }
+        }
+        return padded
+    }
+
+    var jsOutputLength = 0
+    for output in jsOutputOrder {
+        jsOutputLength += output.width
+    }
+
     var outputDecimal: [[BigUInt]] = []
     for tvcPair in tvinfo.coverageList {
+        guard let hex = BigUInt(tvcPair.goldenOutput, radix: 16) else {
+            print("Invalid json. Golden output must be in hex format.")
+            return EX_DATAERR
+        }
         var pointer = 0
         var list: [BigUInt] = []
-        let outputBinary = tvcPair.goldenOutput.reversed()
+        var binFromhex =  String(hex, radix: 2)
+        let padLength = jsOutputLength - binFromhex.count
+        let outputBinary = (String(repeating: "0", count: padLength) + binFromhex).reversed()
         for (i, output) in jsOutputOrder.enumerated() {
             let start = outputBinary.index(outputBinary.startIndex, offsetBy: pointer)
             let end = outputBinary.index(start, offsetBy: output.width)
@@ -122,21 +145,7 @@ func assemble(arguments: [String]) -> Int32 {
 
     var outputLength: Int = 0 
     for (i, output) in outputSorted.enumerated() {
-        if output.kind == .bypassOutput {
-            print("Bypassing \(outputSorted[i].name)")
-        } 
         outputLength += output.width
-    }
-
-    func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
-        var padded = String(number, radix: radix)
-        let length = padded.count
-        if digits > length {
-            for _ in 0..<(digits - length) {
-                padded = "0" + padded
-            }
-        }
-        return padded
     }
 
     var binFileVec = "// test-vector \n"
@@ -149,7 +158,6 @@ func assemble(arguments: [String]) -> Int32 {
                 value = tvcPair.vector[locus]
             } else {
                 if element.kind == .bypassInput {
-                    print("Padded with zeros: ", element.name)
                     value = 0 
                 } else {
                     print("Chain register \(element.name) not found in the TVs.")

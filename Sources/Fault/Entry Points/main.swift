@@ -412,7 +412,7 @@ func main(arguments: [String]) -> Int32 {
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(
                 TVInfoDelay(
-                    inputs: inputsMinusIgnored,
+                    inputs: inputsMinusIgnored + outputs,
                     coverageList: result.coverageList
                 )
             )
@@ -457,7 +457,7 @@ func main(arguments: [String]) -> Int32 {
 
             let data = try encoder.encode(
                 TVInfo(
-                    inputs: inputsMinusIgnored,
+                    inputs: inputsMinusIgnored + outputs,
                     coverageList: result.coverageList
                 )
             )

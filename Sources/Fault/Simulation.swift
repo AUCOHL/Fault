@@ -399,9 +399,10 @@ class Simulator {
 
         var clockCreator = ""
         if !clock.isEmpty {
-            clockCreator = "always #1 \(clock) = ~\(clock); \n"
-            clockCreator += "always #1 \(tck) = ~\(tck); \n"
+            clockCreator = "        always #1 \(clock) = ~\(clock); \n"
+            clockCreator += "        always #1 \(tck) = ~\(tck); \n"
         }
+
         var include = ""
         if let blackboxFile = blackbox {
             include = "`include \"\(blackboxFile)\""
@@ -414,16 +415,17 @@ class Simulator {
         \(include)
         module testbench;
         \(portWires)
-            \(clockCreator)
+        \(clockCreator)
             \(module) uut(
                 \(portHooks.dropLast(2))
-            );
+            ); 
+
             wire[\(chainLength - 1):0] serializable =
                 \(chainLength)'b\(serial);
             reg[\(chainLength - 1):0] serial;
             integer i;
             initial begin
-                $dumpfile("dut.vcd");
+                $dumpfile("chain.vcd");
                 $dumpvars(0, testbench);
         \(inputAssignment)
                 #10;
@@ -446,32 +448,16 @@ class Simulator {
         endmodule
         """
 
-        try File.open(output, mode: .write) {
-            try $0.print(bench)
-        }
-
-        let aoutName = "\(output).a.out"
-
-        let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
-        
-        if iverilogResult.terminationStatus != EX_OK {
-            fputs("An iverilog error has occurred: \n", stderr)
-            fputs(iverilogResult.output, stderr)
-            exit(Int32(iverilogResult.terminationStatus))
-        }
-        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
-
-        if vvpTask.terminationStatus != EX_OK {
-            throw "Failed to run vvp."
-        }
-
-        return vvpTask.output.contains("SUCCESS_STRING")
+        return try Simulator.run(
+            bench: bench, 
+            output: output
+        )
     }
 
     static func simulate(
         verifying module: String,
         in file: String,
+        isolating blackbox: String?,
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
@@ -489,36 +475,120 @@ class Simulator {
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
-        let tb = Testbench(
-            ports: ports,
-            inputs: inputs,
-            clock: clock,
-            reset: reset,
-            resetActive: resetActive,
-            in: file,
-            with: cells
-        )
-        let testbench = tb.createInternal(
-            chainLength: chainLength,
-            tdi: tdi,
-            tdo: tdo,
-            tms: tms,
-            tck: tck,
-            trst: trst,
-            clock: clock,
-            reset: reset,
-            module: module
-        )
-        let success = try Testbench.run(
-            bench: testbench,
+        var portWires = ""
+        var portHooks = ""
+        for (rawName, port) in ports {
+            let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
+            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portHooks += ".\(name) ( \(name) ) , "
+        }
+
+        var inputInit = ""
+        for input in inputs {
+            let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
+            if input.name == reset {
+                inputInit += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
+            } 
+            else {
+                inputInit += "        \(name) = 0 ;\n"
+            }
+        } 
+
+        var clockCreator = ""
+        if !clock.isEmpty {
+            clockCreator = "always #1 \(clock) = ~\(clock);"
+        }
+
+        var resetToggler = ""
+        if !reset.isEmpty {
+            resetToggler = "\(reset) = ~\(reset);"
+        }
+
+        var serial: String = ""
+        for _ in 0..<chainLength {
+            serial += "\(Int.random(in: 0...1))"
+        }
+        
+        var include = ""
+        if let blackboxFile = blackbox {
+            include = "`include \"\(blackboxFile)\""
+        }
+
+        let bench =  """
+        \(String.boilerplate)
+        `include "\(cells)"
+        `include "\(file)"
+        \(include)
+        module testbench;
+        \(portWires)
+
+            \(clockCreator)
+            always #1 \(tck) = ~\(tck);
+
+            \(module) uut(
+                \(portHooks.dropLast(2))
+            );    
+
+            integer i;
+
+            wire[\(chainLength - 1):0] serializable =
+                \(chainLength)'b\(serial);
+            reg[\(chainLength - 1):0] serial;
+
+            wire[7:0] tmsPattern = 8'b 01100110;
+            wire[3:0] preload_chain = 4'b0011;
+
+            initial begin
+                $dumpfile("dut.vcd");
+                $dumpvars(0, testbench);
+        \(inputInit)
+                \(tms) = 1;
+                #150;
+                \(resetToggler)
+                \(trst) = 1;        
+                #150;
+
+                /*
+                    Test PreloadChain Instruction
+                */
+                shiftIR(preload_chain);
+                enterShiftDR();
+
+                for (i = 0; i < \(chainLength); i = i + 1) begin
+                    \(tdi) = serializable[i];
+                    #2;
+                end
+                #1;
+                for(i = 0; i< \(chainLength); i = i + 1) begin
+                    serial[i] = \(tdo);
+                    #2;
+                end 
+
+                if(serial !== serializable) begin
+                    $error("EXECUTING_PRELOAD_CHAIN_INST_FAILED");
+                    $finish;
+                end
+                exitDR();
+                #2;
+
+                $display("SUCCESS_STRING");
+                $finish;
+            end
+
+        \(Simulator.createTasks(tms: tms))
+        endmodule
+        """    
+        
+        return try Simulator.run(
+            bench: bench, 
             output: output
-        )
-        return success     
+        ) 
     }
 
     static func simulate(
         verifying module: String,
         in file: String,
+        isolating blackbox: String?,
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
@@ -584,13 +654,18 @@ class Simulator {
         var testStatements = ""
         for i in 0..<vectorCount {  
             testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
+            testStatements += "        #1 ; \n"
         }
-
+        var include = ""
+        if let blackboxFile = blackbox {
+            include = "`include \"\(blackboxFile)\""
+        }
+        
         let bench = """
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
-        `include "Netlists/sram_1rw1r_32_256_8_sky130.v"
+        \(include)
         module testbench;
         \(portWires)
             
@@ -669,7 +744,7 @@ class Simulator {
                     end
                     \(tms) = 1; // update-DR
                     #2;
-                    \(tms) = 1; // select-DR
+                    \(tms) = 0; // run-test-idle
                     #2;
 
                     if(scanInSerial != goldenOutput) begin
@@ -680,61 +755,36 @@ class Simulator {
                 end
             endtask
 
-            task shiftIR;
-                input[3:0] instruction;
-                integer i;
-                begin
-                    for (i = 0; i< 5; i = i + 1) begin
-                        \(tms) = tmsPattern[i];
-                        #2;
-                    end
-
-                    // At shift-IR: shift new instruction on tdi line
-                    for (i = 0; i < 4; i = i + 1) begin
-                        tdi = instruction[i];
-                        if(i == 3) begin
-                            \(tms) = tmsPattern[5];     // exit-ir
-                        end
-                        #2;
-                    end
-
-                    \(tms) = tmsPattern[6];     // update-ir 
-                    #2;
-                    \(tms) = tmsPattern[7];     // run test-idle
-                    #6;
-                end
-            endtask
-
-            task enterShiftDR;
-                begin
-                    \(tms) = 1;     // select DR
-                    #2;
-                    \(tms) = 0;     // capture DR -- shift DR
-                    #4;
-                end
-            endtask
-
-            task exitDR;
-                begin
-                    \(tms) = 1;     // Exit DR -- update DR
-                    #4;
-                    \(tms) = 0;     // Run test-idle
-                    #2;
-                end
-            endtask
+           \(Simulator.createTasks(tms: tms))
         endmodule
         """
 
-        let tbName = "\(output)"
+        return try Simulator.run(
+            bench: bench, 
+            output: output
+        )
+    }
 
-        try File.open(tbName, mode: .write) {
+    private static func run(
+        bench: String,
+        output: String,
+        clean: Bool = true
+    ) throws -> Bool {
+        
+        try File.open(output, mode: .write) {
             try $0.print(bench)
         }
 
-        let aoutName = "\(module).out"
+        let aoutName = "\(output).a.out"
+        defer {
+            if clean {
+                let _ = "rm \(aoutName)".sh()
+            }
+        }
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".shOutput()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
         
+      
         if iverilogResult.terminationStatus != EX_OK {
             fputs("An iverilog error has occurred: \n", stderr)
             fputs(iverilogResult.output, stderr)
@@ -747,5 +797,52 @@ class Simulator {
         }
 
         return vvpTask.output.contains("SUCCESS_STRING")
+    }
+
+    private static func createTasks (tms: String) -> String {
+        return """
+        task shiftIR;
+            input[3:0] instruction;
+            integer i;
+            begin
+                for (i = 0; i< 5; i = i + 1) begin
+                    \(tms) = tmsPattern[i];
+                    #2;
+                end
+
+                // At shift-IR: shift new instruction on tdi line
+                for (i = 0; i < 4; i = i + 1) begin
+                    tdi = instruction[i];
+                    if(i == 3) begin
+                        \(tms) = tmsPattern[5];     // exit-ir
+                    end
+                    #2;
+                end
+
+                \(tms) = tmsPattern[6];     // update-ir 
+                #2;
+                \(tms) = tmsPattern[7];     // run test-idle
+                #6;
+            end
+        endtask
+
+        task enterShiftDR;
+            begin
+                \(tms) = 1;     // select DR
+                #2;
+                \(tms) = 0;     // capture DR -- shift DR
+                #4;
+            end
+        endtask
+
+        task exitDR;
+            begin
+                \(tms) = 1;     // Exit DR -- update DR
+                #4;
+                \(tms) = 0;     // Run test-idle
+                #2;
+            end
+        endtask
+    """
     }
 }

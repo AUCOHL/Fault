@@ -148,7 +148,7 @@ class BoundaryScanRegisterCreator {
                 end
             end
             assign sout = store;
-            assign dout = testing ? store : din;
+            assign dout = din;
         endmodule
             
         """
