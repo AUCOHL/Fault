@@ -246,7 +246,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let clkSourceName = "__clk_source__"
         let clkSourceId = Node.Identifier(clkSourceName)
 
-        var invClkSourceName: String?
+        let invClkSourceName: String = "__clk_source_n__"
         var invClkSourceId: PythonObject? 
 
         // MARK: Register chaining original module
@@ -258,7 +258,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         statements.append(Node.Input(shiftName))
         statements.append(Node.Input(tckName))
         statements.append(Node.Input(testName))
+        statements.append(Node.Wire(clkSourceName))
 
+        if let _ = clockInv.value {
+            statements.append(Node.Wire(invClkSourceName))
+        }
+        
         statements.extend(Python.list(definition.items))
 
         let ports = Python.list(definition.portlist.ports)
@@ -452,7 +457,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 if let invClockName = clockInv.value, instanceName == invClockName  { 
                     for hook in instance.portlist {
                         if String(describing: hook.argname) == clockName {
-                            invClkSourceName = "__clk_source_n__"
                             invClkSourceId = Node.Identifier(invClkSourceName)
                             hook.argname = invClkSourceId!
                         }
@@ -481,10 +485,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             Node.Lvalue(clkSourceId),
             Node.Rvalue(clockCond)
         )
-        statements.append(Node.Wire(clkSourceName))
         statements.append(clkSourceAssignment)
         
-        if let invClkName = invClkSourceName, let invClkId = invClkSourceId {
+        if let invClkId = invClkSourceId {
             let invClockCond = Node.Cond(
                 Node.Identifier(testName),
                 Node.Unot(Node.Identifier(tckName)),
@@ -495,7 +498,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 Node.Lvalue(invClkId),
                 Node.Rvalue(invClockCond)
             )
-            statements.append(Node.Wire(invClkName))
             statements.append(invClockAssignment)
         }
 
