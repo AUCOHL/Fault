@@ -52,6 +52,7 @@ class BoundaryScanRegisterCreator {
 
     func create(
         ordinal: Int,
+        max: Int,
         din: String,
         dout: String,
         sin: String,
@@ -65,10 +66,12 @@ class BoundaryScanRegisterCreator {
         let ordinalConstant = Node.Constant(ordinal)
 
         let name = input ? inputName : outputName
-        
+        let dinArg = (max == 0) ? dinIdentifier: Node.Pointer(dinIdentifier, ordinalConstant)
+        let doutArg = (max == 0) ?  doutIdentifier: Node.Pointer(doutIdentifier, ordinalConstant)
+
         let portArguments = [
-            Node.PortArg("din", Node.Pointer(dinIdentifier, ordinalConstant)),
-            Node.PortArg("dout", Node.Pointer(doutIdentifier, ordinalConstant)),
+            Node.PortArg("din", dinArg),
+            Node.PortArg("dout", doutArg),
             Node.PortArg("sin", sinIdentifier),
             Node.PortArg("sout", soutIdentifier),
             Node.PortArg("clock", clockIdentifier),

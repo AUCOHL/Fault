@@ -11,7 +11,7 @@ module tap_wrapper(
     sout,
     sin,
     shift,
-    test,
+    test
 );
 
 // tap port inputs

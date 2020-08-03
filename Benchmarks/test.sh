@@ -99,6 +99,13 @@ while (( "$#" )); do
   esac
 done
 
+# Check that top_modules file is specified
+if [ -z "$input" ]
+then
+    echo "Input folder must be specified using -i|--input"
+    exit 99;
+fi
+
 if [ ! -z "$synth" ] || [ ! -z "$chain" ] || [ ! -z "$tap" ] 
 then
     # check that top_modules file is specified
@@ -124,17 +131,14 @@ then
     done < $top
 fi
 
-# Navigate to Fault's directory
-#parentdir="$(dirname "$PWD")"
-#echo "Current DIR $parentdir"
-
 # Read files from the input folder
-for file in $PWD/$input*.v
+for file in $PWD/$input/*.v
 do
   # Read file name 
+  echo $file
   file_name=$( echo ${file##/*/} )
-  netlist=file_name
-  cut_netlist=file_name
+  netlist=$PWD/Netlists/$file_name
+  cut_netlist=$PWD/$input/$file_name
   # Design config
   top_module="${top_dict[$file_name]}"
   clock_signal="${clock_dict[$file_name]}"

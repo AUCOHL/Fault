@@ -263,8 +263,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         if let _ = clockInv.value {
             statements.append(Node.Wire(invClkSourceName))
         }
-        
-        statements.extend(Python.list(definition.items))
 
         let ports = Python.list(definition.portlist.ports)
         ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
@@ -274,8 +272,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         ports.append(Node.Port(testName, Python.None, Python.None, Python.None))
 
         definition.portlist.ports = Python.tuple(ports)
-            
+
+        var wireDeclarations: [PythonObject] = [] 
+        var wrapperCells: [PythonObject] = []
+
         var warn = false
+        var blackbox = false
+        var blackboxItem: PythonObject?
         for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
             // Process gates
@@ -318,8 +321,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     print("Chaining blackbox module...")
                     let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
                     let isolatedInputs = inputs.map { $0.name }
+                    
                     var counter = 0
-
+                    
                     let scCreator = BoundaryScanRegisterCreator(
                         name: "BoundaryScanRegister",
                         clock: tckName,
@@ -348,12 +352,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     let doutName = elementName + "_\(i)" + "__dout"
                                     let doutStatement = Node.Wire(doutName)
 
-                                    statements.append(doutStatement)
+                                    wrapperCells.append(doutStatement)
                                     list.append(Node.Identifier(doutName))   
                                     
-                                    statements.append(
+                                    wrapperCells.append(
                                         scCreator.create(
                                             ordinal: 0,
+                                            max: 0,
                                             din: elementName,
                                             dout: doutName,
                                             sin: "\(previousOutput)",
@@ -367,12 +372,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     let dinName = elementName + "_\(i)" + "__din"
                                     let dinStatement = Node.Wire(dinName)
 
-                                    statements.append(dinStatement)
+                                    wrapperCells.append(dinStatement)
                                     list.append(Node.Identifier(dinName))   
                                     
-                                    statements.append(
+                                    wrapperCells.append(
                                         scCreator.create(
                                             ordinal: 0,
+                                            max: 0,
                                             din: dinName,
                                             dout: elementName,
                                             sin: "\(previousOutput)",
@@ -392,6 +398,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     Node.Identifier(inputName.uniqueName(counter + 1))
                                 counter += 1
                             }
+
                             hook.argname.list = Python.tuple(list)
                         } else {
                             let argName = String(describing: hook.argname)
@@ -407,9 +414,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 statements.append(doutStatement)
                                 hook.argname = Node.Identifier(doutName)
                                     
-                                statements.append(
+                                wrapperCells.append(
                                     scCreator.create(
                                         ordinal: 0,
+                                        max: 0,
                                         din: argName,
                                         dout: doutName,
                                         sin: "\(previousOutput)",
@@ -422,12 +430,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 let dinName = argName + "__din"
                                 let dinStatement = Node.Wire(dinName)
 
-                                statements.append(dinStatement)
+                                wrapperCells.append(dinStatement)
                                 hook.argname = Node.Identifier(dinName)
                                     
-                                statements.append(
+                                wrapperCells.append(
                                     scCreator.create(
                                         ordinal: 0,
+                                        max: 0,
                                         din: dinName,
                                         dout: argName,
                                         sin: "\(previousOutput)",
@@ -450,8 +459,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     }
 
                     for i in 0...counter {
-                        statements.append(Node.Wire(inputName.uniqueName(i)))
+                        wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
                     }
+
+                    blackbox = true
                 }
 
                 if let invClockName = clockInv.value, instanceName == invClockName  { 
@@ -464,17 +475,24 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 }   
             }
 
+            if !blackbox {
+                statements.append(itemDeclaration)
+            } else {
+                blackboxItem = itemDeclaration
+            }
+
         }
 
         if warn {
             print("[Warning]: Detected flip-flops with clock different from \(clockName).")
         }
 
+        var assignStatements: [PythonObject] =  []
         let finalAssignment = Node.Assign(
             Node.Lvalue(outputIdentifier),
             Node.Rvalue(previousOutput)
         )
-        statements.append(finalAssignment)
+        assignStatements.append(finalAssignment)
 
         let clockCond = Node.Cond(
             Node.Identifier(testName),
@@ -485,7 +503,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             Node.Lvalue(clkSourceId),
             Node.Rvalue(clockCond)
         )
-        statements.append(clkSourceAssignment)
+        assignStatements.append(clkSourceAssignment)
         
         if let invClkId = invClkSourceId {
             let invClockCond = Node.Cond(
@@ -498,10 +516,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 Node.Lvalue(invClkId),
                 Node.Rvalue(invClockCond)
             )
-            statements.append(invClockAssignment)
+            assignStatements.append(invClockAssignment)
         }
-
-        definition.items = Python.tuple(statements)
+        
+        if let item = blackboxItem {
+            wrapperCells.append(item)
+        }
+        
+        definition.items = Python.tuple(statements + wireDeclarations + wrapperCells + assignStatements)
         definition.name = Python.str(alteredName)
         
         print(internalOrder.count)
@@ -581,6 +603,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     statements.append(
                         bsrCreator.create(
                             ordinal: i,
+                            max: maximum,
                             din: input.name,
                             dout: doutName,
                             sin: inputName.uniqueName(counter),
@@ -653,6 +676,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     statements.append(
                         bsrCreator.create(
                             ordinal: i,
+                            max: maximum,
                             din: dinName,
                             dout: output.name,
                             sin:  inputName.uniqueName(counter),

@@ -99,6 +99,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
         ("tdo", "JTAG test data output"),
+        ("tdoEnable", "TDO Enable pad (active low) "),
         ("trst", "JTAG test reset (active low)")
     ] {
         let option = StringOption(
@@ -190,6 +191,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
     let tapLocation = "RTL/JTAG/tap_top.v"
+    let wrapperLocation = "RTL/JTAG/tap_wrapper.v"
 
     let libertyFile = defaultLiberty ?
         liberty.value ??
@@ -235,16 +237,17 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ?? names["tdi"]!.default
     let tdoName = names["tdo"]!.option.value 
         ?? names["tdo"]!.default
+    let tdoEnableName = names["tdoEnable"]!.option.value 
+        ?? names["tdoEnable"]!.default
     let tckName = names["tck"]!.option.value 
         ?? names["tck"]!.default
     let trstName = names["trst"]!.option.value 
         ?? names["trst"]!.default
 
     // MARK: Internal signals
-    print("Adding JTAG port…")
+    print("Creating top module…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__DESIGN__UNDER__TEST__"
-    let trstHighName = "__trst_high__"
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
@@ -326,111 +329,50 @@ func jtagCreate(arguments: [String]) -> Int32 {
             
         // MARK: tap module 
         print("Stitching tap port...") 
-        let tapConfig = "RTL/JTAG/tapConfig.json"
-        if !fileManager.fileExists(atPath: tapConfig) {
-            fputs("JTAG configuration file '\(tapConfig)' not found.\n", stderr)
+        let config = "RTL/JTAG/config.json"
+        if !fileManager.fileExists(atPath: config) {
+            fputs("JTAG configuration file '\(config)' not found.\n", stderr)
             return EX_NOINPUT
         }
-        let data = try Data(contentsOf: URL(fileURLWithPath: tapConfig), options: .mappedIfSafe)
-        
-        guard let jtagInfo = try? JSONDecoder().decode(jtagInfo.self, from: data) else {
-            fputs("File '\(tapConfig)' is invalid.\n", stderr)
+
+        let data = try Data(contentsOf: URL(fileURLWithPath: config), options: .mappedIfSafe)
+        guard let tapInfo = try? JSONDecoder().decode(TapInfo.self, from: data) else {
+            fputs("File '\(config)' is invalid.\n", stderr)
             return EX_DATAERR
         }
 
-        let tapCreator = jtagCreator(
-            name: "tap_top",
+        let tapCreator = TapCreator(
+            name: "tap_wrapper",
             using: Node
         )
-        let jtagModule =  tapCreator.create(
-            jtagInfo: jtagInfo, 
+        let tapModule =  tapCreator.create(
+            tapInfo: tapInfo, 
             tms: tmsName,
             tck: tckName,
             tdi: tdiName,
             tdo: tdoName,
-            trst: trstHighName
+            tdoEnable_n: tdoEnableName,
+            trst: trstName,
+            sin: sinName,
+            sout: soutName,
+            shift: shiftName,
+            test: testName
         )
-        var wireDeclarations = jtagModule.wires
-        wireDeclarations.append(Node.Wire(trstHighName))
 
-        statements.extend(wireDeclarations)
-        statements.extend([
-            Node.Wire(shiftName),
-            Node.Wire(testName),
-            Node.Wire(sinName),
-            Node.Wire(soutName)
-        ])
-
-        statements.append(jtagModule.tapModule)
-        // negate reset to make it active high
-        statements.append(Node.Assign(
-            Node.Lvalue(Node.Identifier(trstHighName)),
-            Node.Rvalue(Node.Unot(Node.Identifier(trstName)))
-        ))
-
-        let tdiIdentifier = Node.Identifier(jtagInfo.inputTdi.chain)
-        let shiftIdentifier = Node.And(
-           Node.Or(
-                Node.Identifier(jtagInfo.states.pause),
-                Node.Or(
-                    Node.Identifier(jtagInfo.states.shift),
-                    Node.Identifier(jtagInfo.states.exit1)
-                )
-            ),
-            Node.Identifier(jtagInfo.selects.preloadChain)
-        )
-        // sout and tdi signals assignment
-        statements.append(Node.Assign(
-            Node.Rvalue(Node.Identifier(shiftName)),
-            Node.Lvalue(shiftIdentifier)
-        ))
         // TDO tri-state enable assignment
         let ternary = Node.Cond(
-            Node.Identifier(jtagInfo.pads.tdoEn),
-            Node.Identifier(jtagInfo.pads.tdo),
+            Node.Unot(Node.Identifier(tapInfo.tap.tdoEnable_n)),
+            Node.Identifier(tapInfo.tap.tdo),
             Node.IntConst("1'bz")
         )
         let tdoAssignment = Node.Assign(
             Node.Lvalue(Node.Identifier(tdoName)),
             Node.Rvalue(ternary)
         )
+
         statements.append(tdoAssignment)
-        // Test mode assignment
-        let testCondition = Node.Unot(
-            Node.Or(
-                Node.Identifier(jtagInfo.states.idle), 
-                Node.Identifier(jtagInfo.states.reset)
-            )
-        )
-        let testAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(testName)),
-            Node.Rvalue(testCondition)
-        )
-        statements.append(testAssignment)
-
-        // sin assignment
-        let sinAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(sinName)),
-            Node.Rvalue(Node.Identifier(jtagInfo.tdoSignal))
-        )
-        statements.append(sinAssignment)
-
-        // sout negedge sample
-        let soutRegister = Node.Reg("sout_sampled")
-        let sens = Node.Sens(Node.Identifier(tckName), "negedge")
-        let senslist = Node.SensList([ sens ])
-        let statement = Node.Block([ Node.NonblockingSubstitution(
-            Node.Lvalue(Node.Identifier("sout_sampled")),
-            Node.Rvalue(Node.Identifier(soutName))
-        )])
-        let always = Node.Always(senslist, statement)
-        statements.append(soutRegister)
-        statements.append(always)
-        // chain_tdi ssignment
-        statements.append(Node.Assign(
-            Node.Rvalue(tdiIdentifier),
-            Node.Lvalue(Node.Identifier("sout_sampled"))
-        ))
+        statements.extend(tapModule.wires)
+        statements.append(tapModule.tapModule)
 
         let submoduleInstance = Node.Instance(
             alteredName,
@@ -454,10 +396,13 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
-
-        let definitions = Python.list(description.definitions)
         
+        let wrapperDefinition =
+            parse([wrapperLocation])[0][dynamicMember: "description"].definitions
+        
+        let definitions = Python.list(description.definitions)
         definitions.extend(tapDefinition)
+        definitions.extend(wrapperDefinition)
         definitions.append(supermodel)
         description.definitions = Python.tuple(definitions)
 

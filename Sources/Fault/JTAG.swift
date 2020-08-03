@@ -2,7 +2,7 @@ import Foundation
 import PythonKit
 import BigInt
 
-class jtagCreator {
+class TapCreator {
     var name: String
     private var Node: PythonObject
     init(
@@ -12,45 +12,37 @@ class jtagCreator {
         self.name = name
         self.Node = Node
     }
-
-    func create(
-        jtagInfo: jtagInfo,
+    
+    func create(  
+        tapInfo: TapInfo,
         tms: String,
         tck: String,
         tdi: String,
         tdo: String,
-        trst: String
+        tdoEnable_n: String,
+        trst: String,
+        sin: String,
+        sout: String,
+        shift: String,
+        test: String
     )-> ( tapModule: PythonObject, wires: [PythonObject]) {
-        let pads = jtagInfo.pads
-        let states = jtagInfo.states
-        let selects = jtagInfo.selects 
-        let inputTdi = jtagInfo.inputTdi
-        
+        let pads = tapInfo.tap
+        let chain = tapInfo.chain
+
         let wireDeclarations: [PythonObject] = [ 
             Node.Wire(pads.tdo),
-            Node.Wire(pads.tdoEn),
-            Node.Wire(states.shift),
-            Node.Wire(states.pause),
-            Node.Wire(states.update),
-            Node.Wire(states.capture),
-            Node.Wire(states.idle),
-            Node.Wire(states.reset),
-            Node.Wire(states.exit1),
-            Node.Wire(states.exit2),
-            Node.Wire(selects.extest),
-            Node.Wire(selects.samplePreload),
-            Node.Wire(selects.mbist),
-            Node.Wire(selects.debug),
-            Node.Wire(selects.preloadChain),
-            Node.Wire(jtagInfo.tdoSignal),
-            Node.Wire(inputTdi.debug),
-            Node.Wire(inputTdi.bsChain),
-            Node.Wire(inputTdi.mbist),
-            Node.Wire(inputTdi.chain)
+            Node.Wire(pads.tdoEnable_n),
+            Node.Wire(pads.tms),
+            Node.Wire(pads.tdi),
+            Node.Wire(pads.trst),
+            Node.Wire(chain.sin),
+            Node.Wire(chain.sout),
+            Node.Wire(chain.shift),
+            Node.Wire(chain.test)
         ]
 
         let portArguments = [
-            // JTAG Pads
+            // Tap Top Module Interface
             Node.PortArg(
                 pads.tms,
                 Node.Identifier(tms)
@@ -69,87 +61,28 @@ class jtagCreator {
             ),
             Node.PortArg(
                 pads.tdo,
-                Node.Identifier(pads.tdo)
+                Node.Identifier(tdo)
             ),
             Node.PortArg(
-                pads.tdoEn,
-                Node.Identifier(pads.tdoEn)
+                pads.tdoEnable_n,
+                Node.Identifier(tdoEnable_n)
             ),
-            // TAP States
+            // Chain Interface
             Node.PortArg(
-                states.shift,
-                Node.Identifier(states.shift)
-            ),
-            Node.PortArg(
-                states.pause,
-                Node.Identifier(states.pause)
+                chain.sin,
+                Node.Identifier(sin)
             ),
             Node.PortArg(
-                states.update,
-                Node.Identifier(states.update)
+                chain.sout,
+                Node.Identifier(sout)
             ),
             Node.PortArg(
-                states.capture,
-                Node.Identifier(states.capture)
+                chain.test,
+                Node.Identifier(test)
             ),
             Node.PortArg(
-                states.idle,
-                Node.Identifier(states.idle)
-            ),
-            Node.PortArg(
-                states.reset,
-                Node.Identifier(states.reset)
-            ),
-            Node.PortArg(
-                states.exit1,
-                Node.Identifier(states.exit1)
-            ),
-            Node.PortArg(
-                states.exit2,
-                Node.Identifier(states.exit2)
-            ),
-            // Select signals for boundary scan or mbist
-            Node.PortArg(
-                selects.extest,
-                Node.Identifier(selects.extest)
-            ),
-            Node.PortArg(
-                selects.samplePreload,
-                Node.Identifier(selects.samplePreload)
-            ),
-            Node.PortArg(
-                selects.mbist,
-                Node.Identifier(selects.mbist)
-            ),
-            Node.PortArg(
-                selects.debug,
-                Node.Identifier(selects.debug)
-            ),
-            Node.PortArg(
-                selects.preloadChain,
-                Node.Identifier(selects.preloadChain)
-            ),
-            //  TDO signal that is connected to TDI of sub-modules.
-            Node.PortArg(
-                jtagInfo.tdoSignal, 
-                Node.Identifier(jtagInfo.tdoSignal)
-            ),
-            // TDI signals from sub-modules
-            Node.PortArg(
-                inputTdi.debug,
-                Node.Identifier(inputTdi.debug)
-            ),
-            Node.PortArg(
-                inputTdi.bsChain,
-                Node.Identifier(inputTdi.bsChain)
-            ),
-            Node.PortArg(
-                inputTdi.mbist,
-                Node.Identifier(inputTdi.mbist)
-            ),
-            Node.PortArg(
-                inputTdi.chain,
-                Node.Identifier(inputTdi.chain)
+                chain.shift,
+                Node.Identifier(shift)
             )
         ]
 
@@ -169,182 +102,58 @@ class jtagCreator {
     }
 }
 
-struct jtagInfo: Codable {
-    var pads: Pad
-    var states: State
-    var selects: Select
-    var tdoSignal: String
-    var inputTdi: InputTdi
-
+struct TapInfo: Codable {
+    var tap: Tap
+    var chain: Chain
     init(
-        pads: Pad,
-        states: State, 
-        selects: Select,
-        tdoSignal: String,
-        inputTdi: InputTdi
+        tap: Tap,
+        chain: Chain
     ) {
-        self.pads = pads
-        self.states = states
-        self.selects = selects
-        self.tdoSignal = tdoSignal
-        self.inputTdi = inputTdi
+        self.tap = tap
+        self.chain = chain
     }
 }
 
-
-struct Pad: Codable {
+// Tap top module Interface
+struct Tap: Codable {
     var tms: String
     var tdi: String
     var tdo: String
     var trst: String
     var tck: String
-    var tdoEn: String
+    var tdoEnable_n: String
     init(
         tms: String,
         tdi: String,
         tdo: String,
         trst: String,
         tck: String,
-        tdoEn: String
+        tdoEnable_n: String
     ) {
         self.tms = tms
         self.tdi = tdi
         self.tdo = tdo
         self.trst = trst
         self.tck = tck
-        self.tdoEn = tdoEn
+        self.tdoEnable_n = tdoEnable_n
     }
 }
 
-struct State: Codable {
+// Internal Chain Interface
+struct Chain: Codable {
+    var sin: String
+    var sout: String
     var shift: String
-    var pause: String
-    var update: String
-    var capture: String
-    var idle: String
-    var reset: String
-    var exit1: String
-    var exit2: String
+    var test: String
     init(
+       sin: String,
+       sout: String,
        shift: String,
-       pause: String,
-       update: String,
-       capture: String,
-       idle: String,
-       reset: String,
-       exit1: String,
-       exit2: String
+       test: String
     ) {
+        self.sin = sin
+        self.sout = sout
         self.shift = shift
-        self.pause = pause
-        self.update = update
-        self.capture = capture
-        self.idle = idle
-        self.reset = reset
-        self.exit1 = exit1
-        self.exit2 = exit2
-    }
-}
-
-struct Select: Codable {
-    var extest: String
-    var samplePreload: String
-    var mbist: String
-    var debug: String
-    var preloadChain: String
-    init (
-        extest: String,
-        samplePreload: String,
-        mbist: String,
-        debug: String,
-        preloadChain: String
-    ) {
-        self.extest = extest
-        self.samplePreload = samplePreload
-        self.mbist =  mbist
-        self.debug = debug
-        self.preloadChain = preloadChain
-    }
-}
-
-struct InputTdi: Codable {
-    var debug: String
-    var bsChain: String
-    var mbist: String
-    var chain: String
-    init (
-        debug: String,
-        bsChain: String,
-        mbist: String,
-        chain: String
-    ) {
-        self.debug = debug
-        self.bsChain = bsChain
-        self.mbist = mbist
-        self.chain = chain
-    }
-}
-
-class SerialVectorCreator {
-
-    static func create(
-        tvInfo: TVInfo
-    ) throws -> String {
-
-        var scanStatements = ""
-
-        let chainLength: Int = {
-            var count = 0
-            for input in tvInfo.inputs {
-                count += input.width
-            }
-            return count
-        }()
-       
-        for tvcPair in tvInfo.coverageList {
-            var tdi = ""
-            let testVector = tvcPair.vector
-            for (index, port) in testVector.enumerated() {
-                let portVector = String(port, radix: 2)
-                let offset = tvInfo.inputs[index].width - portVector.count
-                tdi = String(repeating: "0", count: offset) + portVector + tdi
-            }
-
-            if let tdiInt = BigUInt(tdi, radix: 2) {
-                let tdiHex = String(tdiInt, radix: 16)
-                
-                let mask = String(repeating: "f", count: tdiHex.count)
-                if let output = BigUInt(tvcPair.goldenOutput, radix: 2) {
-                    let hexOutput = String(output, radix: 16) 
-                    scanStatements += "SDR \(chainLength) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
-                } else {
-                    print("TV golden output \(tvcPair.goldenOutput) is invalid.")
-                }
-            } else {
-                print("TV \(tvcPair.vector) is invalid.")
-            }
-        }
-
-        var svf: String {
-            return """
-            ! Begin Test Program
-            ! Disable Test Reset line
-            TRST OFF;
-            ! Initialize UUT
-            STATE RESET; 
-            ! End IR scans in DRPAUSE
-            ENDIR DRPAUSE; 
-            ! Trailer & Headers for IR & DR
-            HIR 0;
-            TIR 0;
-            HDR 0;
-            TDR 0;
-            ! INTEST Instruction
-            SIR 4 TDI (4);
-            ! San Test Vectors through the scan chain with length:  \(chainLength)
-            \(scanStatements)
-            """
-        }
-        return svf;
+        self.test = test
     }
 }
