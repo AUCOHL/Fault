@@ -186,8 +186,7 @@ func main(arguments: [String]) -> Int32 {
         let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
-        let tvCeiling = Int(ceiling.value ?? defaultCeiling),
-        URNGFactory.validNames.contains(randomGenerator) && ((tvGen.value == nil) == (bench.value == nil))
+        Int(ceiling.value ?? defaultCeiling) != nil && URNGFactory.validNames.contains(randomGenerator) && ((tvGen.value == nil) == (bench.value == nil))
     else {
         cli.printUsage()
         return EX_USAGE
@@ -428,7 +427,7 @@ func main(arguments: [String]) -> Int32 {
                 initialVectorCount: tvAttempts,
                 incrementingBy: tvIncrement,
                 minimumCoverage: tvMinimumCoverage,
-                ceiling: tvCeiling,
+                ceiling: finalTvCeiling,
                 randomGenerator: randomGenerator,
                 TVSet: tvSetVectors,
                 sampleRun: sampleRun.value,
