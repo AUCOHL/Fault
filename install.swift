@@ -51,7 +51,7 @@ if CommandLine.arguments.count > 1 {
 }
 
 if action == .install {
-    print("Checking dependencies...")
+    print("Checking dependencies…")
 
     let iverilog = "'\(iverilogExecutable)' -B '\(iverilogBase)' -V".shOutput()
     if iverilog.terminationStatus != EX_OK {
@@ -90,12 +90,12 @@ if action == .install {
 
     let podem = "'\(podemExecutable)'".shOutput()
     if podem.terminationStatus != EX_OK {
-        print("Warning: Podem does not seem to be installed.")
+        print("Warning: PODEM does not seem to be installed.")
     }
     
-    print("Installing Fault (\(gitVersion))...")
+    print("Installing Fault (\(gitVersion))…")
 
-    print("Compiling...")
+    print("Compiling…")
     let compilationResult = "swift build".shOutput()
     if compilationResult.terminationStatus != EX_OK {
         print("Compiling Fault failed.")

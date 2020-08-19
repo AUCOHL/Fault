@@ -602,7 +602,7 @@ func jtagCreate(arguments: [String]) -> Int32{
 
             // MARK: Test bench
             if let tvFile = testvectors.value {
-                print("Generating testbench for test vectors...")
+                print("Generating testbench for test vectors…")
                 let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
                 let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
                 let testbecnh = (filePath.value ?? file) + ".tb.sv"

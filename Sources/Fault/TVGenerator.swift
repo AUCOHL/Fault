@@ -1,19 +1,35 @@
 import Foundation 
 import BigInt
 
-enum TVGen: String {
-    case swift
-    case LFSR
-    case atalanta
-    case podem
-}
-enum RNG: String {
-    case swift
-    case LFSR
+protocol ExternalTestVectorGenerator {
+    init()
+    func generate(file: String, module: String) -> ([TestVector], [Port])
 }
 
-class Atalanta {
-    static func generate(file: String, module: String) -> ([TestVector], [Port])  {
+class ETVGFactory {
+    private static var registry: [String: ExternalTestVectorGenerator.Type] = [:]
+
+    static func register<T: ExternalTestVectorGenerator>(name: String, type: T.Type) -> Bool {
+        registry[name] = type
+        return true
+    }
+
+    static func get(name: String) -> ExternalTestVectorGenerator? {
+        guard let metaType = registry[name] else {
+            return nil
+        }
+        return metaType.init()
+    }
+
+    static var validNames: [String] {
+        return [String](registry.keys)
+    }
+}
+
+class Atalanta: ExternalTestVectorGenerator {
+    required init() {}
+
+    func generate(file: String, module: String) -> ([TestVector], [Port]) {
         
         let tempDir = "\(NSTemporaryDirectory())"
 
@@ -38,10 +54,14 @@ class Atalanta {
             exit(EX_SOFTWARE)
         }
     }
+
+    static let registered = ETVGFactory.register(name: "Atalanta", type: Atalanta.self)
 }
 
-class Podem {
-    static func generate (file: String, module: String) -> ([TestVector], [Port]) {
+class PODEM: ExternalTestVectorGenerator {
+    required init() {}
+
+    func generate(file: String, module: String) -> ([TestVector], [Port]) {
         let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
@@ -64,17 +84,21 @@ class Podem {
             exit(EX_SOFTWARE)
         }
     }
-}
-protocol URNG {
-    func generate(bits: Int) -> BigUInt
+
+    static let registered = ETVGFactory.register(name: "PODEM", type: PODEM.self)
 }
 
 // MARK: Random Generators
 class SwiftRNG: URNG {
+    required init() {}
+
     func generate(bits: Int) -> BigUInt {
         return BigUInt.randomInteger(withMaximumWidth: bits)
     }
+
+    static let registered = URNGFactory.register(name: "swift", type: SwiftRNG.self)
 }
+
 
 class LFSR: URNG {
     static let taps: [UInt: Array<UInt>] = [
@@ -117,7 +141,7 @@ class LFSR: URNG {
     var polynomialHex: UInt
     let nbits: UInt 
     
-    init(nbits: UInt) {     
+    required init(nbits: UInt = 64) {     
         let max: UInt = (nbits == 64) ? UInt(pow(Double(2),Double(63))-1) : (1 << nbits) - 1  
         let polynomial =  LFSR.taps[nbits]!
 
@@ -128,6 +152,10 @@ class LFSR: URNG {
         for tap in polynomial {
              self.polynomialHex = self.polynomialHex | (1 << (nbits-tap));
         }
+    }
+
+    required convenience init() {
+        self.init(nbits: 64)
     }
 
     static func parity(number: UInt) -> UInt {
@@ -161,21 +189,6 @@ class LFSR: URNG {
         }
         return returnValue
     }
-}
 
-class RNGFactory{
-    private static var sharedRandFactory = RNGFactory()
-
-    class func shared() -> RNGFactory {
-        return sharedRandFactory
-    }
-
-    func getRNG(type: RNG) -> URNG {
-        switch type {
-            case .swift:
-                return SwiftRNG()
-            case .LFSR:
-                return LFSR(nbits: 64)
-        }
-    }
+    static let registered = URNGFactory.register(name: "LFSR", type: LFSR.self)
 }

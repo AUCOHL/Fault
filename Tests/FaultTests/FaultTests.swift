@@ -25,7 +25,7 @@ final class FaultTests: XCTestCase {
         let liberty = "Tech/osu035/osu035_stdcells.lib"
         let models = "Tech/osu035/osu035_stdcells.v"
 
-        let fileName = "RTL/Seq/spm.v"
+        let fileName = "Tests/RTL/spm.v"
         let topModule = "SPM"
         let clock = "clk"
         let reset = "rst"
@@ -53,7 +53,7 @@ final class FaultTests: XCTestCase {
 
         // 2. Simulate
         process = newProcess()
-        process.arguments = ["-c", models, "-o", fileJson, fileCut]
+        process.arguments = ["-c", models, "-o", fileCut, fileCut]
         try process.startAndBlock()
         print("2/5")
 

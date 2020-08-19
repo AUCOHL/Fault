@@ -20,7 +20,7 @@ class Compactor {
         }
 
         // Find Essential TVs
-        print("Finding essential test vectors...")
+        print("Finding essential test vectors…")
         let result = 
             Compactor.findEssentials(coverageList: coverageList, sa0: sa0, sa1: sa1)
         
@@ -65,7 +65,7 @@ class Compactor {
             return (covered: sa0.count + sa1.count, vector: tvPair.vector)
         }
 
-        print("Performing compaction...")
+        print("Performing compaction…")
 
         repeat {
             let sortedCount = rowCount.sorted { $0.1 > $1.1 }

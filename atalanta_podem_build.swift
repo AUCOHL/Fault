@@ -31,7 +31,7 @@ func main() -> Int32 {
         return atalanta
     }
     
-    let podem = installPodem(execPrefix: execPrefix, previousCWD: previousCWD)
+    let podem = installPODEM(execPrefix: execPrefix, previousCWD: previousCWD)
 
     if podem != 0 {
         let _ = "echo Failed to install PODEM".sh()
@@ -66,7 +66,7 @@ func installAtalanta(execPrefix: String, previousCWD: String) -> Int32 {
     return EX_OK
 }
 
-func installPodem(execPrefix: String, previousCWD: String) -> Int32 {
+func installPODEM(execPrefix: String, previousCWD: String) -> Int32 {
 
     defer {
         chdir(previousCWD)

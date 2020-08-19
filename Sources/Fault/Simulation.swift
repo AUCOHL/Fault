@@ -179,7 +179,7 @@ class Simulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
-        randomGenerator: RNG,
+        randomGenerator: String,
         TVSet: [TestVector],
         sampleRun: Bool,
         using iverilogExecutable: String,
@@ -200,7 +200,7 @@ class Simulator {
         var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
         
         let simulateOnly = (TVSet.count != 0)
-        let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
+        let rng: URNG = URNGFactory.get(name: randomGenerator)!
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {

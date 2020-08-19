@@ -12,6 +12,15 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 
+let _ = [ // Register all RNGs
+    SwiftRNG.registered,
+    LFSR.registered
+]
+let _ = [ // Register all TVGens
+    Atalanta.registered,
+    PODEM.registered
+]
+
 let subcommands: OrderedDictionary =  [
     "synth": (func: synth, desc: "synthesis"),
     "chain": (func: scanChainCreate, desc: "scan chain"),
@@ -31,8 +40,8 @@ func main(arguments: [String]) -> Int32 {
     let defaultTVIncrement = "50"
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
-    let defaultRandGen = "swift"
-
+    let defaultRNG = "swift"
+    
     let installed = env["FAULT_INSTALL_PATH"] != nil
 
     let version = BoolOption(
@@ -100,17 +109,23 @@ func main(arguments: [String]) -> Int32 {
     )
     cli.addOptions(ceiling)
     
+    let rng = StringOption(
+        longFlag: "rng",
+        helpMessage: "Type of the RNG used in Internal TV Generation: LFSR or swift. (Default: swift.)"
+    )
+    cli.addOptions(rng)
+
     let tvGen = StringOption(
         shortFlag: "g",
         longFlag: "tvGen",
-        helpMessage: "Type of the TV Generator: swift, LFSR, atalanta, and podem. (Default: \(defaultRandGen).)"
+        helpMessage: "Use an external TV Generator: Atalanta or PODEM. (Default: Internal.)"
     )
     cli.addOptions(tvGen)
 
     let bench = StringOption(
         shortFlag: "b",
         longFlag: "bench",
-        helpMessage: "Netlist in bench format. Required if the TV generator is set to atalanta"
+        helpMessage: "Netlist in bench format. (Required iff generator is set to Atalanta or PODEM.)"
     )
     cli.addOptions(bench)
 
@@ -164,6 +179,19 @@ func main(arguments: [String]) -> Int32 {
         cli.printUsage()
         return EX_USAGE
     }
+    
+    let randomGenerator = rng.value ?? defaultRNG
+
+    guard
+        let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
+        let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
+        let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
+        let tvCeiling = Int(ceiling.value ?? defaultCeiling),
+        URNGFactory.validNames.contains(randomGenerator) && ((tvGen.value == nil) == (bench.value == nil))
+    else {
+        cli.printUsage()
+        return EX_USAGE
+    }
 
     let fileManager = FileManager()
     let file = args[0]
@@ -188,13 +216,13 @@ func main(arguments: [String]) -> Int32 {
     let jsonOutput = "\(filePath.value ?? file).tv.json"
     let svfOutput = "\(filePath.value  ?? file).tv.svf"
 
-    let ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    let behavior
-        = Array<Simulator.Behavior>(
-            repeating: .holdHigh,
-            count: ignoredInputs.count
-        )
+    let ignoredInputs = Set<String>(
+        ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? []
+    )
+    let behavior = [Simulator.Behavior](
+        repeating: .holdHigh,
+        count: ignoredInputs.count
+    )
 
     var cellsFile = cellsOption.value
 
@@ -235,12 +263,15 @@ func main(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    // MARK: TV generation mode
+    print("Processing module \(definition.name)…")
+
+    // MARK: TV Generation Mode Selection
     var tvSetVectors:[TestVector] = []
     var tvSetInputs: [Port] = []
+
     if let tvSetTest = tvSet.value {
         if !fileManager.fileExists(atPath: tvSetTest) {
-            fputs("TVs json file '\(tvSetTest)' not found.\n", stderr)
+            fputs("TVs JSON file '\(tvSetTest)' not found.\n", stderr)
             return EX_NOINPUT
         }
         do {
@@ -255,47 +286,33 @@ func main(arguments: [String]) -> Int32 {
         }
         print("Read \(tvSetVectors.count) vectors.")
     }
+    
+    if let tvGenerator = tvGen.value, ETVGFactory.validNames.contains(tvGenerator) {
+        let etvgen = ETVGFactory.get(name: tvGenerator)!
+        let benchUnwrapped = bench.value! // Program exits if tvGen.value isn't nil and bench.value is or vice versa
 
-    let tvGenerator: TVGen = TVGen(rawValue: tvGen.value ?? defaultRandGen)!
-    let externalGenerator = (tvGenerator == .atalanta || tvGenerator == .podem)
-    if let tvGeneratorTest = TVGen(rawValue: tvGen.value ?? defaultRandGen) {
-        if externalGenerator {
-            if let benchTest = bench.value {
-                if !fileManager.fileExists(atPath: benchTest) {
-                    fputs("Bench file '\(benchTest)' not found.\n", stderr)
-                    return EX_NOINPUT
-                }
-                if tvGeneratorTest == .atalanta {
-                    (tvSetVectors, tvSetInputs) = Atalanta.generate(file: benchTest, module: "\(definition.name)")
-                } else {
-                    (tvSetVectors, tvSetInputs) = Podem.generate(file: benchTest, module: "\(definition.name)")
-                }
-                print("Generated \(tvSetVectors.count) test vectors")
-                if tvSetVectors.count == 0 {
-                    print("[Error]: bench netlist not valid. Are you sure there are no floating nets/outputs ? ")
-                    return EX_DATAERR
-                }
-            } else {
-                print("[Error]: bench netlist must be passed to generate TVs with atalanta.\n Run the synthesized netlist through `fault bench` to generate bench netlist. ")
-                exit(EX_SOFTWARE)
-            }
+        if !fileManager.fileExists(atPath: benchUnwrapped) {
+            fputs("Bench file '\(benchUnwrapped)' not found.\n", stderr)
+            return EX_NOINPUT
+        }
+        (tvSetVectors, tvSetInputs) = etvgen.generate(file: benchUnwrapped, module: "\(definition.name)")
+
+        if tvSetVectors.count == 0 {
+            fputs("Bench netlist appears invalid (no vectors generated). Are you sure there are no floating nets/outputs?", stderr)
+            return EX_DATAERR
+        } else {
+            print("Generated \(tvSetVectors.count) test vectors.")
         }
     }
 
-    guard
-        let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
-        let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
-        let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
-        let tvCeiling = Int(ceiling.value ?? (tvSetVectors.count == 0 ? defaultCeiling: String(tvSetVectors.count))),
-        let randomGenerator: RNG = (!externalGenerator) ? RNG(rawValue: tvGen.value ?? defaultRandGen) : RNG(rawValue: defaultRandGen)
-    else {
-        cli.printUsage()
-        return EX_USAGE
-    }
-
     let tvMinimumCoverage = Float(tvMinimumCoverageInt) / 100.0
-
-    print("Processing module \(definition.name)…")
+    let finalTvCeiling = Int(
+        ceiling.value ?? (
+            tvSetVectors.count == 0 ?
+            defaultCeiling:
+            String(tvSetVectors.count)
+        )
+    )!
 
     do {
         let (ports, inputs, outputs) = try Port.extract(from: definition)
@@ -386,7 +403,7 @@ func main(arguments: [String]) -> Int32 {
                 initialVectorCount: tvAttempts,
                 incrementingBy: tvIncrement,
                 minimumCoverage: tvMinimumCoverage,
-                ceiling: tvCeiling,
+                ceiling: finalTvCeiling,
                 randomGenerator: randomGenerator,
                 sampleRun: sampleRun.value,
                 using: iverilogExecutable,

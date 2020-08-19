@@ -18,7 +18,7 @@ class TFSimulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
-        randomGenerator: RNG,
+        randomGenerator: String,
         sampleRun: Bool,
         using iverilogExecutable: String,
         with vvpExecutable: String
@@ -37,7 +37,7 @@ class TFSimulator {
         var totalTVAttempts = 0
         var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
         
-        let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
+        let rng: URNG = URNGFactory.get(name: randomGenerator)!
 
         var faultMatches : [String:(TestVector, TestVector)] = [:]
         for fault in faultPoints {
