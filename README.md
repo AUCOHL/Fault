@@ -68,7 +68,7 @@ For more information on the supported instructions, check the example [testbench
 For more options, you can invoke `fault tap --help`.
 
 # License
-The GNU General Public License v3 (or later, at your option). See 'License'.
+Phi is available under the Apache 2.0 License.
 
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
