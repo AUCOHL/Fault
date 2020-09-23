@@ -77,8 +77,8 @@ func assemble(arguments: [String]) -> Int32 {
     let orderOutput = chain.filter{ $0.kind != .input }
     let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
 
-    let jsInputOrder = tvinfo.inputs.filter{ $0.polarity != .output }
-    let jsOutputOrder = tvinfo.inputs.filter{ $0.polarity != .input }
+    let jsInputOrder = tvinfo.inputs
+    let jsOutputOrder = tvinfo.outputs
 
     var inputMap: [String: Int] = [:]
     var outputMap: [String: Int] = [:]

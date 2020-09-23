@@ -25,75 +25,19 @@ struct TVCPair: Codable {
 
 struct TVInfo: Codable {
     var inputs: [Port]
+    var outputs: [Port]
     var coverageList: [TVCPair]
     init(
         inputs: [Port],
+        outputs: [Port],
         coverageList: [TVCPair]
     ) {
         self.inputs = inputs
+        self.outputs = outputs
         self.coverageList = coverageList
     }
 }
 
-struct TFCoverage: Codable {
-    var st0: [String]
-    var st1: [String]
-    init(st0: [String], st1: [String]) {
-        self.st0 = st0
-        self.st1 = st1
-    }
-}
-
-struct vectorCovers: Codable {
-    var zeroInit: [String]
-    var oneInit: [String]
-    var sa0: [String]
-    var sa1: [String]
-    init(sa0: [String], sa1: [String], zeroInit: [String], oneInit: [String]){
-        self.sa0 = sa0
-        self.sa1 = sa1
-        self.zeroInit = zeroInit
-        self.oneInit = oneInit
-    }
-}
-extension vectorCovers {
-    static func match(
-        v1Covers: vectorCovers,
-        v2Covers: vectorCovers
-    ) -> (first: TFCoverage, second: TFCoverage){
-        let st1First = v1Covers.sa0.filter { v2Covers.zeroInit.contains($0) }
-        let st0First = v1Covers.sa1.filter { v2Covers.oneInit.contains($0) }
-
-        let firstPairCoverage = TFCoverage(st0: st0First, st1: st1First)
-
-        let st1Second = v2Covers.sa0.filter { v1Covers.zeroInit.contains($0) }
-        let st0Second = v2Covers.sa1.filter { v1Covers.oneInit.contains($0) }
-        let secondPairCoverage = TFCoverage(st0: st0Second, st1: st1Second)
-
-        return (first: firstPairCoverage, second: secondPairCoverage)
-    }
-}
-struct TFCPair: Codable {
-    var initVector: TestVector
-    var faultVector: TestVector
-    var coverage: TFCoverage
-    init (initVector: TestVector, faultVector: TestVector, coverage: TFCoverage) {
-        self.initVector = initVector
-        self.faultVector = faultVector
-        self.coverage = coverage
-    }
-}
-struct TVInfoDelay: Codable {
-    var inputs: [Port]
-    var coverageList: [TFCPair]
-    init(
-        inputs: [Port],
-        coverageList: [TFCPair]
-    ) {
-        self.inputs = inputs
-        self.coverageList = coverageList
-    }
-}
 class TVSet {
 
     static func readFromJson(file: String) throws -> ([TestVector], [Port]) {

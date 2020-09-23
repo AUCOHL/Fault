@@ -21,11 +21,11 @@ class Simulator {
         behavior: [Behavior],
         outputs: [Port],
         stuckAt: Int,
-        delayFault: Bool,
         cleanUp: Bool,
         goldenOutput: Bool,
         clock: String?,
         filePrefix: String = ".",
+        defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (faults: [String], goldenOutput: String) {
@@ -67,6 +67,11 @@ class Simulator {
         fmtString = String(fmtString.dropLast(1))
         inputList = String(inputList.dropLast(2))
 
+        var defineStatements = ""
+        for def in defines {
+            defineStatements += "`define \(def) \n"
+        }
+
         var outputCount = 0 
         var outputComparison = ""
         var outputAssignment = ""
@@ -94,11 +99,6 @@ class Simulator {
             faultForces += "        #1 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
             faultForces += "        #1 ; \n"
-
-            if delayFault {
-                faultForces += "        if(uut.\(fault) == \(stuckAt)) $display(\"v1: \(fault)\") ;\n"
-                faultForces += "        #1; \n"
-            }
         }
 
         var clockCreator = ""
@@ -200,10 +200,11 @@ class Simulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
-        randomGenerator: RNG,
+        randomGenerator: String,
         TVSet: [TestVector],
         sampleRun: Bool,
         clock: String?,
+        defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
@@ -222,7 +223,7 @@ class Simulator {
         var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
         
         let simulateOnly = (TVSet.count != 0)
-        let rng: URNG = RNGFactory.shared().getRNG(type: randomGenerator)
+        let rng: URNG = URNGFactory.get(name: randomGenerator)!
 
         while coverage < minimumCoverage && totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -268,11 +269,11 @@ class Simulator {
                                 behavior: behavior,
                                 outputs: outputs,
                                 stuckAt: 0,
-                                delayFault: false,
                                 cleanUp: !sampleRun,
                                 goldenOutput: true,
                                 clock: clock,
                                 filePrefix: tempDir,
+                                defines: defines,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -290,11 +291,11 @@ class Simulator {
                                 behavior: behavior,
                                 outputs: outputs,
                                 stuckAt: 1,
-                                delayFault: false,
                                 cleanUp: !sampleRun,
                                 goldenOutput: false,
                                 clock: clock,
                                 filePrefix: tempDir,
+                                defines: defines,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -370,6 +371,7 @@ class Simulator {
         shift: String,
         test: String,
         output: String,
+        defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -408,8 +410,14 @@ class Simulator {
             include = "`include \"\(blackboxFile)\""
         }
 
+        var defineStatements = ""
+        for def in defines {
+            defineStatements += "`define \(def) \n"
+        }
+    
         let bench = """
         \(String.boilerplate)
+        \(defineStatements)
         `include "\(cells)"
         `include "\(file)"
         \(include)
@@ -425,8 +433,8 @@ class Simulator {
             reg[\(chainLength - 1):0] serial;
             integer i;
             initial begin
-                $dumpfile("chain.vcd");
-                $dumpvars(0, testbench);
+                // $dumpfile("chain.vcd");
+                // $dumpvars(0, testbench);
         \(inputAssignment)
                 #10;
                 \(reset) = ~\(reset);
@@ -472,6 +480,7 @@ class Simulator {
         tdo: String,
         trst: String,
         output: String,
+        defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -514,7 +523,13 @@ class Simulator {
             include = "`include \"\(blackboxFile)\""
         }
 
+        var defineStatements = ""
+        for def in defines {
+            defineStatements += "`define \(def) \n"
+        }
+
         let bench =  """
+        \(defineStatements)
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
@@ -539,8 +554,8 @@ class Simulator {
             wire[3:0] preload_chain = 4'b0011;
 
             initial begin
-                $dumpfile("dut.vcd");
-                $dumpvars(0, testbench);
+                // $dumpfile("dut.vcd");
+                // $dumpvars(0, testbench);
         \(inputInit)
                 \(tms) = 1;
                 #150;
@@ -610,6 +625,7 @@ class Simulator {
         vectorCount: Int, 
         vectorLength: Int,
         outputLength: Int,
+        defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -661,7 +677,13 @@ class Simulator {
             include = "`include \"\(blackboxFile)\""
         }
         
+        var defineStatements = ""
+        for def in defines {
+            defineStatements += "`define \(def) \n"
+        }
+
         let bench = """
+        \(defineStatements)
         \(String.boilerplate)
         `include "\(cells)"
         `include "\(file)"
@@ -686,8 +708,8 @@ class Simulator {
             wire[3:0] preloadChain = 4'b 0011;
 
             initial begin
-                $dumpfile("dut.vcd"); // DEBUG
-                $dumpvars(0, testbench);
+                // $dumpfile("dut.vcd"); // DEBUG
+                // $dumpvars(0, testbench);
         \(inputAssignment)
                 $readmemb("\(vecbinFile)", vectors);
                 $readmemb("\(outbinFile)", gmOutput);

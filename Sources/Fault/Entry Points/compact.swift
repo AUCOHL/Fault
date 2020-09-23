@@ -105,6 +105,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         let jsonData = try encoder.encode(
             TVInfo(
                 inputs: tvInfo.inputs,
+                outputs: tvInfo.outputs,
                 coverageList: compactedTV
             )
         )
@@ -118,7 +119,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         }
         
         if let modelTest = verifyOpt.value {
-            print("Running simulations using the compacted set...")
+            print("Running simulations using the compacted set…")
             let verifiedOutput = "\(output).verified.json"
             let mainArguments: [String] = [
                 arguments[0].components(separatedBy: " ")[0],

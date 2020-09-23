@@ -9,8 +9,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
-    let defaultBoundaryReset = "boundaryScanReset";
-
     let help = BoolOption(
         shortFlag: "h",
         longFlag: "help",
@@ -77,7 +75,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell name (Default: DFF)"
+        helpMessage: "Flip-flop cell names ,comma,seperated (Default: DFFSR,DFFNEGX1,DFFPOSX1)"
     )
     cli.addOptions(dffOpt)
 
@@ -86,6 +84,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         helpMessage: "Isolated module definitions (.v) (Hard un-scannable blocks). (Default: none)"
     )
     cli.addOptions(isolated)
+
+    let defs = StringOption(
+        longFlag: "define",
+        helpMessage: "define statements to include during simulations. (Default: none)"
+    )
+    cli.addOptions(defs)
 
     var names: [String: (default: String, option: StringOption)] = [:]
 
@@ -161,10 +165,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
     let bsrLocation = output + ".bsr.v"
-    let dffName = dffOpt.value ?? "DFF"
-
+    
+    let dffNames: Set<String>
+        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter {$0 != ""} ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+
+    let defines: Set<String>
+        = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+        
     let clockName = clockOpt.value!
     let resetName = resetOpt.value!
 
@@ -285,7 +294,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             if type == "InstanceList" {
                 let instance = itemDeclaration.instances[0]
                 let instanceName = String(describing: instance.module)
-                if instanceName.starts(with: dffName) {
+                if dffNames.contains(instanceName) {
                     for hook in instance.portlist {
                         if hook.portname == "CLK" {
                             if String(describing: hook.argname) == clockName {
@@ -526,7 +535,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         definition.items = Python.tuple(statements + wireDeclarations + wrapperCells + assignStatements)
         definition.name = Python.str(alteredName)
         
-        print(internalOrder.count)
+        print("Internal scan chain successfuly constructed. Length: " , internalOrder.count)
 
         // MARK: Chaining boundary registers
         print("Creating and chaining boundary flip-flops…")
@@ -742,8 +751,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             return counter - 1 // Accounting for skip
         }()
+        
+        
+        print("Boundary scan cells successfuly chained. Length: " , boundaryCount)
 
-        print(boundaryCount)
+        let chainLength = boundaryCount + internalOrder.count
+        print("Total scan-chain length: " , chainLength)
 
         let metadata = ChainMetadata(
             boundaryCount: boundaryCount,
@@ -816,7 +829,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
-                chainLength: boundaryCount +  internalOrder.count,
+                chainLength: chainLength,
                 clock: clockName,
                 tck: tckName,
                 reset: resetName,
@@ -826,6 +839,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 shift: shiftName,
                 test: testName,
                 output: output + ".tb.sv",
+                defines: defines,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -839,7 +853,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                 }
                 if internalOrder.count == 0 {
-                    print("・Ensure that D flip-flop cell name starts with \(dffName).")
+                    print("・Ensure that D flip-flop cell name starts with \(dffNames).")
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }

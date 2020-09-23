@@ -16,7 +16,7 @@ func cut(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell name (Default: DFF)."
+        helpMessage: "Flip-flop cell names ,comma,speerated (Default: DFF)."
     )
     cli.addOptions(dffOpt)
 
@@ -64,7 +64,10 @@ func cut(arguments: [String]) -> Int32 {
         fputs("File '\(file)' not found.\n", stderr)
         return EX_NOINPUT
     }
-    let dffName = dffOpt.value ?? "DFF"
+
+    let dffNames: Set<String>
+        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter {$0 != ""} ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
+
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
@@ -124,7 +127,7 @@ func cut(arguments: [String]) -> Int32 {
             if type == "InstanceList" {
                 let instance = item.instances[0]
                 let instanceName = String(describing: instance.module)
-                if instanceName.starts(with: dffName) {
+                if dffNames.contains(instanceName) {
                     let instanceName = String(describing: instance.name)
                     let outputName = "\\" + instanceName + ".q"
 

@@ -1,0 +1,16 @@
+{
+    "tap":{
+        "tms": "tms",
+        "tck": "tck",
+        "tdi": "tdi",
+        "tdo": "tdo_pad_o",
+        "trst": "trst",
+        "tdoEnable_n": "tdo_paden_o"
+    },
+    "chain":{
+        "sin": "sin",
+        "sout": "sout",
+        "shift": "shift",
+        "test": "test"
+    }
+}

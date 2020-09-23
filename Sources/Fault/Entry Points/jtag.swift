@@ -5,7 +5,7 @@ import Defile
 
 func jtagCreate(arguments: [String]) -> Int32 {
     let env = ProcessInfo.processInfo.environment
-    let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
+    let faultInstalled = env["FAULT_INSTALL_PATH"] != nil
 
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
@@ -53,9 +53,9 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
-        required: !defaultLiberty,
+        required: !faultInstalled,
         helpMessage:
-            "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")"
+            "Liberty file. \(faultInstalled ? "(Default: osu035)" : "(Required.)")"
     )
     cli.addOptions(liberty)
 
@@ -88,6 +88,12 @@ func jtagCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(blackbox)
 
+    let defs = StringOption(
+        longFlag: "define",
+        helpMessage: "define statements to include during simulations. (Default: none)"
+    )
+    cli.addOptions(defs)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -99,7 +105,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ("tck", "JTAG test clock"),
         ("tdi", "JTAG test data input"),
         ("tdo", "JTAG test data output"),
-        ("tdoEnable", "TDO Enable pad (active low) "),
+        ("tdo_paden_o", "TDO Enable pad (active low) "),
         ("trst", "JTAG test reset (active low)")
     ] {
         let option = StringOption(
@@ -142,6 +148,10 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+    
+    let defines: Set<String>
+        = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
 
@@ -190,10 +200,16 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
-    let tapLocation = "RTL/JTAG/tap_top.v"
-    let wrapperLocation = "RTL/JTAG/tap_wrapper.v"
+    
+    let tapLocation = faultInstalled ? 
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : 
+        "RTL/JTAG/tap_top.v"
 
-    let libertyFile = defaultLiberty ?
+    let wrapperLocation = faultInstalled ? 
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : 
+        "RTL/JTAG/tap_wrapper.v"
+
+    let libertyFile = faultInstalled ?
         liberty.value ??
         "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
         liberty.value!
@@ -237,8 +253,8 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ?? names["tdi"]!.default
     let tdoName = names["tdo"]!.option.value 
         ?? names["tdo"]!.default
-    let tdoEnableName = names["tdoEnable"]!.option.value 
-        ?? names["tdoEnable"]!.default
+    let tdoenableName = names["tdo_paden_o"]!.option.value 
+        ?? names["tdo_paden_o"]!.default
     let tckName = names["tck"]!.option.value 
         ?? names["tck"]!.default
     let trstName = names["trst"]!.option.value 
@@ -275,12 +291,15 @@ func jtagCreate(arguments: [String]) -> Int32 {
             tdoName, Python.None, Python.None, Python.None))
         topModulePorts.append(Node.Port(
             trstName, Python.None, Python.None, Python.None))
+        topModulePorts.append(Node.Port(
+            tdoenableName, Python.None, Python.None, Python.None))
 
         let statements = Python.list()
         statements.append(Node.Input(tmsName))
         statements.append(Node.Input(tckName))
         statements.append(Node.Input(tdiName))
         statements.append(Node.Output(tdoName))
+        statements.append(Node.Output(tdoenableName))
         statements.append(Node.Input(trstName))
 
         let portArguments = Python.list()
@@ -351,7 +370,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             tck: tckName,
             tdi: tdiName,
             tdo: tdoName,
-            tdoEnable_n: tdoEnableName,
+            tdoEnable_n: tdoenableName,
             trst: trstName,
             sin: sinName,
             sout: soutName,
@@ -359,18 +378,18 @@ func jtagCreate(arguments: [String]) -> Int32 {
             test: testName
         )
 
-        // TDO tri-state enable assignment
-        let ternary = Node.Cond(
-            Node.Unot(Node.Identifier(tapInfo.tap.tdoEnable_n)),
-            Node.Identifier(tapInfo.tap.tdo),
-            Node.IntConst("1'bz")
-        )
-        let tdoAssignment = Node.Assign(
-            Node.Lvalue(Node.Identifier(tdoName)),
-            Node.Rvalue(ternary)
-        )
+        // // TDO tri-state enable assignment
+        // let ternary = Node.Cond(
+        //     Node.Unot(Node.Identifier(tapInfo.tap.tdoEnable_n)),
+        //     Node.Identifier(tapInfo.tap.tdo),
+        //     Node.IntConst("1'bz")
+        // )
+        // let tdoAssignment = Node.Assign(
+        //     Node.Lvalue(Node.Identifier(tdoName)),
+        //     Node.Rvalue(ternary)
+        // )
 
-        statements.append(tdoAssignment)
+        // statements.append(tdoAssignment)
         statements.extend(tapModule.wires)
         statements.append(tapModule.tapModule)
 
@@ -524,6 +543,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     vectorCount: vectorCount,
                     vectorLength: vectorLength,
                     outputLength: outputLength,
+                    defines: defines,
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )

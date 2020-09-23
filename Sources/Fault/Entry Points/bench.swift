@@ -66,7 +66,7 @@ func bench(arguments: [String]) -> Int32 {
         }
 
         if modelTest.hasSuffix(".v") || modelTest.hasSuffix(".sv") {
-            print("Creating json for the cell models...")
+            print("Creating json for the cell models…")
             cellModelsFile = "\(modelTest).json"
 
             let cellModels =

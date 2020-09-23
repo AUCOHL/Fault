@@ -25,15 +25,18 @@ final class FaultTests: XCTestCase {
         let liberty = "Tech/osu035/osu035_stdcells.lib"
         let models = "Tech/osu035/osu035_stdcells.v"
 
-        let fileName = "RTL/Seq/spm.v"
+        let fileName = "Tests/RTL/spm.v"
         let topModule = "SPM"
         let clock = "clk"
         let reset = "rst"
-        
+        let ignoredInputs = "\(clock),\(reset)" 
+
         let fileSynth = "Netlists/" + fileName + ".netlist.v"
         let fileCut = fileSynth + ".cut.v"
         let fileJson = fileCut + ".tv.json"
         let fileChained = fileSynth + ".chained.v"
+        let fileAsmVec = fileJson + ".vec.bin"
+        let fileAsmOut = fileJson + ".out.bin"
 
         // 0. Synth
         var process = newProcess()
@@ -42,7 +45,7 @@ final class FaultTests: XCTestCase {
 
 
         XCTAssertEqual(process.terminationStatus, 0)
-        print("1/5")
+        print("1/6")
         // 1. Cut
         process = newProcess()
         process.arguments = ["cut", "-o", fileCut, fileSynth]
@@ -53,28 +56,28 @@ final class FaultTests: XCTestCase {
 
         // 2. Simulate
         process = newProcess()
-        process.arguments = ["-c", models, "-o", fileJson, fileCut]
+        process.arguments = ["-c", models, "-i", ignoredInputs, "--define", "functional", "-o", fileCut, fileCut]
         try process.startAndBlock()
-        print("2/5")
+        print("2/6")
 
 
         XCTAssertEqual(process.terminationStatus, 0)
 
         // 3. Chain
         process = newProcess()
-        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, fileSynth]
+        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "-i", ignoredInputs, fileSynth]
         print(process.arguments!.joined(separator: " "))
         try process.startAndBlock()
-        print("3/5")
+        print("3/6")
 
 
         XCTAssertEqual(process.terminationStatus, 0)
 
         // 4. Assemble
         process = newProcess()
-        process.arguments = ["asm", "-o", "/dev/null", fileJson, fileChained]
+        process.arguments = ["asm", fileJson, fileChained]
         try process.startAndBlock()
-        print("4/5")
+        print("4/6")
 
 
         XCTAssertEqual(process.terminationStatus, 0)
@@ -83,8 +86,13 @@ final class FaultTests: XCTestCase {
         process = newProcess()
         process.arguments = ["compact", "-o", "/dev/null", fileJson]
         try process.startAndBlock()
-        print("5/5")
+        print("5/6")
 
+        // 6. Tap
+        process = newProcess()
+        process.arguments = ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs]
+        try process.startAndBlock()
+        print("6/6")
 
         XCTAssertEqual(process.terminationStatus, 0)
     }

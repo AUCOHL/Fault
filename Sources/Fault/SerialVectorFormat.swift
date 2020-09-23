@@ -29,7 +29,7 @@ class SerialVectorCreator {
                 let tdiHex = String(tdiInt, radix: 16)
                 
                 let mask = String(repeating: "f", count: tdiHex.count)
-                if let output = BigUInt(tvcPair.goldenOutput, radix: 2) {
+                if let output = BigUInt(tvcPair.goldenOutput, radix: 16) {
                     let hexOutput = String(output, radix: 16) 
                     scanStatements += "SDR \(chainLength) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
                 } else {

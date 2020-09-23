@@ -636,7 +636,7 @@ begin
         `SAMPLE_PRELOAD:    tdo_pad_o = bs_chain_tdi_i;   // Sampling/Preloading
         `EXTEST:            tdo_pad_o = bs_chain_tdi_i;   // External test
         `MBIST:             tdo_pad_o = mbist_tdi_i;      // Mbist test
-        `PRELOAD_CHAIN:     tdo_pad_o = chain_tdi_i;    // Preload Chain 1
+        `PRELOAD_CHAIN:     tdo_pad_o = chain_tdi_i;      // Preload Chain 1
         default:            tdo_pad_o = bypassed_tdo;     // BYPASS instruction
       endcase
     end
