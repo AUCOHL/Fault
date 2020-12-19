@@ -11,10 +11,10 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/lukaskubanek/OrderedDictionary.git", .branch("master")),
+        .package(url: "https://github.com/lukaskubanek/OrderedDictionary.git", from: "3.0.1"),
         .package(url: "https://github.com/pvieito/PythonKit", .branch("master")),
         .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
-        .package(url: "https://github.com/donn/Defile.git", .branch("master")),
+        .package(url: "https://github.com/donn/Defile.git", from: "5.0.0"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0")
     ],
     targets: [

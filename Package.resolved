@@ -23,9 +23,9 @@
         "package": "Defile",
         "repositoryURL": "https://github.com/donn/Defile.git",
         "state": {
-          "branch": "master",
+          "branch": null,
           "revision": "a66e27059eb158c4ef6c49fd6f899be30bb99002",
-          "version": null
+          "version": "5.0.0"
         }
       },
       {
@@ -41,9 +41,9 @@
         "package": "OrderedDictionary",
         "repositoryURL": "https://github.com/lukaskubanek/OrderedDictionary.git",
         "state": {
-          "branch": "master",
-          "revision": "acb62df76052bef95a918d26f12bf4996b8587ea",
-          "version": null
+          "branch": null,
+          "revision": "9adcc6f84c470bd80a29e16887c0f94fea2a783d",
+          "version": "3.0.1"
         }
       },
       {
