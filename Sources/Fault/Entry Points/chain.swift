@@ -327,7 +327,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
                 } else if let name = isolatedName, name == instanceName {
                     // MARK: Isolating hard blocks
-                    print("Chaining blackbox module...")
+                    print("Chaining blackbox module…")
                     let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
                     let isolatedInputs = inputs.map { $0.name }
                     

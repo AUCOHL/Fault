@@ -202,11 +202,11 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let intermediate = output + ".intermediate.v"
     
     let tapLocation = faultInstalled ? 
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : 
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/RTL/JTAG/tap_top.v" : 
         "RTL/JTAG/tap_top.v"
 
     let wrapperLocation = faultInstalled ? 
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" : 
+        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/RTL/JTAG/tap_wrapper.v" : 
         "RTL/JTAG/tap_wrapper.v"
 
     let libertyFile = faultInstalled ?
@@ -347,7 +347,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
             
         // MARK: tap module 
-        print("Stitching tap port...") 
+        print("Stitching tap port…") 
         let config = "RTL/JTAG/config.json"
         if !fileManager.fileExists(atPath: config) {
             fputs("JTAG configuration file '\(config)' not found.\n", stderr)
@@ -445,7 +445,9 @@ func jtagCreate(arguments: [String]) -> Int32 {
             fputs("A yosys error has occurred.\n", stderr)
             return Int32(result)
         }
-        print("Done.")
+        if verifyOpt.value == nil {
+            print("Done.")
+        }
 
         guard let content = File.read(output) else {
             throw "Could not re-read created file."
@@ -509,7 +511,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
             // MARK: Test bench
             if let tvFile = testvectors.value {
-                print("Generating testbench for test vectors...")
+                print("Generating testbench for test vectors…")
                 let behavior
                     = Array<Simulator.Behavior>(
                         repeating: .holdHigh,
@@ -547,7 +549,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )
-                print("Done.")
                 if (verified) {
                     print("Test vectors verified successfully.")
                 } else {

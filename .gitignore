@@ -9,6 +9,7 @@ Netlists
 /Atalanta*/
 /podem*/
 /Testbench*/
+/DerivedData
 
 *.out
 *.vcd

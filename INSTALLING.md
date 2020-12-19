@@ -7,7 +7,7 @@
 * Atalanta
 
 # Installing
-You need a Swift-compatible operating system (i.e. macOS or Linux).
+You need a Swift-compatible operating system (i.e. macOS or Linux). The Swift version of Windows isn't mature enough for this just yet.
 
 Again, if you're on Microsoft Windows (or you're too lazy to follow these instructions,) you can use the Docker container.
 
@@ -20,14 +20,23 @@ Use [Homebrew](https://brew.sh).
 
 `brew install python yosys icarus-verilog`
 
-## Debian-based Linuces (e.g. Ubuntu)
+## Linux
+You need to fulfill these dependencies:
+- Git
+- Clang
+- Python 3.6 or higher (w/ development libraries)
+- Yosys 0.7 or higher
+- Icarus Verilog 10.2 or higher
+
+### Ubuntu
 Using apt:
 
-`sudo apt-get install git clang python3 python3-dev yosys`
+`sudo apt-get install git clang python3 python3-dev yosys iverilog`
 
 Then install the Swift programming language: instructions are on [swift.org](https://swift.org/download/#using-downloads).
 
-Notice how Icarus Verilog is excluded. This is because as of the time of writing, there is no version of Swift on a version of Ubuntu that has Icarus Verilog 10.2 or above. Which is ridiculous. You'll have to build it from source. First, grab these dev dependencies:
+### If you're using Ubuntu 18.04 or lower…
+The version of Icarus Verilog you just installed is insufficient, as 10.2 has a number of critical bugfixes that are required for Fault to run. You'll have to build it from source. First, grab these dev dependencies:
 
 `sudo apt-get install curl autoconf make gperf flex bison`
 
@@ -38,11 +47,11 @@ EXEC_PREFIX=</usr/local/bin> sudo ./iverilog_build.swift
 ```
 
 ## Both
-You'll need the dev branch of Pyverilog install with pip.
+You'll need Pyverilog
 
-`python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/develop.zip`
+`python3 -m pip install pyverilog`
 
-You'll also need to install Atalanta if you want to use it for test vector generation.
+You can optionally install Atalanta if you want to use it for test vector generation.
 
 ```bash
 EXEC_PREFIX=</usr/local/bin> sudo ./atalanta_build.swift
@@ -58,4 +67,6 @@ You may need to add `~/bin` to path depending on your OS.
 To uninstall this, you can simply invoke `fault uninstall`.
 
 # Usage without installation
-Osu035 will not be used automatically and `fault uninstall`, `fault -V` will not function.
+Osu035 will not be used automatically and both `fault uninstall` and `fault -V` will not function.
+
+You can use Fault without installing by invoking `swift run Fault` in place of `fault`. Please note that you still need all the other dependencies anyway.
