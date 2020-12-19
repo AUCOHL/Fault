@@ -1,15 +1,16 @@
 # Dependencies
-* Swift 5.0+
+* Swift 5.2+
 * Python 3.6+ with PIP
 * Yosys 0.7+
 * Icarus Verilog 10.2+
-* Pyverilog (dev)
-* Atalanta
+* Pyverilog
+* Atalanta (Optional)
+* PODEM (Optional)
 
 # Installing
 You need a Swift-compatible operating system (i.e. macOS or Linux). The Swift version of Windows isn't mature enough for this just yet.
 
-Again, if you're on Microsoft Windows (or you're too lazy to follow these instructions,) you can use the Docker container.
+Again, if you're on Windows (or you're too lazy to follow these instructions,) you can use the Docker container.
 
 ## macOS
 macOS 10.13 High Sierra or higher is required.
