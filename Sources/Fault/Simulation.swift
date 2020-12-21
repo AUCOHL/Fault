@@ -808,8 +808,8 @@ class Simulator {
         
       
         if iverilogResult.terminationStatus != EX_OK {
-            fputs("An iverilog error has occurred: \n", stderr)
-            fputs(iverilogResult.output, stderr)
+            Stderr.print("An iverilog error has occurred: ")
+            Stderr.print(iverilogResult.output)
             exit(Int32(iverilogResult.terminationStatus))
         }
         let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()

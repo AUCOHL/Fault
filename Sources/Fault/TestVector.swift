@@ -1,5 +1,6 @@
 import Foundation
 import BigInt
+import Defile
 
 typealias TestVector = [BigUInt]
 
@@ -39,28 +40,29 @@ struct TVInfo: Codable {
 }
 
 class TVSet {
-
     static func readFromJson(file: String) throws -> ([TestVector], [Port]) {
-
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
         guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
-            fputs("File '\(file)' is invalid.\n", stderr)
+            Stderr.print("File '\(file)' is invalid.")
             exit(EX_DATAERR)
         }
         let vectors = tvInfo.coverageList.map{ $0.vector }
         return (vectors: vectors , inputs: tvInfo.inputs)
     }
-    static func readFromText(file: String) throws -> ([TestVector], [Port]){
+
+    static func readFromText(file path: String) throws -> ([TestVector], [Port]){
         var inputs: [Port] = []
         var vectors: [TestVector] = []
-
-        guard let reader = LineReader(path: file) else {
-            fputs("Test vector set input file '\(file)' not found.\n", stderr)
+        
+        guard let file = File.open(path) else {
+            Stderr.print("Test vector set input file '\(path)' not found.")
             exit(EX_DATAERR)
         }
 
-        let ports = reader.nextLine!.components(separatedBy: " ")
-        for (index, port) in ports.enumerated(){
+        let lines = file.lines!
+
+        let ports = lines[0].components(separatedBy: " ")
+        for (index, port) in ports.enumerated() {
             if port != "PI"{
                 inputs.append(Port(name: port, at: index))
             }
@@ -68,7 +70,7 @@ class TVSet {
         inputs = inputs.dropLast(1)
 
         var readPorts = true
-        for line in reader {
+        for line in lines[1...] {
 
             let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -85,7 +87,7 @@ class TVSet {
                 }
                 inputs = inputs.dropLast(1)
             } else {
-                fputs("Warning: Dropped invalid testvector line \(line)", stderr)
+                Stderr.print("Warning: Dropped invalid testvector line \(line)")
             }
         }
         return (vectors: vectors, inputs: inputs)

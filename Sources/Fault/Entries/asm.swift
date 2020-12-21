@@ -59,13 +59,13 @@ func assemble(arguments: [String]) -> Int32 {
     let goldenOutput = (filePath.value ?? json) + ".out.bin"
 
     guard let jsonString = File.read(json) else {
-        fputs("Could not read file '\(json)'\n", stderr)
+        Stderr.print("Could not read file '\(json)'")
         return EX_NOINPUT
     }
 
     let decoder = JSONDecoder()
     guard let tvinfo = try? decoder.decode(TVInfo.self, from: jsonString.data(using: .utf8)!) else {
-        fputs("Test vector json file is invalid.\n", stderr)
+        Stderr.print("Test vector json file is invalid.")
         return EX_DATAERR
     }
 
@@ -130,10 +130,10 @@ func assemble(arguments: [String]) -> Int32 {
         }
         var pointer = 0
         var list: [BigUInt] = []
-        var binFromhex =  String(hex, radix: 2)
+        let binFromhex =  String(hex, radix: 2)
         let padLength = jsOutputLength - binFromhex.count
         let outputBinary = (String(repeating: "0", count: padLength) + binFromhex).reversed()
-        for (i, output) in jsOutputOrder.enumerated() {
+        for output in jsOutputOrder{
             let start = outputBinary.index(outputBinary.startIndex, offsetBy: pointer)
             let end = outputBinary.index(start, offsetBy: output.width)
             let value = String(outputBinary[start..<end])
@@ -144,7 +144,7 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     var outputLength: Int = 0 
-    for (i, output) in outputSorted.enumerated() {
+    for output in outputSorted {
         outputLength += output.width
     }
 
@@ -167,7 +167,7 @@ func assemble(arguments: [String]) -> Int32 {
             binaryString += pad(value, digits: element.width, radix: 2).reversed()
         } 
         var outputBinary = ""
-        for (j, element) in orderOutput.enumerated() {
+        for element in orderOutput {
             var value: BigUInt = 0
             if let locus = outputMap[element.name] {  
                 value = outputDecimal[i][locus]
@@ -193,11 +193,11 @@ func assemble(arguments: [String]) -> Int32 {
     let outMetadata = binMetadata(count: vectorCount, length: outputLength)
 
     guard let vecMetadataString = vecMetadata.toJSON() else {
-        fputs("Could not generate metadata string.", stderr)
+        Stderr.print("Could not generate metadata string.")
         return EX_SOFTWARE
     }
     guard let outMetadataString = outMetadata.toJSON() else {
-        fputs("Could not generate metadata string.", stderr)
+        Stderr.print("Could not generate metadata string.")
         return EX_SOFTWARE
     }
     do {
@@ -212,7 +212,7 @@ func assemble(arguments: [String]) -> Int32 {
             try $0.print(binFileOut, terminator: "")
         } 
     } catch {
-        fputs("Could not access file \(vectorOutput) or \(goldenOutput)", stderr)
+        Stderr.print("Could not access file \(vectorOutput) or \(goldenOutput)")
         return EX_CANTCREAT
     }
 

@@ -4,9 +4,6 @@ import PythonKit
 import Defile
 
 func scanChainCreate(arguments: [String]) -> Int32 {
-    let env = ProcessInfo.processInfo.environment
-    let defaultLiberty = env["FAULT_INSTALL_PATH"] != nil
-    
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let help = BoolOption(
@@ -66,9 +63,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
-        required: !defaultLiberty,
-        helpMessage:
-            "Liberty file. \(defaultLiberty ? "(Default: osu035)" : "(Required.)")"
+        required: true,
+        helpMessage: "Liberty file. (Required.)"
     )
     cli.addOptions(liberty)
 
@@ -132,32 +128,30 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
+        Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
 
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
-            fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
+            Stderr.print("Liberty file '\(libertyTest)' not found.")
             return EX_NOINPUT
         }
         if !libertyTest.hasSuffix(".lib") {
-            fputs(
-                "Warning: Liberty file provided does not end with .lib.",
-                stderr
+            Stderr.print(
+                "Warning: Liberty file provided does not end with .lib."
             )
         }
     }
 
     if let modelTest = verifyOpt.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
-            fputs(
-                "Warning: Cell model file provided does not end with .v or .sv.\n",
-                stderr
+            Stderr.print(
+                "Warning: Cell model file provided does not end with .v or .sv.\n"
             )
         }
     }
@@ -180,10 +174,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
 
-    let libertyFile = defaultLiberty ?
-        liberty.value ??
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_muxonly.lib" :
-        liberty.value!
+    let libertyFile = liberty.value!
 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -206,7 +197,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     }
 
     guard let definition = definitionOptional else {
-        fputs("No module found.\n", stderr)
+        Stderr.print("No module found.")
         return EX_DATAERR
     }
 
@@ -228,7 +219,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     if let _ = isolatedOptional {
     } else {
         if let isolatedFile = isolated.value {
-            fputs("No module defintion found in \(isolatedFile)", stderr)
+            Stderr.print("No module defintion found in \(isolatedFile)")
             return EX_DATAERR
         }
     }
@@ -767,7 +758,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             sout: outputName
         )
         guard let metadataString = metadata.toJSON() else {
-            fputs("Could not generate metadata string.", stderr)
+            Stderr.print("Could not generate metadata string.")
             return EX_SOFTWARE
         }
     
@@ -788,7 +779,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
         if result != EX_OK {
-            fputs("A yosys error has occurred.\n", stderr)
+            Stderr.print("A yosys error has occurred.")
             return Int32(result)
         }
 
@@ -816,7 +807,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 }
             }
             guard let definition = definitionOptional else {
-                fputs("No module found.\n", stderr)
+                Stderr.print("No module found.")
                 return EX_DATAERR
             }
             let (ports, inputs, outputs) = try Port.extract(from: definition)
@@ -861,7 +852,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         print("Done.")
     
     } catch {
-        fputs("Internal software error: \(error)", stderr)
+        Stderr.print("Internal software error: \(error)")
         return EX_SOFTWARE
     }
     return EX_OK

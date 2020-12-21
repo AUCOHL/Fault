@@ -56,34 +56,34 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     let file = args[0]
 
     if !fileManager.fileExists(atPath: file) {
-       fputs("File '\(file)' not found.\n", stderr)
+       Stderr.print("File '\(file)' not found.")
        return EX_NOINPUT
     }
 
     if let modelTest = verifyOpt.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
-            fputs(
+            Stderr.print(
                 "Warning: Cell model file provided does not end with .v or .sv.\n",
                 stderr
             )
         }
         guard let _ = netlistOpt.value else {
-            fputs("Error: The netlist must be provided to verify compaciton \n",stderr)
+            Stderr.print("Error: The netlist must be provided to verify compaciton ")
             return EX_NOINPUT
         }
     }
 
     if let netlistTest = netlistOpt.value {
         if !fileManager.fileExists(atPath: netlistTest) {
-            fputs("Netlist file '\(netlistTest)' not found.\n", stderr)
+            Stderr.print("Netlist file '\(netlistTest)' not found.")
             return EX_NOINPUT
         }
         guard let _ = verifyOpt.value else {
-            fputs("Error: The cell models file  must be provided to verify compaciton \n",stderr)
+            Stderr.print("Error: The cell models file  must be provided to verify compaciton ")
             return EX_NOINPUT
         }
     }
@@ -93,7 +93,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     do {
         let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
         guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
-            fputs("File '\(file)' is invalid.\n", stderr)
+            Stderr.print("File '\(file)' is invalid.")
             return EX_DATAERR
         }
 
@@ -134,7 +134,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
             exit(main(arguments: mainArguments))
         } 
     } catch {
-        fputs(error.localizedDescription, stderr)
+        Stderr.print(error.localizedDescription)
         return EX_NOINPUT
     }
 

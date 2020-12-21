@@ -41,8 +41,6 @@ func main(arguments: [String]) -> Int32 {
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
     let defaultRNG = "swift"
-    
-    let installed = env["FAULT_INSTALL_PATH"] != nil
 
     let version = BoolOption(
         shortFlag: "V",
@@ -70,17 +68,10 @@ func main(arguments: [String]) -> Int32 {
     let cellsOption = StringOption(
         shortFlag: "c",
         longFlag: "cellModel",
-        helpMessage: ".v file describing the cells \(installed ? "(Default: osu035)" : "(Required.)")"
+        required: true,
+        helpMessage: ".v file describing the cells (Required.)"
     )
     cli.addOptions(cellsOption)
-
-    let osu035 = BoolOption(
-        longFlag: "osu035",
-        helpMessage: "Use the Oklahoma State University standard cell library for -c. (Legacy, now used by default.)"
-    )
-    if installed {
-        cli.addOptions(osu035)
-    }
 
     let testVectorCount = StringOption(
         shortFlag: "v",
@@ -207,19 +198,18 @@ func main(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
+        Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
 
     if let modelTest = cellsOption.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
-            fputs(
-                "Warning: Cell model file provided does not end with .v or .sv.",
-                stderr
+            Stderr.print(
+                "Warning: Cell model file provided does not end with .v or .sv."
             )
         }
     }
@@ -237,22 +227,7 @@ func main(arguments: [String]) -> Int32 {
     let defines: Set<String>
         = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
 
-    var cellsFile = cellsOption.value
-
-    if installed {
-        if cellsFile == nil {
-            cellsFile = env["FAULT_INSTALL_PATH"]! + "/FaultInstall/Tech/osu035/osu035_stdcells.v"
-        }
-    }
-
-    if osu035.value {
-        print("[WARNING] --osu035 flag is deprecated and may be removed in a future vesion.")
-    }
-
-    guard let cells = cellsFile else {
-        cli.printUsage()
-        return EX_USAGE
-    }
+    let cells = cellsOption.value!
 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -272,7 +247,7 @@ func main(arguments: [String]) -> Int32 {
     }
 
     guard let definition = definitionOptional else {
-        fputs("No module found.\n", stderr)
+        Stderr.print("No module found.")
         return EX_DATAERR
     }
 
@@ -284,7 +259,7 @@ func main(arguments: [String]) -> Int32 {
 
     if let tvSetTest = tvSet.value {
         if !fileManager.fileExists(atPath: tvSetTest) {
-            fputs("TVs JSON file '\(tvSetTest)' not found.\n", stderr)
+            Stderr.print("TVs JSON file '\(tvSetTest)' not found.")
             return EX_NOINPUT
         }
         do {
@@ -305,13 +280,13 @@ func main(arguments: [String]) -> Int32 {
         let benchUnwrapped = bench.value! // Program exits if tvGen.value isn't nil and bench.value is or vice versa
 
         if !fileManager.fileExists(atPath: benchUnwrapped) {
-            fputs("Bench file '\(benchUnwrapped)' not found.\n", stderr)
+            Stderr.print("Bench file '\(benchUnwrapped)' not found.")
             return EX_NOINPUT
         }
         (tvSetVectors, tvSetInputs) = etvgen.generate(file: benchUnwrapped, module: "\(definition.name)")
 
         if tvSetVectors.count == 0 {
-            fputs("Bench netlist appears invalid (no vectors generated). Are you sure there are no floating nets/outputs?", stderr)
+            Stderr.print("Bench netlist appears invalid (no vectors generated). Are you sure there are no floating nets/outputs?")
             return EX_DATAERR
         } else {
             print("Generated \(tvSetVectors.count) test vectors.")
@@ -451,7 +426,7 @@ func main(arguments: [String]) -> Int32 {
         }
 
     } catch {
-        fputs("Internal error: \(error)", stderr)
+        Stderr.print("Internal error: \(error)")
         return EX_SOFTWARE
     }
 

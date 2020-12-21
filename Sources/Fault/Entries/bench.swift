@@ -51,7 +51,7 @@ func bench(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
+        Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
 
@@ -61,7 +61,7 @@ func bench(arguments: [String]) -> Int32 {
     var cellModelsFile: String = cellsOption.value!
     if let modelTest = cellsOption.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
 
@@ -121,14 +121,13 @@ func bench(arguments: [String]) -> Int32 {
             }
 
             } catch {
-                fputs("Internal error: \(error)", stderr)
+                Stderr.print("Internal error: \(error)")
                 return EX_SOFTWARE
             }
         }
         else if !modelTest.hasSuffix(".json") {
-            fputs(
-                "Warning: Cell model file provided does not end with .v or .sv or .json.",
-                stderr
+            Stderr.print(
+                "Warning: Cell model file provided does not end with .v or .sv or .json."
             )
         }
     }
@@ -136,7 +135,7 @@ func bench(arguments: [String]) -> Int32 {
         // MARK: Processing Library Cells
         let data = try Data(contentsOf: URL(fileURLWithPath: cellModelsFile), options: .mappedIfSafe)
         guard let benchCells = try? JSONDecoder().decode(BenchCircuit.self, from: data) else {
-            fputs("File '\(cellsOption.value!)' is invalid.\n", stderr)
+            Stderr.print("File '\(cellsOption.value!)' is invalid.")
             return EX_DATAERR
         }
 
@@ -160,7 +159,7 @@ func bench(arguments: [String]) -> Int32 {
         }
 
         guard let definition = definitionOptional else {
-            fputs("No module found.\n", stderr)
+            Stderr.print("No module found.")
             exit(EX_DATAERR)
         }
 
@@ -284,7 +283,7 @@ func bench(arguments: [String]) -> Int32 {
         }
 
     } catch {
-        fputs("Internal error: \(error)", stderr)
+        Stderr.print("Internal error: \(error)")
         return EX_SOFTWARE
     }
     

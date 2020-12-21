@@ -50,7 +50,7 @@ class Atalanta: ExternalTestVectorGenerator {
             let (testvectors, inputs) = try TVSet.readFromTest(file: output)
             return (vectors: testvectors, inputs: inputs)
         } catch {
-            fputs("Internal software error: \(error)", stderr)
+            Stderr.print("Internal software error: \(error)")
             exit(EX_SOFTWARE)
         }
     }
@@ -80,7 +80,7 @@ class PODEM: ExternalTestVectorGenerator {
             let (testvectors, inputs) = try TVSet.readFromText(file: output)
             return (vectors: testvectors, inputs: inputs)
         } catch {
-            fputs("Internal software error: \(error)", stderr)
+            Stderr.print("Internal software error: \(error)")
             exit(EX_SOFTWARE)
         }
     }

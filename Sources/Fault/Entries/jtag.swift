@@ -4,9 +4,6 @@ import PythonKit
 import Defile
 
 func jtagCreate(arguments: [String]) -> Int32 {
-    let env = ProcessInfo.processInfo.environment
-    let faultInstalled = env["FAULT_INSTALL_PATH"] != nil
-
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let help = BoolOption(
@@ -53,17 +50,15 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
-        required: !faultInstalled,
-        helpMessage:
-            "Liberty file. \(faultInstalled ? "(Default: osu035)" : "(Required.)")"
+        required: true,
+        helpMessage: "Liberty file. (Required.)"
     )
     cli.addOptions(liberty)
 
     let testvectors = StringOption(
         shortFlag: "t",
         longFlag: "testVectors",
-        helpMessage: 
-            " .bin file for test vectors."
+        helpMessage:  ".bin file for test vectors."
     )
     cli.addOptions(testvectors)
 
@@ -137,7 +132,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
+        Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
     
@@ -157,62 +152,48 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
     if let libertyTest = liberty.value {
         if !fileManager.fileExists(atPath: libertyTest) {
-            fputs("Liberty file '\(libertyTest)' not found.\n", stderr)
+            Stderr.print("Liberty file '\(libertyTest)' not found.")
             return EX_NOINPUT
         }
         if !libertyTest.hasSuffix(".lib") {
-            fputs(
-                "Warning: Liberty file provided does not end with .lib.",
-                stderr
+            Stderr.print(
+                "Warning: Liberty file provided does not end with .lib."
             )
         }
     }
 
     if let modelTest = verifyOpt.value {
         if !fileManager.fileExists(atPath: modelTest) {
-            fputs("Cell model file '\(modelTest)' not found.\n", stderr)
+            Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
-            fputs(
-                "Warning: Cell model file provided does not end with .v or .sv.\n",
-                stderr
+            Stderr.print(
+                "Warning: Cell model file provided does not end with .v or .sv."
             )
         }
     }
 
     if let tvTest = testvectors.value {
         if !fileManager.fileExists(atPath: tvTest) {
-            fputs("Test vectors file '\(tvTest)' not found.\n", stderr)
+            Stderr.print("Test vectors file '\(tvTest)' not found.")
             return EX_NOINPUT
         }
         if !tvTest.hasSuffix(".bin") {
-            fputs(
-                "Warning: Test vectors file provided does not end with .bin. \n",
-                stderr
+            Stderr.print(
+                "Warning: Test vectors file provided does not end with .bin."
             )
         }
         guard let _ = goldenOutput.value else {
-            fputs("Using goldenOutput (-g) option is required '\(tvTest)'.\n", stderr)
+            Stderr.print("Using goldenOutput (-g) option is required '\(tvTest)'.")
             return EX_NOINPUT
         }
     }
 
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
-    
-    let tapLocation = faultInstalled ? 
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/RTL/JTAG/tap_top.v" : 
-        "RTL/JTAG/tap_top.v"
 
-    let wrapperLocation = faultInstalled ? 
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/RTL/JTAG/tap_wrapper.v" : 
-        "RTL/JTAG/tap_wrapper.v"
-
-    let libertyFile = faultInstalled ?
-        liberty.value ??
-        "\(env["FAULT_INSTALL_PATH"]!)/FaultInstall/Tech/osu035/osu035_stdcells.lib" :
-        liberty.value!
+    let libertyFile = liberty.value!
 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -235,7 +216,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
     }
 
     guard let definition = definitionOptional else {
-        fputs("No module found.\n", stderr)
+        Stderr.print("No module found.")
         return EX_DATAERR
     }
 
@@ -348,17 +329,18 @@ func jtagCreate(arguments: [String]) -> Int32 {
             
         // MARK: tap module 
         print("Stitching tap port…") 
-        let config = "RTL/JTAG/config.json"
-        if !fileManager.fileExists(atPath: config) {
-            fputs("JTAG configuration file '\(config)' not found.\n", stderr)
-            return EX_NOINPUT
-        }
+        // let config = "RTL/JTAG/config.json"
+        // if !fileManager.fileExists(atPath: config) {
+        //     Stderr.print("JTAG configuration file '\(config)' not found.")
+        //     return EX_NOINPUT
+        // }
 
-        let data = try Data(contentsOf: URL(fileURLWithPath: config), options: .mappedIfSafe)
-        guard let tapInfo = try? JSONDecoder().decode(TapInfo.self, from: data) else {
-            fputs("File '\(config)' is invalid.\n", stderr)
-            return EX_DATAERR
-        }
+        // let data = try Data(contentsOf: URL(fileURLWithPath: config), options: .mappedIfSafe)
+        // guard let tapInfo = try? JSONDecoder().decode(TapInfo.self, from: data) else {
+        //     Stderr.print("File '\(config)' is invalid.")
+        //     return EX_DATAERR
+        // }
+        let tapInfo = TapInfo.default
 
         let tapCreator = TapCreator(
             name: "tap_wrapper",
@@ -413,12 +395,33 @@ func jtagCreate(arguments: [String]) -> Int32 {
             Python.tuple(statements)
         )
 
+        let tempDir = "\(NSTemporaryDirectory())"
+
+
+        let tapLocation = "\(tempDir)/top.v"
+        let wrapperLocation = "\(tempDir)/wrapper.v"
+
+        do {
+            try File.open(tapLocation, mode: .write) { 
+                try $0.print(TapCreator.top)
+            }
+            try File.open(wrapperLocation, mode: .write) {
+                try $0.print(TapCreator.wrapper)
+            }
+
+        } catch {
+
+        }
+
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
         
         let wrapperDefinition =
             parse([wrapperLocation])[0][dynamicMember: "description"].definitions
         
+        try? File.delete(tapLocation)
+        try? File.delete(wrapperLocation)
+
         let definitions = Python.list(description.definitions)
         definitions.extend(tapDefinition)
         definitions.extend(wrapperDefinition)
@@ -442,7 +445,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
         if result != EX_OK {
-            fputs("A yosys error has occurred.\n", stderr)
+            Stderr.print("A yosys error has occurred.")
             return Int32(result)
         }
         if verifyOpt.value == nil {
@@ -472,7 +475,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 }
             }
             guard let definition = definitionOptional else {
-                fputs("No module found.\n", stderr)
+                Stderr.print("No module found.")
                 return EX_DATAERR
             }
             let (ports, inputs, outputs) = try Port.extract(from: definition)
@@ -560,7 +563,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             }
         }
     } catch {
-        fputs("Internal software error: \(error)", stderr)
+        Stderr.print("Internal software error: \(error)")
         return EX_SOFTWARE
     }
     

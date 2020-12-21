@@ -61,7 +61,7 @@ func cut(arguments: [String]) -> Int32 {
     let fileManager = FileManager()
     let file = args[0]
     if !fileManager.fileExists(atPath: file) {
-        fputs("File '\(file)' not found.\n", stderr)
+        Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
 
@@ -107,7 +107,7 @@ func cut(arguments: [String]) -> Int32 {
     }
     
     guard let definition = definitionOptional else {
-        fputs("No module found.\n", stderr)
+        Stderr.print("No module found.")
         exit(EX_DATAERR)
     }
 
@@ -148,9 +148,8 @@ func cut(arguments: [String]) -> Int32 {
                     }
 
                     guard let d = dArg, let q = qArg else {
-                        fputs(
+                        Stderr.print(
                             "Cell \(instanceName) missing either a 'D' or 'Q' port."
-                            , stderr
                         )
                         return EX_DATAERR
                     }
@@ -177,7 +176,7 @@ func cut(arguments: [String]) -> Int32 {
                     include = false
                     
                     guard let isolatedDefinition = isolatedOptional  else {
-                        fputs("No module definition for blackbox \(blakcboxName)",stderr)
+                        Stderr.print("No module definition for blackbox \(blakcboxName)")
                         exit(EX_DATAERR)
                     }
 
@@ -262,7 +261,7 @@ func cut(arguments: [String]) -> Int32 {
             try $0.print(Generator.visit(definition))
         }
     } catch {
-        fputs("An internal software error has occurred.", stderr)
+        Stderr.print("An internal software error has occurred.")
         return EX_SOFTWARE
     }   
     

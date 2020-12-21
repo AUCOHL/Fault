@@ -9,7 +9,7 @@ You may refer to the [wiki](https://github.com/Cloud-V/Fault/wiki) for quick set
 ### synth
 Synth is a synthesis script included with Fault that generates both a netlist and a cut-away version.
 
-To run it, `fault synth --top <your-top-module> --liberty <your-liberty-file> <your-file>`. You can optionally omit` --liberty` where osu035 will be used.
+To run it, `fault synth --top <your-top-module> --liberty <your-liberty-file> <your-file>`. 
 
 For more options, you can invoke `fault synth --help`.
 
@@ -21,7 +21,7 @@ This exposes the D-flipflops as ports for use with the main script.
 For more options, you can invoke `fault cut --help`.
 
 ### main
-`fault --cellModel <your-cell-models> <your-file>`, `--cellModel` behaving similar to `--liberty` in synth.
+`fault --cellModel <your-cell-models> <your-file>`.
 
 A set of assumptions are made about the input file:
 * It is a netlist
@@ -33,7 +33,7 @@ Generated test vectors are printed to stdout by default, but you can use `-o <fi
 For more options, you can invoke `fault --help`.
 
 ### chain
-`fault chain --liberty <your-liberty-file> --clock <clockName> --reset <resetName> <--activeLow> <your-file>`, `--liberty` behaving identical to Synth.
+`fault chain --liberty <your-liberty-file> --clock <clockName> --reset <resetName> <--activeLow> <your-file>`.
 
 Chain is another synthesis script that links registers together for scan insertion. It takes all the assumptions made in the main program but the last, and one more:
 * All instantiated D flipflops start with "DFF".
@@ -59,9 +59,11 @@ This performs static compaction on the generated test vectors by reducing the te
 For more options, you can invoke `fault compact --help`.
 
 ### tap
-`fault tap --clock <clockName> --reset <resetName> <chained netlist>`
+`fault tap --liberty <liberty> [--cellModel <cell model>] --clock <clockName> --reset <resetName> <chained netlist>`
 
 Tap adds JTAG interface to a chained netlist. Currently, two scan chains are supported: the boundary cell scan chain and the internal registers chain. Tap supports the IEEE 1149.1 four mandatory: Extest, Bypass, Sample, and Preload. Also, it has been extended to support ScanIn (4'b 0100) instruction to select the internal register chain.   
+
+A cell model can optionally be passed to verify the tap.
 
 For more information on the supported instructions, check the example [testbench](Tests/Testbenches/TestTap.sv).
 

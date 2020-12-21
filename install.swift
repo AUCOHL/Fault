@@ -145,8 +145,6 @@ if action == .install {
     let _ = "chmod +x '\(path)/fault'".shOutput().terminationStatus
 
     let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
-    let _ = "cp -r Tech/ '\(path)/FaultInstall/Tech'".shOutput().terminationStatus
-    let _ = "cp -r RTL/ '\(path)/FaultInstall/RTL'".shOutput().terminationStatus
 
     print("Installed.")
 }

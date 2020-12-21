@@ -46,18 +46,18 @@ struct ChainMetadata: Codable {
     
     static func extract(file: String) -> ([ChainRegister], Int, Int) {
         guard let string = File.read(file) else {
-            fputs("Could not read file '\(file)'\n", stderr)
+            Stderr.print("Could not read file '\(file)'")
             exit(EX_NOINPUT)
         }
         let slice = string.components(separatedBy: "/* FAULT METADATA: '")[1]
         if !slice.contains("' END FAULT METADATA */") {
-            fputs("Fault metadata not terminated.\n", stderr)
+            Stderr.print("Fault metadata not terminated.")
             exit(EX_NOINPUT)
         }
         let decoder = JSONDecoder()
         let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
         guard let metadata = try? decoder.decode(ChainMetadata.self, from: metadataString.data(using: .utf8)!) else {
-            fputs("Metadata json is invalid.\n", stderr)
+            Stderr.print("Metadata json is invalid.")
             exit(EX_DATAERR)
         }
         return (
@@ -81,20 +81,20 @@ struct binMetadata: Codable {
     static func extract(file: String) -> (Int, Int) {
 
         guard let binString = File.read(file) else {
-            fputs("Could not read file '\(file)'\n", stderr)
+            Stderr.print("Could not read file '\(file)'")
             exit(EX_NOINPUT)
         }
 
         let slice = binString.components(separatedBy: "/* FAULT METADATA: '")[1]
         if !slice.contains("' END FAULT METADATA */") {
-            fputs("Fault metadata not terminated.\n", stderr)
+            Stderr.print("Fault metadata not terminated.")
             exit(EX_NOINPUT)
         }
         
         let decoder = JSONDecoder()
         let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
         guard let metadata = try? decoder.decode(binMetadata.self, from: metadataString.data(using: .utf8)!) else {
-            fputs("Metadata json is invalid.\n", stderr)
+            Stderr.print("Metadata json is invalid.")
             exit(EX_DATAERR)
         }
         return(count: metadata.count, length: metadata.length)

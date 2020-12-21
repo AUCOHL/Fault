@@ -102,18 +102,6 @@ class TapCreator {
     }
 }
 
-struct TapInfo: Codable {
-    var tap: Tap
-    var chain: Chain
-    init(
-        tap: Tap,
-        chain: Chain
-    ) {
-        self.tap = tap
-        self.chain = chain
-    }
-}
-
 // Tap top module Interface
 struct Tap: Codable {
     var tms: String
@@ -145,6 +133,7 @@ struct Chain: Codable {
     var sout: String
     var shift: String
     var test: String
+
     init(
        sin: String,
        sout: String,
@@ -156,4 +145,20 @@ struct Chain: Codable {
         self.shift = shift
         self.test = test
     }
+}
+
+// Aggregate
+struct TapInfo: Codable {
+    var tap: Tap
+    var chain: Chain
+    
+    init(
+        tap: Tap,
+        chain: Chain
+    ) {
+        self.tap = tap
+        self.chain = chain
+    }
+
+    static let `default`: TapInfo = try! JSONDecoder().decode(TapInfo.self, from: Data(TapCreator.info.utf8))
 }
