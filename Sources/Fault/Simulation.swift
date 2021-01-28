@@ -26,6 +26,7 @@ class Simulator {
         clock: String?,
         filePrefix: String = ".",
         defines: Set<String> = [],
+        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (faults: [String], goldenOutput: String) {
@@ -69,7 +70,7 @@ class Simulator {
 
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`define \(def) \n"
+            defineStatements += "-D\(def) "
         }
 
         var outputCount = 0 
@@ -109,6 +110,7 @@ class Simulator {
         let bench = """
         \(String.boilerplate)
 
+        \(includes)
         `include "\(cells)"
         `include "\(file)"
 
@@ -153,7 +155,7 @@ class Simulator {
         let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp \(defineStatements) -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
@@ -205,6 +207,7 @@ class Simulator {
         sampleRun: Bool,
         clock: String?,
         defines: Set<String> = [],
+        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
@@ -274,6 +277,7 @@ class Simulator {
                                 clock: clock,
                                 filePrefix: tempDir,
                                 defines: defines,
+                                includes: includes,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -296,6 +300,7 @@ class Simulator {
                                 clock: clock,
                                 filePrefix: tempDir,
                                 defines: defines,
+                                includes: includes,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -372,6 +377,7 @@ class Simulator {
         test: String,
         output: String,
         defines: Set<String> = [],
+        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -412,12 +418,12 @@ class Simulator {
 
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`define \(def) \n"
+            defineStatements += "-D\(def) "
         }
     
         let bench = """
         \(String.boilerplate)
-        \(defineStatements)
+        \(includes)
         `include "\(cells)"
         `include "\(file)"
         \(include)
@@ -457,6 +463,7 @@ class Simulator {
         """
 
         return try Simulator.run(
+            define: defineStatements,
             bench: bench, 
             output: output
         )
@@ -481,6 +488,7 @@ class Simulator {
         trst: String,
         output: String,
         defines: Set<String> = [],
+        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -525,12 +533,13 @@ class Simulator {
 
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`define \(def) \n"
+            defineStatements += "`-D\(def) "
         }
 
         let bench =  """
-        \(defineStatements)
         \(String.boilerplate)
+
+        \(includes)
         `include "\(cells)"
         `include "\(file)"
         \(include)
@@ -595,6 +604,7 @@ class Simulator {
         """    
         
         return try Simulator.run(
+            define: defineStatements,
             bench: bench, 
             output: output
         ) 
@@ -626,6 +636,7 @@ class Simulator {
         vectorLength: Int,
         outputLength: Int,
         defines: Set<String> = [],
+        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> Bool {
@@ -679,12 +690,13 @@ class Simulator {
         
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`define \(def) \n"
+            defineStatements += "`-D\(def) "
         }
 
         let bench = """
-        \(defineStatements)
+
         \(String.boilerplate)
+        \(includes)
         `include "\(cells)"
         `include "\(file)"
         \(include)
@@ -782,12 +794,14 @@ class Simulator {
         """
 
         return try Simulator.run(
+            define: defineStatements,
             bench: bench, 
             output: output
         )
     }
 
     private static func run(
+        define: String,
         bench: String,
         output: String,
         clean: Bool = true
@@ -804,7 +818,7 @@ class Simulator {
             }
         }
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
         
       
         if iverilogResult.terminationStatus != EX_OK {

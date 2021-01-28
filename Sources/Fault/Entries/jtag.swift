@@ -89,6 +89,12 @@ func jtagCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(defs)
 
+    let include = StringOption(
+        longFlag: "inc",
+        helpMessage: "Verilog files to include during simulations. (Default: none)"
+    )
+    cli.addOptions(include)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -190,6 +196,20 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
     }
 
+    let includeFiles: Set<String>
+        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    
+    var includeString = ""
+    for file in includeFiles {
+        if !fileManager.fileExists(atPath: file) {
+            Stderr.print("Verilog file '\(file)' not found.")
+            return EX_NOINPUT
+        }
+        includeString += """
+            `include "\(file)"
+        """
+    }
+ 
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
 
@@ -497,6 +517,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 tdo: tdoName,
                 trst: trstName,
                 output: output + ".tb.sv",
+                includes: includeString,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -549,6 +570,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     vectorLength: vectorLength,
                     outputLength: outputLength,
                     defines: defines,
+                    includes: includeString,
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )

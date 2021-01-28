@@ -87,6 +87,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(defs)
 
+    let include = StringOption(
+        longFlag: "inc",
+        helpMessage: "Verilog files to include during simulations. (Default: none)"
+    )
+    cli.addOptions(include)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -175,6 +181,20 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     ignoredInputs.insert(resetName)
 
     let libertyFile = liberty.value!
+
+    let includeFiles: Set<String>
+        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    
+    var includeString = ""
+    for file in includeFiles {
+        if !fileManager.fileExists(atPath: file) {
+            Stderr.print("Verilog file '\(file)' not found.")
+            return EX_NOINPUT
+        }
+        includeString += """
+            `include "\(file)"
+        """
+    }
 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -831,6 +851,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 test: testName,
                 output: output + ".tb.sv",
                 defines: defines,
+                includes: includeString,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )

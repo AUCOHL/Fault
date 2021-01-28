@@ -157,6 +157,12 @@ func main(arguments: [String]) -> Int32 {
     )
     cli.addOptions(defs)
     
+    let include = StringOption(
+        longFlag: "inc",
+        helpMessage: "Verilog files to include during simulations. (Default: none)"
+    )
+    cli.addOptions(include)
+
     do {
         try cli.parse()
     } catch {
@@ -229,6 +235,20 @@ func main(arguments: [String]) -> Int32 {
 
     let cells = cellsOption.value!
 
+    let includeFiles: Set<String>
+        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    
+    var includeString = ""
+    for file in includeFiles {
+        if !fileManager.fileExists(atPath: file) {
+            Stderr.print("Verilog file '\(file)' not found.")
+            return EX_NOINPUT
+        }
+        includeString += """
+            `include "\(file)"
+        """
+    }
+ 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse
 
@@ -391,6 +411,7 @@ func main(arguments: [String]) -> Int32 {
             sampleRun: sampleRun.value,
             clock: clock.value,
             defines: defines,
+            includes: includeString,
             using: iverilogExecutable,
             with: vvpExecutable
         )
