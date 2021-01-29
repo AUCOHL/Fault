@@ -49,7 +49,12 @@ struct ChainMetadata: Codable {
             Stderr.print("Could not read file '\(file)'")
             exit(EX_NOINPUT)
         }
-        let slice = string.components(separatedBy: "/* FAULT METADATA: '")[1]
+        let components = string.components(separatedBy: "/* FAULT METADATA: '")
+        if components.count == 0 {
+            Stderr.print("Fault metadata not provided.")
+            exit(EX_NOINPUT)
+        }
+        let slice = components[1];
         if !slice.contains("' END FAULT METADATA */") {
             Stderr.print("Fault metadata not terminated.")
             exit(EX_NOINPUT)
