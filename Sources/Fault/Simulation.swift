@@ -533,7 +533,7 @@ class Simulator {
 
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`-D\(def) "
+            defineStatements += "-D\(def) "
         }
 
         let bench =  """
@@ -690,7 +690,7 @@ class Simulator {
         
         var defineStatements = ""
         for def in defines {
-            defineStatements += "`-D\(def) "
+            defineStatements += "-D\(def) "
         }
 
         let bench = """
