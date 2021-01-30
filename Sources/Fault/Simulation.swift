@@ -567,10 +567,10 @@ class Simulator {
                 // $dumpvars(0, testbench);
         \(inputInit)
                 \(tms) = 1;
-                #150;
+                #2;
                 \(resetToggler)
                 \(trst) = 1;        
-                #150;
+                #2;
 
                 /*
                     Test PreloadChain Instruction
@@ -582,7 +582,6 @@ class Simulator {
                     \(tdi) = serializable[i];
                     #2;
                 end
-                #1;
                 for(i = 0; i< \(chainLength); i = i + 1) begin
                     serial[i] = \(tdo);
                     #2;
@@ -593,7 +592,6 @@ class Simulator {
                     $finish;
                 end
                 exitDR();
-                #2;
 
                 $display("SUCCESS_STRING");
                 $finish;
@@ -681,7 +679,6 @@ class Simulator {
         var testStatements = ""
         for i in 0..<vectorCount {  
             testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
-            testStatements += "        #1 ; \n"
         }
         var include = ""
         if let blackboxFile = blackbox {
@@ -725,10 +722,10 @@ class Simulator {
         \(inputAssignment)
                 $readmemb("\(vecbinFile)", vectors);
                 $readmemb("\(outbinFile)", gmOutput);
-                #50;
+                #2;
                 \(resetToggler)
                 \(trst) = 1;        
-                #50;
+                #2;
         \(testStatements)
                 $display("SUCCESS_STRING");
                 $finish;
@@ -762,11 +759,10 @@ class Simulator {
                     #2;
                     // Shift-out response
                     error = 0;
-                    #1;
                     for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
                         scanInSerial[i] = \(tdo);
-                        if (scanInSerial[i] != goldenOutput[i]) begin
+                        if (scanInSerial[i] !== goldenOutput[i]) begin
                             $display("Error simulating output response at bit number %0d    \
                             Expected %0b, Got %0b", i, goldenOutput[i], scanInSerial[i]);
                             error = error + 1;
@@ -781,7 +777,7 @@ class Simulator {
                     \(tms) = 0; // run-test-idle
                     #2;
 
-                    if(scanInSerial != goldenOutput) begin
+                    if(scanInSerial !== goldenOutput) begin
                         $display("Simulating TV failed, number fo errors %0d : ", error);
                         $error("SIMULATING_TV_FAILED");
                         $finish;
