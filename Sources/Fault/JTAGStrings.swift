@@ -58,12 +58,8 @@ extension TapCreator {
     wire run_test_idle_o;
     wire test_logic_reset_o;
     wire exit1_dr_o;
-    // sample at negedge to sync with tdo
-    reg sout_sampled;
-    always @(negedge tck) begin
-        sout_sampled <= sout;
-    end
-    assign chain_tdi_i = sout_sampled;
+    
+    assign chain_tdi_i = sout;
 
     // negate trst (active low according to the standard) 
     assign __trst_high__ = ~trst;
