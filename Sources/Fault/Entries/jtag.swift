@@ -517,6 +517,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 tdo: tdoName,
                 trst: trstName,
                 output: output + ".tb.sv",
+                defines: defines,
                 includes: includeString,
                 using: iverilogExecutable,
                 with: vvpExecutable
