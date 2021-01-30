@@ -148,7 +148,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let resetName = resetOpt.value!
 
     var ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     
     let defines: Set<String>
         = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
