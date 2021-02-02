@@ -64,7 +64,7 @@ extension TapCreator {
     // negate trst (active low according to the standard) 
     assign __trst_high__ = ~trst;
     assign shift = (pause_dr_o | (shift_dr_o | exit1_dr_o)) & preload_chain_o;
-    assign test = ~(run_test_idle_o | test_logic_reset_o);
+    assign test = ~test_logic_reset_o;
     assign sin = tdo_o;
     // negate tdo_pad enable signal 
     assign tdo_paden_o = ~tdo_padoe_o; 
