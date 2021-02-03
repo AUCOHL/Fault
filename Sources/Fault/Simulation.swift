@@ -562,6 +562,8 @@ class Simulator {
             wire[7:0] tmsPattern = 8'b 01100110;
             wire[3:0] preload_chain = 4'b0011;
 
+            wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
+
             initial begin
                 // $dumpfile("dut.vcd");
                 // $dumpvars(0, testbench);
@@ -583,7 +585,7 @@ class Simulator {
                     #2;
                 end
                 for(i = 0; i< \(chainLength); i = i + 1) begin
-                    serial[i] = \(tdo);
+                    serial[i] = tdo_pad_out;
                     #2;
                 end 
 
@@ -716,6 +718,8 @@ class Simulator {
             wire[7:0] tmsPattern = 8'b 01100110;
             wire[3:0] preloadChain = 4'b 0011;
 
+            wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
+
             initial begin
                 // $dumpfile("dut.vcd"); // DEBUG
                 // $dumpvars(0, testbench);
@@ -761,7 +765,7 @@ class Simulator {
                     error = 0;
                     for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[i] = \(tdo);
+                        scanInSerial[i] = tdo_pad_out;
                         if (scanInSerial[i] !== goldenOutput[i]) begin
                             $display("Error simulating output response at bit number %0d    \
                             Expected %0b, Got %0b", i, goldenOutput[i], scanInSerial[i]);

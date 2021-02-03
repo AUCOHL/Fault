@@ -739,7 +739,7 @@ extension TapCreator {
     // Tristate control for tdo_pad_o pin
     always @ (negedge tck_pad_i)
     begin
-    tdo_padoe_o <= #1 shift_ir | shift_dr | (pause_dr & debug_select);
+    tdo_padoe_o <= #1 shift_ir | shift_dr | exit2_dr | (pause_dr & debug_select);
     end
     /**********************************************************************************
     *                                                                                 *
