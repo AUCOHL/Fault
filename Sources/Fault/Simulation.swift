@@ -407,8 +407,8 @@ class Simulator {
 
         var clockCreator = ""
         if !clock.isEmpty {
-            clockCreator = "        always #1 \(clock) = ~\(clock); \n"
-            clockCreator += "        always #1 \(tck) = ~\(tck); \n"
+            clockCreator = "        always #(`CLOCK_PERIOD / 2) \(clock) = ~\(clock); \n"
+            clockCreator += "        always #(`CLOCK_PERIOD / 2) \(tck) = ~\(tck); \n"
         }
 
         var include = ""
@@ -427,6 +427,9 @@ class Simulator {
         `include "\(cells)"
         `include "\(file)"
         \(include)
+        `ifndef CLOCK_PERIOD
+            `define CLOCK_PERIOD 2
+        `endif
         module testbench;
         \(portWires)
         \(clockCreator)
@@ -439,20 +442,22 @@ class Simulator {
             reg[\(chainLength - 1):0] serial;
             integer i;
             initial begin
-                // $dumpfile("chain.vcd");
-                // $dumpvars(0, testbench);
+                `ifdef VCD
+                    $dumpfile("chain.vcd");
+                    $dumpvars(0, testbench);
+                `endif
         \(inputAssignment)
-                #10;
+                #(`CLOCK_PERIOD*5);
                 \(reset) = ~\(reset);
                 \(shift) = 1;
                 \(test) = 1;
                 for (i = 0; i < \(chainLength); i = i + 1) begin
                     sin = serializable[i];
-                    #2;
+                    #(`CLOCK_PERIOD);
                 end
                 for (i = 0; i < \(chainLength); i = i + 1) begin
                     serial[i] = sout;
-                    #2;
+                    #(`CLOCK_PERIOD);
                 end
                 if (serial === serializable) begin
                     $display("SUCCESS_STRING");
@@ -513,7 +518,7 @@ class Simulator {
 
         var clockCreator = ""
         if !clock.isEmpty {
-            clockCreator = "always #1 \(clock) = ~\(clock);"
+            clockCreator = "always #(`CLOCK_PERIOD / 2) \(clock) = ~\(clock);"
         }
 
         var resetToggler = ""
@@ -543,11 +548,14 @@ class Simulator {
         `include "\(cells)"
         `include "\(file)"
         \(include)
+        `ifndef CLOCK_PERIOD
+            `define CLOCK_PERIOD 2
+        `endif
         module testbench;
         \(portWires)
 
             \(clockCreator)
-            always #1 \(tck) = ~\(tck);
+            always #(`CLOCK_PERIOD / 2) \(tck) = ~\(tck);
 
             \(module) uut(
                 \(portHooks.dropLast(2))
@@ -565,14 +573,16 @@ class Simulator {
             wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
 
             initial begin
-                // $dumpfile("dut.vcd");
-                // $dumpvars(0, testbench);
+                `ifdef VCD
+                    $dumpfile("dut.vcd");
+                    $dumpvars(0, testbench);
+                `endif
         \(inputInit)
                 \(tms) = 1;
-                #2;
+                #(`CLOCK_PERIOD) ;
                 \(resetToggler)
                 \(trst) = 1;        
-                #2;
+                #(`CLOCK_PERIOD) ;
 
                 /*
                     Test PreloadChain Instruction
@@ -582,11 +592,11 @@ class Simulator {
 
                 for (i = 0; i < \(chainLength); i = i + 1) begin
                     \(tdi) = serializable[i];
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                 end
                 for(i = 0; i< \(chainLength); i = i + 1) begin
                     serial[i] = tdo_pad_out;
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                 end 
 
                 if(serial !== serializable) begin
@@ -672,7 +682,7 @@ class Simulator {
     
         var clockCreator = ""
         if !clock.isEmpty {
-            clockCreator = "always #1 \(clock) = ~\(clock);"
+            clockCreator = "always #(`CLOCK_PERIOD / 2) \(clock) = ~\(clock);"
         }
         var resetToggler = ""
         if !reset.isEmpty {
@@ -699,11 +709,14 @@ class Simulator {
         `include "\(cells)"
         `include "\(file)"
         \(include)
+        `ifndef CLOCK_PERIOD
+            `define CLOCK_PERIOD 2
+        `endif
         module testbench;
         \(portWires)
             
             \(clockCreator)
-            always #1 \(tck) = ~\(tck);
+            always #(`CLOCK_PERIOD / 2) \(tck) = ~\(tck);
 
             \(module) uut(
                 \(portHooks.dropLast(2))
@@ -721,15 +734,17 @@ class Simulator {
             wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
 
             initial begin
-                // $dumpfile("dut.vcd"); // DEBUG
-                // $dumpvars(0, testbench);
+                `ifdef VCD
+                    $dumpfile("dut.vcd"); // DEBUG
+                    $dumpvars(0, testbench);
+                `endif
         \(inputAssignment)
                 $readmemb("\(vecbinFile)", vectors);
                 $readmemb("\(outbinFile)", gmOutput);
-                #2;
+                #(`CLOCK_PERIOD) ;
                 \(resetToggler)
                 \(trst) = 1;        
-                #2;
+                #(`CLOCK_PERIOD) ;
         \(testStatements)
                 $display("SUCCESS_STRING");
                 $finish;
@@ -756,11 +771,11 @@ class Simulator {
                         if (i == \(vectorLength - 1)) begin
                             \(tms) = 1; // Exit2-DR
                         end
-                        #2;
+                        #(`CLOCK_PERIOD) ;
                     end
 
                     \(tms) = 0; // Shift-DR
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                     // Shift-out response
                     error = 0;
                     for (i = 0; i< \(outputLength);i = i + 1) begin
@@ -774,12 +789,12 @@ class Simulator {
                         if(i == \(outputLength - 1)) begin
                             \(tms) = 1; // Exit-DR
                         end
-                        #2;
+                        #(`CLOCK_PERIOD) ;
                     end
                     \(tms) = 1; // update-DR
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                     \(tms) = 0; // run-test-idle
-                    #2;
+                    #(`CLOCK_PERIOD) ;
 
                     if(scanInSerial !== goldenOutput) begin
                         $display("Simulating TV failed, number fo errors %0d : ", error);
@@ -843,7 +858,7 @@ class Simulator {
             begin
                 for (i = 0; i< 5; i = i + 1) begin
                     \(tms) = tmsPattern[i];
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                 end
 
                 // At shift-IR: shift new instruction on tdi line
@@ -852,31 +867,31 @@ class Simulator {
                     if(i == 3) begin
                         \(tms) = tmsPattern[5];     // exit-ir
                     end
-                    #2;
+                    #(`CLOCK_PERIOD) ;
                 end
 
                 \(tms) = tmsPattern[6];     // update-ir 
-                #2;
+                #(`CLOCK_PERIOD) ;
                 \(tms) = tmsPattern[7];     // run test-idle
-                #6;
+                #(`CLOCK_PERIOD * 3) ;
             end
         endtask
 
         task enterShiftDR;
             begin
                 \(tms) = 1;     // select DR
-                #2;
+                #(`CLOCK_PERIOD) ;
                 \(tms) = 0;     // capture DR -- shift DR
-                #4;
+                #(`CLOCK_PERIOD * 2) ;
             end
         endtask
 
         task exitDR;
             begin
                 \(tms) = 1;     // Exit DR -- update DR
-                #4;
+                #(`CLOCK_PERIOD * 2) ;
                 \(tms) = 0;     // Run test-idle
-                #2;
+                #(`CLOCK_PERIOD) ;
             end
         endtask
     """
