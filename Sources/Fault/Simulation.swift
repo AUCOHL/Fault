@@ -428,7 +428,7 @@ class Simulator {
         `include "\(file)"
         \(include)
         `ifndef CLOCK_PERIOD
-            `define CLOCK_PERIOD 2
+            `define CLOCK_PERIOD 4
         `endif
         module testbench;
         \(portWires)
@@ -549,7 +549,7 @@ class Simulator {
         `include "\(file)"
         \(include)
         `ifndef CLOCK_PERIOD
-            `define CLOCK_PERIOD 2
+            `define CLOCK_PERIOD 4
         `endif
         module testbench;
         \(portWires)
@@ -710,7 +710,7 @@ class Simulator {
         `include "\(file)"
         \(include)
         `ifndef CLOCK_PERIOD
-            `define CLOCK_PERIOD 2
+            `define CLOCK_PERIOD 4
         `endif
         module testbench;
         \(portWires)
