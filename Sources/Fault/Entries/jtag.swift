@@ -95,6 +95,12 @@ func jtagCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(include)
 
+    let skipSynth = BoolOption(
+        longFlag: "skipSynth",
+        helpMessage: "Skip Re-synthesizing the chained netlist. (Default: none)"
+    )
+    cli.addOptions(skipSynth)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -235,6 +241,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
     }
 
+    print(definitionOptional?.name)
     guard let definition = definitionOptional else {
         Stderr.print("No module found.")
         return EX_DATAERR
@@ -460,23 +467,39 @@ func jtagCreate(arguments: [String]) -> Int32 {
             output: output
         )
 
-        // MARK: Yosys
-        print("Resynthesizing with yosys…")
-        let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
+        let netlist: String = {
+            if !skipSynth.value {
+                let script = Synthesis.script(
+                    for: definitionName,
+                    in: [intermediate],
+                    checkHierarchy: false,
+                    liberty: libertyFile,
+                    output: output
+                )
 
-        if result != EX_OK {
-            Stderr.print("A yosys error has occurred.")
-            return Int32(result)
-        }
+                // MARK: Yosys
+                print("Resynthesizing with yosys…")
+                let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
+
+                if result != EX_OK {
+                    Stderr.print("A yosys error has occurred.")
+                    exit(EX_DATAERR)
+                }
+                return output
+            } else {
+                return intermediate
+            }
+        }()
+
         if verifyOpt.value == nil {
             print("Done.")
         }
 
-        guard let content = File.read(output) else {
+        guard let content = File.read(netlist) else {
             throw "Could not re-read created file."
         }
 
-        try File.open(output, mode: .write) {
+        try File.open(netlist, mode: .write) {
             try $0.print(String.boilerplate)
             try $0.print(content)
         }
@@ -484,14 +507,13 @@ func jtagCreate(arguments: [String]) -> Int32 {
         // MARK: Verification
         if let model = verifyOpt.value {
             print("Verifying tap port integrity…")
-            let ast = parse([output])[0]
+            let ast = parse([netlist])[0]
             let description = ast[dynamicMember: "description"]
             var definitionOptional: PythonObject?
             for definition in description.definitions {
                 let type = Python.type(definition).__name__
                 if type == "ModuleDef" {
                     definitionOptional = definition
-                    break
                 }
             }
             guard let definition = definitionOptional else {
@@ -501,7 +523,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             let (ports, inputs, outputs) = try Port.extract(from: definition)
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: output, // DEBUG
+                in: netlist, // DEBUG
                 isolating: blackbox.value,
                 with: model,
                 ports: ports,
@@ -516,7 +538,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 tck: tckName,
                 tdo: tdoName,
                 trst: trstName,
-                output: output + ".tb.sv",
+                output: netlist + ".tb.sv",
                 defines: defines,
                 includes: includeString,
                 using: iverilogExecutable,
@@ -544,10 +566,10 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     )
                 let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
                 let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-                let testbecnh = output + ".tv" + ".tb.sv"
+                let testbecnh = netlist + ".tv" + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
-                    in: output, // DEBUG
+                    in: netlist, // DEBUG
                     isolating: blackbox.value,
                     with: model,
                     ports: ports,

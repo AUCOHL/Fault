@@ -93,6 +93,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(include)
 
+    let skipSynth = BoolOption(
+        longFlag: "skipSynth",
+        helpMessage: "Skip Re-synthesizing the chained netlist. (Default: none)"
+    )
+    cli.addOptions(skipSynth)
+
     var names: [String: (default: String, option: StringOption)] = [:]
 
     for (name, value) in [
@@ -786,28 +792,36 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             try $0.print(Generator.visit(ast))
         }
 
-        let script = Synthesis.script(
-            for: definitionName,
-            in: [intermediate],
-            checkHierarchy: false,
-            liberty: libertyFile,
-            output: output
-        )
+        let netlist: String = {
+            
+            if !skipSynth.value {
+                let script = Synthesis.script(
+                    for: definitionName,
+                    in: [intermediate],
+                    checkHierarchy: false,
+                    liberty: libertyFile,
+                    output: output
+                )
 
-        // MARK: Yosys
-        print("Resynthesizing with yosys…")
-        let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
+                // MARK: Yosys
+                print("Resynthesizing with yosys…")
+                let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
-        if result != EX_OK {
-            Stderr.print("A yosys error has occurred.")
-            return Int32(result)
-        }
-
-        guard let content = File.read(output) else {
+                if result != EX_OK {
+                    Stderr.print("A yosys error has occurred.")
+                    exit(EX_DATAERR)
+                }
+                return output
+            } else {
+                return intermediate
+            }
+        }()
+        
+        guard let content = File.read(netlist) else {
             throw "Could not re-read created file."
         }
 
-        try File.open(output, mode: .write) {
+        try File.open(netlist, mode: .write) {
             try $0.print(String.boilerplate)
             try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
             try $0.print(content)
@@ -816,7 +830,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         // MARK: Verification
         if let model = verifyOpt.value {
             print("Verifying scan chain integrity…")
-            let ast = parse([output])[0]
+            let ast = parse([netlist])[0]
             let description = ast[dynamicMember: "description"]
             var definitionOptional: PythonObject?
             for definition in description.definitions {
@@ -834,7 +848,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: output, 
+                in: netlist, 
                 isolating: isolated.value,
                 with: model,
                 ports: ports,
@@ -849,7 +863,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 resetActive: resetActiveLow.value ? .low : .high,
                 shift: shiftName,
                 test: testName,
-                output: output + ".tb.sv",
+                output: netlist + ".tb.sv",
                 defines: defines,
                 includes: includeString,
                 using: iverilogExecutable,
