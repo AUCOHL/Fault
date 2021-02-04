@@ -241,7 +241,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
     }
 
-    print(definitionOptional?.name)
     guard let definition = definitionOptional else {
         Stderr.print("No module found.")
         return EX_DATAERR
@@ -356,17 +355,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
             
         // MARK: tap module 
         print("Stitching tap port…") 
-        // let config = "RTL/JTAG/config.json"
-        // if !fileManager.fileExists(atPath: config) {
-        //     Stderr.print("JTAG configuration file '\(config)' not found.")
-        //     return EX_NOINPUT
-        // }
-
-        // let data = try Data(contentsOf: URL(fileURLWithPath: config), options: .mappedIfSafe)
-        // guard let tapInfo = try? JSONDecoder().decode(TapInfo.self, from: data) else {
-        //     Stderr.print("File '\(config)' is invalid.")
-        //     return EX_DATAERR
-        // }
         let tapInfo = TapInfo.default
 
         let tapCreator = TapCreator(
@@ -387,18 +375,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
             test: testName
         )
 
-        // // TDO tri-state enable assignment
-        // let ternary = Node.Cond(
-        //     Node.Unot(Node.Identifier(tapInfo.tap.tdoEnable_n)),
-        //     Node.Identifier(tapInfo.tap.tdo),
-        //     Node.IntConst("1'bz")
-        // )
-        // let tdoAssignment = Node.Assign(
-        //     Node.Lvalue(Node.Identifier(tdoName)),
-        //     Node.Rvalue(ternary)
-        // )
-
-        // statements.append(tdoAssignment)
         statements.extend(tapModule.wires)
         statements.append(tapModule.tapModule)
 
@@ -569,7 +545,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 let testbecnh = netlist + ".tv" + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
-                    in: netlist, // DEBUG
+                    in: netlist, 
                     isolating: blackbox.value,
                     with: model,
                     ports: ports,

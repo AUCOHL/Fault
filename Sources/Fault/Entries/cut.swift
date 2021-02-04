@@ -253,6 +253,10 @@ func cut(arguments: [String]) -> Int32 {
             }
         }
 
+        if declarations.count == 0 {
+            print("[Warning]: Failed to detect flip-flop cells named: \(dffNames).")
+        }
+        
         definition.portlist.ports = ports
         definition.items = Python.tuple(declarations + items)
 

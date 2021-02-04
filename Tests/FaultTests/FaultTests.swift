@@ -29,7 +29,7 @@ final class FaultTests: XCTestCase {
         let topModule = "SPM"
         let clock = "clk"
         let reset = "rst"
-        let ignoredInputs = "\(clock),\(reset)" 
+        let ignoredInputs = "\(reset)" 
 
         let fileSynth = "Netlists/" + fileName + ".netlist.v"
         let fileCut = fileSynth + ".cut.v"
@@ -56,7 +56,7 @@ final class FaultTests: XCTestCase {
 
         // 2. Simulate
         process = newProcess()
-        process.arguments = ["-c", models, "-i", ignoredInputs, "--define", "functional", "-o", fileCut, fileCut]
+        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileCut, fileCut]
         try process.startAndBlock()
         print("2/6")
 

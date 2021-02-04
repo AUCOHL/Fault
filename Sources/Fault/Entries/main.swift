@@ -141,7 +141,8 @@ func main(arguments: [String]) -> Int32 {
 
     let clock = StringOption(
         longFlag: "clock",
-        helpMessage: "clock name to use for simulation in case of partial scan-chain. (Default: none)"
+        required: true,
+        helpMessage: "clock name to add to --ignoring. (Required.)"
     )
     cli.addOptions(clock)
 
@@ -223,8 +224,12 @@ func main(arguments: [String]) -> Int32 {
     let jsonOutput = "\(filePath.value ?? file).tv.json"
     let svfOutput = "\(filePath.value  ?? file).tv.svf"
 
-    let ignoredInputs: Set<String>
+    let clockName = clock.value!
+    var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    
+    ignoredInputs.insert(clockName)
+
     let behavior
         = Array<Simulator.Behavior>(
             repeating: holdLow.value ? .holdLow : .holdHigh,
