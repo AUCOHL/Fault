@@ -437,9 +437,9 @@ class Simulator {
                 \(portHooks.dropLast(2))
             ); 
 
-            wire[\(chainLength - 1):0] serializable =
+            wire[\(chainLength - 1):0] __serializable__ =
                 \(chainLength)'b\(serial);
-            reg[\(chainLength - 1):0] serial;
+            reg[\(chainLength - 1):0] __serial__;
             integer i;
             initial begin
                 `ifdef VCD
@@ -452,14 +452,14 @@ class Simulator {
                 \(shift) = 1;
                 \(test) = 1;
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    sin = serializable[i];
+                    \(sin) = __serializable__[i];
                     #(`CLOCK_PERIOD);
                 end
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    serial[i] = sout;
+                    __serial__[i] = \(sout);
                     #(`CLOCK_PERIOD);
                 end
-                if (serial === serializable) begin
+                if (__serial__ === __serializable__) begin
                     $display("SUCCESS_STRING");
                 end
                 $finish;
@@ -563,14 +563,14 @@ class Simulator {
 
             integer i;
 
-            wire[\(chainLength - 1):0] serializable =
+            wire[\(chainLength - 1):0] __serializable__ =
                 \(chainLength)'b\(serial);
-            reg[\(chainLength - 1):0] serial;
+            reg[\(chainLength - 1):0] __serial__;
 
-            wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] preload_chain = 4'b0011;
+            wire[7:0] __tmsPattern__ = 8'b 01100110;
+            wire[3:0] __preload_chain__ = 4'b0011;
 
-            wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
+            wire __tdo_pad_out__ = tdo_paden_o ? 1'bz : \(tdo);
 
             initial begin
                 `ifdef VCD
@@ -587,19 +587,19 @@ class Simulator {
                 /*
                     Test PreloadChain Instruction
                 */
-                shiftIR(preload_chain);
+                shiftIR(__preload_chain__);
                 enterShiftDR();
 
                 for (i = 0; i < \(chainLength); i = i + 1) begin
-                    \(tdi) = serializable[i];
+                    \(tdi) = __serializable__[i];
                     #(`CLOCK_PERIOD) ;
                 end
                 for(i = 0; i< \(chainLength); i = i + 1) begin
-                    serial[i] = tdo_pad_out;
+                    __serial__[i] = __tdo_pad_out__;
                     #(`CLOCK_PERIOD) ;
                 end 
 
-                if(serial !== serializable) begin
+                if(__serial__ !== __serializable__) begin
                     $error("EXECUTING_PRELOAD_CHAIN_INST_FAILED");
                     $finish;
                 end
@@ -609,7 +609,7 @@ class Simulator {
                 $finish;
             end
 
-        \(Simulator.createTasks(tms: tms))
+        \(Simulator.createTasks(tms: tms, tdi: tdi))
         endmodule
         """    
         
@@ -690,7 +690,7 @@ class Simulator {
         }
         var testStatements = ""
         for i in 0..<vectorCount {  
-            testStatements += "        test(vectors[\(i)], gmOutput[\(i)]) ;\n"
+            testStatements += "        test(__vectors__[\(i)], __gmOutput__[\(i)]) ;\n"
         }
         var include = ""
         if let blackboxFile = blackbox {
@@ -722,16 +722,16 @@ class Simulator {
                 \(portHooks.dropLast(2))
             );
 
-            integer i, error;
+            integer i, __error__;
 
-            reg [\(outputLength - 1):0] scanInSerial;
-            reg [\(vectorLength - 1):0] vectors [0:\(vectorCount - 1)];
-            reg [\(outputLength - 1):0] gmOutput[0:\(vectorCount - 1)];
+            reg [\(outputLength - 1):0] __scanInSerial__;
+            reg [\(vectorLength - 1):0] __vectors__ [0:\(vectorCount - 1)];
+            reg [\(outputLength - 1):0] __gmOutput__ [0:\(vectorCount - 1)];
 
-            wire[7:0] tmsPattern = 8'b 01100110;
-            wire[3:0] preloadChain = 4'b 0011;
+            wire[7:0] __tmsPattern__ = 8'b 01100110;
+            wire[3:0] __preloadChain__ = 4'b 0011;
 
-            wire tdo_pad_out = tdo_paden_o ? 1'bz : \(tdo);
+            wire __tdo_pad_out__ = tdo_paden_o ? 1'bz : \(tdo);
 
             initial begin
                 `ifdef VCD
@@ -739,8 +739,8 @@ class Simulator {
                     $dumpvars(0, testbench);
                 `endif
         \(inputAssignment)
-                $readmemb("\(vecbinFile)", vectors);
-                $readmemb("\(outbinFile)", gmOutput);
+                $readmemb("\(vecbinFile)", __vectors__);
+                $readmemb("\(outbinFile)", __gmOutput__);
                 #(`CLOCK_PERIOD) ;
                 \(resetToggler)
                 \(trst) = 1;        
@@ -751,17 +751,17 @@ class Simulator {
             end
 
             task test;
-                input [\(vectorLength - 1):0] vector;
-                input [\(outputLength - 1):0] goldenOutput;
+                input [\(vectorLength - 1):0] __vector__;
+                input [\(outputLength - 1):0] __goldenOutput__;
                 begin
                    
                     // Preload Scan-Chain with TV
 
-                    shiftIR(preloadChain);
+                    shiftIR(__preloadChain__);
                     enterShiftDR();
 
                     for (i = 0; i < \(vectorLength); i = i + 1) begin
-                        tdi = vector[i];
+                        \(tdi) = __vector__[i];
                         if (i == \(vectorLength - 3)) begin
                             \(tms) = 1; // Exit-DR
                         end
@@ -777,14 +777,14 @@ class Simulator {
                     \(tms) = 0; // Shift-DR
                     #(`CLOCK_PERIOD) ;
                     // Shift-out response
-                    error = 0;
+                    __error__ = 0;
                     for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
-                        scanInSerial[i] = tdo_pad_out;
-                        if (scanInSerial[i] !== goldenOutput[i]) begin
+                        __scanInSerial__[i] = __tdo_pad_out__;
+                        if (__scanInSerial__[i] !== __goldenOutput__[i]) begin
                             $display("Error simulating output response at bit number %0d    \
-                            Expected %0b, Got %0b", i, goldenOutput[i], scanInSerial[i]);
-                            error = error + 1;
+                            Expected %0b, Got %0b", i, __goldenOutput__[i], __scanInSerial__[i]);
+                            __error__ = __error__ + 1;
                         end
                         if(i == \(outputLength - 1)) begin
                             \(tms) = 1; // Exit-DR
@@ -796,15 +796,15 @@ class Simulator {
                     \(tms) = 0; // run-test-idle
                     #(`CLOCK_PERIOD) ;
 
-                    if(scanInSerial !== goldenOutput) begin
-                        $display("Simulating TV failed, number fo errors %0d : ", error);
+                    if(__scanInSerial__ !== __goldenOutput__) begin
+                        $display("Simulating TV failed, number fo errors %0d : ", __error__);
                         $error("SIMULATING_TV_FAILED");
                         $finish;
                     end
                 end
             endtask
 
-           \(Simulator.createTasks(tms: tms))
+           \(Simulator.createTasks(tms: tms, tdi: tdi))
         endmodule
         """
 
@@ -850,29 +850,29 @@ class Simulator {
         return vvpTask.output.contains("SUCCESS_STRING")
     }
 
-    private static func createTasks (tms: String) -> String {
+    private static func createTasks (tms: String, tdi: String) -> String {
         return """
         task shiftIR;
-            input[3:0] instruction;
+            input[3:0] __instruction__;
             integer i;
             begin
                 for (i = 0; i< 5; i = i + 1) begin
-                    \(tms) = tmsPattern[i];
+                    \(tms) = __tmsPattern__[i];
                     #(`CLOCK_PERIOD) ;
                 end
 
                 // At shift-IR: shift new instruction on tdi line
                 for (i = 0; i < 4; i = i + 1) begin
-                    tdi = instruction[i];
+                    \(tdi) = __instruction__[i];
                     if(i == 3) begin
-                        \(tms) = tmsPattern[5];     // exit-ir
+                        \(tms) = __tmsPattern__[5];     // exit-ir
                     end
                     #(`CLOCK_PERIOD) ;
                 end
 
-                \(tms) = tmsPattern[6];     // update-ir 
+                \(tms) = __tmsPattern__[6];     // update-ir 
                 #(`CLOCK_PERIOD) ;
-                \(tms) = tmsPattern[7];     // run test-idle
+                \(tms) = __tmsPattern__[7];     // run test-idle
                 #(`CLOCK_PERIOD * 3) ;
             end
         endtask
