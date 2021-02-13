@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/lukaskubanek/OrderedDictionary.git", from: "3.0.1"),
         .package(url: "https://github.com/pvieito/PythonKit", .branch("master")),
         .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
-        .package(url: "https://github.com/donn/Defile.git", from: "5.2.0"),
+        .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0")
     ],
     targets: [
