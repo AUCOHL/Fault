@@ -21,7 +21,7 @@ let _ = [ // Register all TVGens
     PODEM.registered
 ]
 
-let subcommands: OrderedDictionary =  [
+let subcommands: OrderedDictionary = [
     "synth": (func: synth, desc: "synthesis"),
     "chain": (func: scanChainCreate, desc: "scan chain"),
     "cut": (func: cut, desc: "cutting"),
@@ -167,12 +167,13 @@ func main(arguments: [String]) -> Int32 {
     do {
         try cli.parse()
     } catch {
-        cli.printUsage()
+        Stderr.print(error)
+        Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
     }
 
     if version.value {
-        print("Fault \(env["FAULT_VER"]!). ©Cloud V 2019. All rights reserved.")
+        print("Fault \(env["FAULT_VER"]!). ©The Cloud V Project 2019-2021. All rights reserved.")
         return EX_OK
     }
 
@@ -186,7 +187,8 @@ func main(arguments: [String]) -> Int32 {
 
     let args = cli.unparsedArguments
     if args.count != 1 {
-        cli.printUsage()
+        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
+        Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
     }
     

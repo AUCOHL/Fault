@@ -20,7 +20,8 @@ func synth(arguments: [String]) -> Int32 {
     do {
         try cli.parse()
     } catch {
-        cli.printUsage()
+        Stderr.print(error)
+        Stderr.print("Invoke fault synth --help for more info.")
         return EX_USAGE
     }
 
@@ -31,7 +32,8 @@ func synth(arguments: [String]) -> Int32 {
 
     let args = cli.unparsedArguments
     if args.count < 1 {
-        cli.printUsage()
+        Stderr.print("At least one Verilog file is required.")
+        Stderr.print("Invoke fault synth --help for more info.")
         return EX_USAGE
     }      
 

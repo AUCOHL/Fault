@@ -37,7 +37,8 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     do {
         try cli.parse()
     } catch {
-        cli.printUsage()
+        Stderr.print(error)
+        Stderr.print("Invoke fault compact --help for more info.")
         return EX_USAGE
     }
 
@@ -48,7 +49,8 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     let args = cli.unparsedArguments
 
     if args.count != 1 {
-        cli.printUsage()
+        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
+        Stderr.print("Invoke fault compact --help for more info.")
         return EX_USAGE
     }
 

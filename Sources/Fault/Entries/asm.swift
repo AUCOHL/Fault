@@ -39,16 +39,12 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     let args = cli.unparsedArguments
-    if args.count != 2 {
-        usage()
-        return EX_USAGE
-    }
-
     let jsonArgs = args.filter { $0.hasSuffix(".json") }
     let vArgs = args.filter { $0.hasSuffix(".v") }
 
     if jsonArgs.count != 1 || vArgs.count != 1 {
-        usage()
+        Stderr.print("fault asm requires exactly one .json argument and one .v argument.")
+        Stderr.print("Invoke fault asm --help for more info.")
         return EX_USAGE        
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import Defile
 
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
