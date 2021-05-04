@@ -79,6 +79,7 @@ Fault is available under the Apache 2.0 License.
 [Paper](http://link.springer.com/chapter/10.1007/978-3-319-16214-0_42)
 
 # Publication(s)
+- M. Abdelatty, M. Gaber, M. Shalan, "Fault: Open Source EDA’s Missing DFT Toolchain," IEEE Design & Test Magazine. April 2021. [Paper](https://ieeexplore.ieee.org/document/9324799)
 - Mohamed Gaber, Manar Abdelatty, and Mohamed Shalan, "Fault, an Open Source DFT Toolchain", Article No.13, Workshop on Open-Source EDA Technology (WOSET), 2019.
 [Paper](https://woset-workshop.github.io/PDFs/2019/a13.pdf)
 - M. Abdelatty, M. Gaber and M. Shalan, "Fault: Open Source EDA’s Missing DFT Toolchain," in IEEE Design & Test, doi: 10.1109/MDAT.2021.3051850. [Paper](https://ieeexplore.ieee.org/document/9324799/authors#authors)
