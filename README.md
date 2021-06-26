@@ -1,8 +1,13 @@
 # 🧪 Fault
+![Swift 5.2+](https://img.shields.io/badge/Swift-5.2-orange?logo=swift)
+
 Fault is a complete open source design for testing (DFT) Solution that includes automatic test pattern generation for netlists, scan chain stitching, synthesis scripts and a number of other convenience features.
 
 # Quick Setup/Walkthrough
 You may refer to the [wiki](https://github.com/Cloud-V/Fault/wiki) for quick setup instructions (and a small walkthrough!) if you're into that.
+
+## Detailed installation instructions
+If you don't feel like using (or can't use) Docker, you can try [INSTALLING.md](INSTALLING.md) for full installation instructions.
 
 # Running
 ## Subcommands
@@ -69,8 +74,8 @@ For more information on the supported instructions, check the example [testbench
 
 For more options, you can invoke `fault tap --help`.
 
-# License
-Fault is available under the Apache 2.0 License.
+# Copyright & Licensing
+All rights reserved ©2018-2021 The American University in Cairo & The Cloud V Project. Fault is available under the Apache 2.0 License: See `License`.
 
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
@@ -80,8 +85,7 @@ Fault is available under the Apache 2.0 License.
 
 # Publication(s)
 - M. Abdelatty, M. Gaber, M. Shalan, "Fault: Open Source EDA’s Missing DFT Toolchain," IEEE Design & Test Magazine. April 2021. [Paper](https://ieeexplore.ieee.org/document/9324799)
-- Mohamed Gaber, Manar Abdelatty, and Mohamed Shalan, "Fault, an Open Source DFT Toolchain", Article No.13, Workshop on Open-Source EDA Technology (WOSET), 2019.
+- Mohamed Gaber, Manar Abdelatty, and Mohamed Shalan, "Fault, an Open Source DFT Toolchain," Article No.13, Workshop on Open-Source EDA Technology (WOSET), 2019.
 [Paper](https://woset-workshop.github.io/PDFs/2019/a13.pdf)
 
-# Detailed installation instructions
-You can try [INSTALLING.md](INSTALLING.md) for full installation instructions.
+
