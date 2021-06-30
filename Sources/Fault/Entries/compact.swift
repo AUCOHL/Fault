@@ -69,8 +69,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         }
         if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
             Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv.\n",
-                stderr
+                "Warning: Cell model file provided does not end with .v or .sv.\n"
             )
         }
         guard let _ = netlistOpt.value else {

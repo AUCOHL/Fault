@@ -7,7 +7,7 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 let atalantaExecutable = env["FAULT_ATALANTA"] ?? "atalanta"
-let podemExecutable = env["FAULT_ATALANTA"] ?? "atpg"
+let podemExecutable = env["FAULT_PODEM"] ?? "atpg"
 
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
@@ -52,6 +52,11 @@ if CommandLine.arguments.count > 1 {
 
 if action == .install {
     print("Checking dependencies…")
+
+    let ivlPath = "[ -d '\(iverilogBase)' ]".shOutput()
+    if ivlPath.terminationStatus != EX_OK {
+        print("Warning: The directory \(iverilogBase) was not found.")
+    }
 
     let iverilog = "'\(iverilogExecutable)' -B '\(iverilogBase)' -V".shOutput()
     if iverilog.terminationStatus != EX_OK {
@@ -121,6 +126,13 @@ if action == .install {
     export FAULT_INSTALL_PATH="\(path)"
     export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
     export FAULT_VER="\(gitVersion)"
+
+    export FAULT_IVL_BASE="\(iverilogBase)"
+    export FAULT_IVERILOG="\(iverilogExecutable)"
+    export FAULT_VVP="\(vvpExecutable)"
+    export FAULT_YOSYS="\(yosysExecutable)"
+    export FAULT_ATALANTA="\(atalantaExecutable)"
+    export FAULT_PODEM="\(podemExecutable)"
 
     if [ "uninstall" = "$1" ]; then
         echo "Uninstalling Fault…"

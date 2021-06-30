@@ -29,14 +29,12 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
     let clockOpt = StringOption(
         longFlag: "clock",
-        required: true,
         helpMessage: "Clock signal of core logic to use in simulation. (Required)"
     )
     cli.addOptions(clockOpt)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        required: true,
         helpMessage: "Reset signal of core logic to use in simulation. (Required)"
     )
     cli.addOptions(resetOpt)
@@ -50,7 +48,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
-        required: true,
         helpMessage: "Liberty file. (Required.)"
     )
     cli.addOptions(liberty)
@@ -152,8 +149,18 @@ func jtagCreate(arguments: [String]) -> Int32 {
     
     let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)  
     
-    let clockName = clockOpt.value!
-    let resetName = resetOpt.value!
+    guard let clockName = clockOpt.value else {
+        Stderr.print("Option --clock is required.")
+        Stderr.print("Invoke fault jtag --help for more info.")
+        return EX_USAGE
+    }
+    
+    guard let resetName = resetOpt.value else {
+        Stderr.print("Option --reset is required.")
+        Stderr.print("Invoke fault jtag --help for more info.")
+        return EX_USAGE
+    }
+
 
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
@@ -164,16 +171,21 @@ func jtagCreate(arguments: [String]) -> Int32 {
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
 
-    if let libertyTest = liberty.value {
-        if !fileManager.fileExists(atPath: libertyTest) {
-            Stderr.print("Liberty file '\(libertyTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !libertyTest.hasSuffix(".lib") {
-            Stderr.print(
-                "Warning: Liberty file provided does not end with .lib."
-            )
-        }
+    guard let libertyFile = liberty.value else {
+        Stderr.print("Option --liberty is required.")
+        Stderr.print("Invoke fault jtag --help for more info.")
+        return EX_USAGE
+    }
+
+    if !fileManager.fileExists(atPath: libertyFile) {
+        Stderr.print("Liberty file '\(libertyFile)' not found.")
+        return EX_NOINPUT
+    }
+    
+    if !libertyFile.hasSuffix(".lib") {
+        Stderr.print(
+            "Warning: Liberty file provided does not end with .lib."
+        )
     }
 
     if let modelTest = verifyOpt.value {
@@ -220,8 +232,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
  
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
-
-    let libertyFile = liberty.value!
 
     // MARK: Importing Python and Pyverilog
     let parse = Python.import("pyverilog.vparser.parser").parse

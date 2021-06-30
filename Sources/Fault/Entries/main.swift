@@ -68,7 +68,6 @@ func main(arguments: [String]) -> Int32 {
     let cellsOption = StringOption(
         shortFlag: "c",
         longFlag: "cellModel",
-        required: true,
         helpMessage: ".v file describing the cells (Required.)"
     )
     cli.addOptions(cellsOption)
@@ -141,7 +140,6 @@ func main(arguments: [String]) -> Int32 {
 
     let clock = StringOption(
         longFlag: "clock",
-        required: true,
         helpMessage: "clock name to add to --ignoring. (Required.)"
     )
     cli.addOptions(clock)
@@ -211,22 +209,30 @@ func main(arguments: [String]) -> Int32 {
         return EX_NOINPUT
     }
 
-    if let modelTest = cellsOption.value {
-        if !fileManager.fileExists(atPath: modelTest) {
-            Stderr.print("Cell model file '\(modelTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
-            Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv."
-            )
-        }
+    guard let clockName = clock.value else {
+        Stderr.print("Option --clock is required.")
+        Stderr.print("Invoke fault --help for more info.")
+        return EX_USAGE
+    }    
+
+    guard let cells = cellsOption.value else {
+        Stderr.print("Option --cellModel is required.")
+        Stderr.print("Invoke fault --help for more info.")
+        return EX_USAGE
+    }    
+
+    if !fileManager.fileExists(atPath: cells) {
+        Stderr.print("Cell model file '\(cells)' not found.")
+        return EX_NOINPUT
+    }
+    if !cells.hasSuffix(".v") && !cells.hasSuffix(".sv") {
+        Stderr.print(
+            "Warning: Cell model file provided does not end with .v or .sv."
+        )
     }
 
     let jsonOutput = "\(filePath.value ?? file).tv.json"
     let svfOutput = "\(filePath.value  ?? file).tv.svf"
-
-    let clockName = clock.value!
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     
@@ -239,8 +245,6 @@ func main(arguments: [String]) -> Int32 {
         )
     let defines: Set<String>
         = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-
-    let cells = cellsOption.value!
 
     let includeFiles: Set<String>
         = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])

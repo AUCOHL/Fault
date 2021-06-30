@@ -6,8 +6,8 @@
         "repositoryURL": "https://github.com/attaswift/BigInt.git",
         "state": {
           "branch": null,
-          "revision": "2bbb8a7addeb79ceccf45acac9f6e2a07cbe9680",
-          "version": "5.1.0"
+          "revision": "889a1ecacd73ccc189c5cb29288048f186c44ed9",
+          "version": "5.2.1"
         }
       },
       {
@@ -29,15 +29,6 @@
         }
       },
       {
-        "package": "LoggerKit",
-        "repositoryURL": "https://github.com/pvieito/LoggerKit.git",
-        "state": {
-          "branch": "master",
-          "revision": "2d1cecdc0c8c01a0714031c7e0740318f5b1a60e",
-          "version": null
-        }
-      },
-      {
         "package": "OrderedDictionary",
         "repositoryURL": "https://github.com/lukaskubanek/OrderedDictionary.git",
         "state": {
@@ -51,17 +42,8 @@
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
           "branch": "master",
-          "revision": "05f75d162601eb39d879812d5ab0cc7e7d8954cf",
+          "revision": "c77231820148515a77e9bba5016a57e5a88ef007",
           "version": null
-        }
-      },
-      {
-        "package": "swift-argument-parser",
-        "repositoryURL": "https://github.com/apple/swift-argument-parser",
-        "state": {
-          "branch": null,
-          "revision": "35b76bf577d3cc74820f8991894ce3bcdf024ddc",
-          "version": "0.0.2"
         }
       }
     ]

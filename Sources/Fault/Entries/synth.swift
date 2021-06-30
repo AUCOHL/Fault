@@ -11,10 +11,10 @@ func synth(arguments: [String]) -> Int32 {
     let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output netlist. (Default: Netlists/ + input + .netlist.v)")
     cli.addOptions(filePath)
 
-    let liberty = StringOption(shortFlag: "l", longFlag: "liberty", required: true, helpMessage: "Liberty file. (Required.)")
+    let liberty = StringOption(shortFlag: "l", longFlag: "liberty", helpMessage: "Liberty file. (Required.)")
     cli.addOptions(liberty)
 
-    let topModule = StringOption(shortFlag: "t", longFlag: "top", required: true, helpMessage: "Top module. (Required.)")
+    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Required.)")
     cli.addOptions(topModule)
     
     do {
@@ -47,23 +47,30 @@ func synth(arguments: [String]) -> Int32 {
         }
     }
 
-    if let libertyTest = liberty.value {
-        if !fileManager.fileExists(atPath: libertyTest) {
-            Stderr.print("Liberty file '\(libertyTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !libertyTest.hasSuffix(".lib") {
-            Stderr.print(
-                "Warning: Liberty file provided does not end with .lib."
-            )
-        }
+    guard let module = topModule.value else {
+        Stderr.print("Option --top is required.")
+        Stderr.print("Invoke fault synth --help for more info.")
+        return EX_USAGE
     }
 
-    let module = "\(topModule.value!)"
+    guard let libertyFile = liberty.value else {
+        Stderr.print("Option --liberty is required.")
+        Stderr.print("Invoke fault synth --help for more info.")
+        return EX_USAGE
+    }
+
+    if !fileManager.fileExists(atPath: libertyFile) {
+        Stderr.print("Liberty file '\(libertyFile)' not found.")
+        return EX_NOINPUT
+    }
+    
+    if !libertyFile.hasSuffix(".lib") {
+        Stderr.print(
+            "Warning: Liberty file provided does not end with .lib."
+        )
+    }
 
     let output = filePath.value ?? "Netlists/\(module).netlist.v"
-    
-    let libertyFile = liberty.value!
 
     let script = Synthesis.script(for: module, in: args, cutting: false, liberty: libertyFile, output: output)
 

@@ -36,7 +36,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     
     let clockOpt = StringOption(
         longFlag: "clock",
-        required: true,
         helpMessage: "Clock signal to add to --ignoring and use in simulation. (Required.)."
     )
     cli.addOptions(clockOpt)
@@ -49,7 +48,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        required: true,
         helpMessage: "Reset signal to add to --ignoring and use in simulation.  (Required.)"
     )
     cli.addOptions(resetOpt)
@@ -63,7 +61,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let liberty = StringOption(
         shortFlag: "l",
         longFlag: "liberty",
-        required: true,
         helpMessage: "Liberty file. (Required.)"
     )
     cli.addOptions(liberty)
@@ -145,17 +142,34 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
+        
+    guard let clockName = clockOpt.value else {
+        Stderr.print("Option --clock is required.")
+        Stderr.print("Invoke fault chain --help for more info.")
+        return EX_USAGE
+    }
+    
+    guard let resetName = resetOpt.value else {
+        Stderr.print("Option --reset is required.")
+        Stderr.print("Invoke fault chain --help for more info.")
+        return EX_USAGE
+    }
 
-    if let libertyTest = liberty.value {
-        if !fileManager.fileExists(atPath: libertyTest) {
-            Stderr.print("Liberty file '\(libertyTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !libertyTest.hasSuffix(".lib") {
-            Stderr.print(
-                "Warning: Liberty file provided does not end with .lib."
-            )
-        }
+    guard let libertyFile = liberty.value else {
+        Stderr.print("Option --liberty is required.")
+        Stderr.print("Invoke fault chain --help for more info.")
+        return EX_USAGE
+    }
+
+    if !fileManager.fileExists(atPath: libertyFile) {
+        Stderr.print("Liberty file '\(libertyFile)' not found.")
+        return EX_NOINPUT
+    }
+
+    if !libertyFile.hasSuffix(".lib") {
+        Stderr.print(
+            "Warning: Liberty file provided does not end with .lib."
+        )
     }
 
     if let modelTest = verifyOpt.value {
@@ -181,14 +195,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let defines: Set<String>
         = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-        
-    let clockName = clockOpt.value!
-    let resetName = resetOpt.value!
 
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
-
-    let libertyFile = liberty.value!
 
     let includeFiles: Set<String>
         = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])

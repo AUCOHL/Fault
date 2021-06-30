@@ -68,6 +68,6 @@ You may need to add `~/bin` to path depending on your OS.
 To uninstall this, you can simply invoke `fault uninstall`.
 
 # Usage without installation
-Osu035 will not be used automatically and both `fault uninstall` and `fault -V` will not function.
+Both `fault uninstall` and `fault -V` will not function.
 
 You can use Fault without installing by invoking `swift run Fault` in place of `fault`. Please note that you still need all the other dependencies anyway.

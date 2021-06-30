@@ -17,8 +17,7 @@ func bench(arguments: [String]) -> Int32 {
 
     let cellsOption = StringOption(
         shortFlag: "c",
-        longFlag: "cells",
-        required: true,
+        longFlag: "cellModel",
         helpMessage: "Path to cell models file. (.v) files are converted to (.json). If .json is available, it could be supplied directly."
     )
     cli.addOptions(cellsOption)
@@ -56,82 +55,89 @@ func bench(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
-
     
     let output = filePath.value ?? "\(file).bench"
 
-    var cellModelsFile: String = cellsOption.value!
-    if let modelTest = cellsOption.value {
-        if !fileManager.fileExists(atPath: modelTest) {
-            Stderr.print("Cell model file '\(modelTest)' not found.")
-            return EX_NOINPUT
+    guard let cellModel = cellsOption.value else {
+        Stderr.print("Option --cellModel is required.")
+        Stderr.print("Invoke fault bench --help for more info.")
+        return EX_USAGE
+    }
+
+    if !fileManager.fileExists(atPath: cellModel) {
+        Stderr.print("Cell model file '\(cellModel)' not found.")
+        return EX_NOINPUT
+    }
+
+    var cellModelsFile = cellModel
+
+    if cellModel.hasSuffix(".v") || cellModel.hasSuffix(".sv") {
+        print("Creating json for the cell models…")
+        cellModelsFile = "\(cellModel).json"
+
+        let cellModels =
+        "grep -E -- \"\\bmodule\\b|\\bendmodule\\b|and|xor|or|not(\\s+|\\()|buf|input.*;|output.*;\" \(cellModel)".shOutput();
+        let pattern = "(?s)(?:module).*?(?:endmodule)"
+
+        var cellDefinitions = ""
+        if let range = cellModels.output.range(of: pattern, options: .regularExpression) {
+            cellDefinitions = String(cellModels.output[range])
         }
+        do {
 
-        if modelTest.hasSuffix(".v") || modelTest.hasSuffix(".sv") {
-            print("Creating json for the cell models…")
-            cellModelsFile = "\(modelTest).json"
-
-            let cellModels =
-            "grep -E -- \"\\bmodule\\b|\\bendmodule\\b|and|xor|or|not(\\s+|\\()|buf|input.*;|output.*;\" \(modelTest)".shOutput();
-            let pattern = "(?s)(?:module).*?(?:endmodule)"
-
-            var cellDefinitions = ""
-            if let range = cellModels.output.range(of: pattern, options: .regularExpression) {
-                cellDefinitions = String(cellModels.output[range])
-            }
-            do {
-
-            let regex = try NSRegularExpression(pattern: pattern)
-            let range = NSRange(cellModels.output.startIndex..., in: cellModels.output)
-            let results = regex.matches(in: cellModels.output, range: range)   
-            let matches = results.map { String(cellModels.output[Range($0.range, in: cellModels.output)!])}     
-            
-            cellDefinitions = matches.joined(separator: "\n")
-
-            let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-            let _ = "mkdir -p \(folderName)".sh()
-            
-            defer {
-                let _ = "rm -rf \(folderName)".sh()
-            }
-            let CellFile = "\(folderName)/cells.v"
+        let regex = try NSRegularExpression(pattern: pattern)
+        let range = NSRange(cellModels.output.startIndex..., in: cellModels.output)
+        let results = regex.matches(in: cellModels.output, range: range)   
+        let matches = results.map { String(cellModels.output[Range($0.range, in: cellModels.output)!])}     
         
-            try File.open(CellFile, mode: .write) {
-                try $0.print(cellDefinitions)
-            }
+        cellDefinitions = matches.joined(separator: "\n")
 
-            // MARK: Importing Python and Pyverilog
-            let parse = Python.import("pyverilog.vparser.parser").parse
-
-            // MARK: Parse
-            let ast = parse([CellFile])[0]
-            let description = ast[dynamicMember: "description"]
-
-            let cells = try BenchCircuit.extract(definitions: description.definitions)
-            let circuit = BenchCircuit(cells: cells)
-            let encoder = JSONEncoder()
-            
-            encoder.outputFormatting = .prettyPrinted
-            let data = try encoder.encode(circuit)
-
-            guard let string = String(data: data, encoding: .utf8) else {
-                throw "Could not create utf8 string."
-            }
-
-            try File.open(cellModelsFile, mode: .write) {
-                try $0.print(string)
-            }
-
-            } catch {
-                Stderr.print("Internal error: \(error)")
-                return EX_SOFTWARE
-            }
+        let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+        let _ = "mkdir -p \(folderName)".sh()
+        
+        defer {
+            let _ = "rm -rf \(folderName)".sh()
         }
-        else if !modelTest.hasSuffix(".json") {
-            Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv or .json."
-            )
+        let CellFile = "\(folderName)/cells.v"
+    
+        try File.open(CellFile, mode: .write) {
+            try $0.print(cellDefinitions)
         }
+
+        // MARK: Importing Python and Pyverilog
+        let parse = Python.import("pyverilog.vparser.parser").parse
+
+        // MARK: Parse
+        let ast = parse([CellFile])[0]
+        let description = ast[dynamicMember: "description"]
+
+        let cells = try BenchCircuit.extract(definitions: description.definitions)
+        let circuit = BenchCircuit(cells: cells)
+        let encoder = JSONEncoder()
+        
+        encoder.outputFormatting = .prettyPrinted
+        let data = try encoder.encode(circuit)
+
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw "Could not create utf8 string."
+        }
+
+        try File.open(cellModelsFile, mode: .write) {
+            try $0.print(string)
+        }
+
+        } catch {
+            Stderr.print("Internal error: \(error)")
+            return EX_SOFTWARE
+        }
+    }
+    else if !cellModel.hasSuffix(".json") {
+        Stderr.print(
+            "Warning: Cell model file provided does not end with .v or .sv or .json."
+        )
+        Stderr.print(
+            "It will be treated as a json file."
+        )
     }
     do {
         // MARK: Processing Library Cells
