@@ -44,7 +44,7 @@ The version of Icarus Verilog you just installed is insufficient, as 10.2 has a 
 Then just run this in a terminal instance:
 
 ```bash
-EXEC_PREFIX=</usr/local/bin> sudo ./iverilog_build.swift
+EXEC_PREFIX=</usr/local/bin> sudo $(which swift) ./iverilog_build.swift
 ```
 
 ## Both
@@ -55,13 +55,13 @@ You'll need Pyverilog
 You can optionally install Atalanta if you want to use it for test vector generation.
 
 ```bash
-EXEC_PREFIX=</usr/local/bin> sudo ./atalanta_build.swift
+EXEC_PREFIX=</usr/local/bin> sudo $(which swift) ./atalanta_build.swift
 ```
 
 # Installation
 Type `git submodule update --init --recursive` in the terminal to initialize submodules.
 
-Then simply invoke `swift install.swift`. This will install it to `~/bin` by default. You can customize this installation directory by executing `INSTALL_DIR=<path> swift install.swift`.
+Then simply invoke `swift install.swift`. This will install it to `~/bin` by default. You can customize this installation directory by executing `INSTALL_DIR=<path> swift ./install.swift`.
 
 You may need to add `~/bin` to path depending on your OS.
 
