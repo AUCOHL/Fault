@@ -7,7 +7,7 @@ Fault is a complete open source design for testing (DFT) Solution that includes 
 You may refer to the [wiki](https://github.com/Cloud-V/Fault/wiki) for quick setup instructions (and a small walkthrough!) if you're into that.
 
 ## Detailed installation instructions
-If you don't feel like using (or can't use) Docker, you can try [INSTALLING.md](INSTALLING.md) for full installation instructions.
+If you don't feel like using (or can't use) Docker, you can try [Installing.md](./Installing.md) for full installation instructions.
 
 # Running
 ## Subcommands
