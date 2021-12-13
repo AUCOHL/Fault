@@ -20,6 +20,12 @@ jobs:
     - name: Build Images
       run: |
         docker build -t cloud-v/fault:latest .
+    - name: Log in to the Container registry
+      uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     - name: Push to GHCR
       run: |
         docker image tag cloud-v/fault:latest ghcr.io/cloud-v/fault:latest

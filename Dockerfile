@@ -16,7 +16,7 @@ RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install jinja2
 
 # Install pyverilog
-RUN python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/develop.zip
+RUN python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/refs/tags/1.3.0.zip
 
 # Install Yosys
 RUN apt-get install -y yosys
