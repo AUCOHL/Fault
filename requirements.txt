@@ -1,0 +1,2 @@
+jinja2
+https://github.com/PyHDI/Pyverilog/archive/refs/tags/1.3.0.zip

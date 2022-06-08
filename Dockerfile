@@ -1,56 +1,70 @@
-FROM swift:5.3.2-bionic
+FROM efabless/openlane-tools:yosys-cfe940a98b08f1a5d08fb44427db155ba1f18b62-centos-7 AS yosys
+# ---
 
-RUN apt-get update
-RUN apt-get install -y apt-utils
+FROM swift:5.6-centos7
 
-# Install Basics
-RUN apt-get install -y git curl
+# Setup Build Environment
+RUN yum install -y --setopt=skip_missing_names_on_install=False https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm centos-release-scl
+RUN yum install -y --setopt=skip_missing_names_on_install=False git curl python36 python3-pip devtoolset-8 devtoolset-8-libatomic-devel flex bison readline-devel ncurses-devel autoconf libtool gperf tcl-devel  libcurl-devel
 
-# Install Python
-RUN rm -rf /usr/lib/python2.7/site-packages
-RUN apt-get install -y python python-dev python-pip
-RUN apt-get install -y python3 python3-dev python3-pip
-
-# Install jinja
-RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install jinja2
-
-# Install pyverilog
-RUN python3 -m pip install https://github.com/PyHDI/Pyverilog/archive/refs/tags/1.3.0.zip
+ENV CC=/opt/rh/devtoolset-8/root/usr/bin/gcc \
+    CPP=/opt/rh/devtoolset-8/root/usr/bin/cpp \
+    CXX=/opt/rh/devtoolset-8/root/usr/bin/g++ \
+    PATH=/opt/rh/devtoolset-8/root/usr/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/rh/devtoolset-8/root/usr/lib64:/opt/rh/devtoolset-8/root/usr/lib:/opt/rh/devtoolset-8/root/usr/lib64/dyninst:/opt/rh/devtoolset-8/root/usr/lib/dyninst:/opt/rh/devtoolset-8/root/usr/lib64:/opt/rh/devtoolset-8/root/usr/lib:$LD_LIBRARY_PATH
 
 # Install Yosys
-RUN apt-get install -y yosys
+COPY --from=yosys /build /build
+ENV PATH=/build/bin:$PATH
 
-# Install IcarusVerilog 10.2+
-RUN mkdir -p /share/iverilog
-WORKDIR /share/iverilog
-RUN curl -sL https://github.com/FPGAwars/toolchain-iverilog/releases/download/v1.2.1/toolchain-iverilog-linux_x86_64-1.2.1.tar.gz | tar -xzf -
+# Install git
+RUN yum install -y gettext
+WORKDIR /git
+RUN curl -L https://github.com/git/git/tarball/e9d7761bb94f20acc98824275e317fa82436c25d/ |\
+    tar -xzC . --strip-components=1 &&\
+    make configure &&\
+    ./configure --prefix=/build &&\
+    make -j$(nproc) &&\
+    make install &&\
+    rm -rf *
+
+# Install IcarusVerilog 11
+WORKDIR /iverilog
+RUN curl -L https://github.com/steveicarus/iverilog/archive/refs/tags/v11_0.tar.gz |\
+    tar --strip-components=1 -xzC . &&\
+    aclocal &&\
+    autoconf &&\
+    ./configure &&\
+    make -j$(nproc) &&\
+    make install &&\
+    rm -rf *
 
 # Install Atalanta
-RUN curl -sL https://github.com/hsluoyz/Atalanta/archive/master.tar.gz | tar -xzf -
-WORKDIR Atalanta-master
-RUN make
-RUN cp atalanta /usr/bin
+WORKDIR /atalanta
+RUN curl -L https://github.com/hsluoyz/Atalanta/archive/12d405311c3dc9f371a9009bb5cdc8844fe34f90.tar.gz |\
+    tar --strip-components=1 -xzC . &&\
+    make &&\
+    cp atalanta /usr/bin &&\
+    rm -rf *
 
-# Install PODEM 
-RUN apt-get install -y flex bison libreadline-dev libncurses5-dev libncursesw5-dev
-RUN curl -sL http://tiger.ee.nctu.edu.tw/course/Testing2018/assignments/hw0/podem.tgz  | tar -xzf -
-WORKDIR podem
-RUN make
-RUN cp atpg /usr/bin
+# Install PODEM
+WORKDIR /podem
+RUN curl -L http://tiger.ee.nctu.edu.tw/course/Testing2018/assignments/hw0/podem.tgz |\
+    tar --strip-components=1 -xzC . &&\
+    make &&\
+    cp atpg /usr/bin &&\
+    rm -rf *
+
+# Install PIP dependencies
+WORKDIR /
+RUN python3 -m pip install --upgrade pip
+COPY requirements.txt /requirements.txt
+RUN python3 -m pip install --upgrade -r /requirements.txt
 
 # Install Fault
-ENV PYVERILOG_IVERILOG="/share/iverilog/bin/iverilog"
-ENV FAULT_IVERILOG="/share/iverilog/bin/iverilog"
-ENV FAULT_VVP="/share/iverilog/bin/vvp"
-ENV FAULT_YOSYS="yosys"
-ENV FAULT_IVL_BASE="/share/iverilog/lib/ivl"
-
-# For Pyverilog:
-RUN ln -s $FAULT_IVL_BASE "/usr/local/lib/ivl" 
-
-WORKDIR /share
-COPY . /share/Fault
-WORKDIR /share/Fault
+ENV FAULT_YOSYS "yosys"
+ENV PYTHON_LIBRARY /lib64/libpython3.so
+WORKDIR /fault
+COPY . .
 RUN INSTALL_DIR=/usr/bin swift install.swift
 WORKDIR /
