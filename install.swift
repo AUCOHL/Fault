@@ -95,7 +95,7 @@ if action == .install {
         print("Warning: PODEM does not seem to be installed.")
     }
     
-    print("Installing Fault (\(gitVersion))…")
+    print("Installing Fault…")
 
     print("Compiling…")
     let compilationResult = "swift build".shOutput()

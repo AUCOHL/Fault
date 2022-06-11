@@ -77,6 +77,8 @@ For more options, you can invoke `fault tap --help`.
 # Copyright & Licensing
 All rights reserved ©2018-2022 The American University in Cairo and other contributors. Fault is available under the Apache 2.0 License: See `License`.
 
+SOFTWARE INCLUDED WITH FAULT DISTRIBUTIONS, I.E. ATALANTA AND PODEM, WHILE FREE TO DISTRIBUTE, ARE PROPRIETARY, AND MAY NOT BE USED FOR COMMERCIAL PURPOSES.
+
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
 [Book](https://ieeexplore.ieee.org/book/5266057)
