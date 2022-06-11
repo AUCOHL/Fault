@@ -75,7 +75,7 @@ For more information on the supported instructions, check the example [testbench
 For more options, you can invoke `fault tap --help`.
 
 # Copyright & Licensing
-All rights reserved ©2018-2021 The American University in Cairo & The Cloud V Project. Fault is available under the Apache 2.0 License: See `License`.
+All rights reserved ©2018-2022 The American University in Cairo and other contributors. Fault is available under the Apache 2.0 License: See `License`.
 
 # References
 - Z. Navabi, Digital System Test and Testable Design : Using Hdl Models and Architectures. 2010;2011;. DOI: 10.1007/978-1-4419-7548-5.
