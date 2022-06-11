@@ -10,7 +10,6 @@ jobs:
   push_to_pypi:
     name: Build (and publish, if applicable)
     runs-on: ubuntu-20.04
-    needs: lint_python
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v2
