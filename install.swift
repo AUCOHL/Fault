@@ -34,9 +34,6 @@ extension String {
     }
 }
 
-let gitVersion = "git describe --always --tags".shOutput(
-).output.trimmingCharacters(in: .whitespacesAndNewlines)
-
 enum Action {
     case install
     case uninstall
@@ -98,7 +95,7 @@ if action == .install {
         print("Warning: PODEM does not seem to be installed.")
     }
     
-    print("Installing Fault (\(gitVersion))…")
+    print("Installing Fault…")
 
     print("Compiling…")
     let compilationResult = "swift build".shOutput()
@@ -125,7 +122,6 @@ if action == .install {
 
     export FAULT_INSTALL_PATH="\(path)"
     export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
-    export FAULT_VER="\(gitVersion)"
 
     export FAULT_IVL_BASE="\(iverilogBase)"
     export FAULT_IVERILOG="\(iverilogExecutable)"

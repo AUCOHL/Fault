@@ -1,10 +1,27 @@
-# Contributing
-Contributions are welcome and encouraged!
+# How to Contribute
+We'd love to accept your patches and contributions to this project. There are
+just a few small guidelines you need to follow.
 
-Leaglly, each contributor hereby grants Cloud V a world-wide, royalty-free, non-exclusive license:
+# Branching
+For various reasons, it's recommended to call working branches, even in your forks, something else other than `main`, as this branch name does have some special behavior associated with them. 
 
-0. under intellectual property rights (other than patent or trademark) licensable by such Contributor to use, reproduce, make available, modify, display, perform, distribute, and otherwise exploit its Contributions, either on an unmodified basis, with Modifications, or as part of a Larger Work; and
+# Testing and Code Standards
+Before you submit your changes, it's prudent to perform some kind of smoke test. `swift test` will do just fine.
 
-1. under Patent Claims of such Contributor to make, use, sell, offer for sale, have made, import, and otherwise transfer either its Contributions or its Contributor Version.
+Please do not write new shell scripts.
 
-Copyright notice: above text adapted from Mozilla Public License version 2.0.
+# Submissions
+Make your changes and then submit them as a pull requests to the `main` branch.
+
+Consult [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more information on using pull requests.
+
+## The Approval Process
+For a PR to be merged, there are two requirements:
+
+- It must pass all automated checks.
+- An OpenLane team member must inspect and approve the PR.
+
+# Licensing and Copyright
+Please add you (or your employer's) copyright headers to any files to which you have made major edits.
+
+Please note all code contributions must have the same license as Fault, i.e., the Apache License, version 2.0. 

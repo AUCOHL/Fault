@@ -6,6 +6,8 @@ import Defile
 import OrderedDictionary
 import BigInt
 
+let VERSION = "0.4.4"
+
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
 let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
@@ -47,9 +49,7 @@ func main(arguments: [String]) -> Int32 {
         longFlag: "version",
         helpMessage: "Prints the current version and exits."
     )
-    if env["FAULT_VER"] != nil {
-        cli.addOptions(version)
-    }
+    cli.addOptions(version)
 
     let help = BoolOption(
         shortFlag: "h",
@@ -171,7 +171,7 @@ func main(arguments: [String]) -> Int32 {
     }
 
     if version.value {
-        print("Fault \(env["FAULT_VER"]!). ©The Cloud V Project 2019-2021. All rights reserved.")
+        print("Fault \(VERSION). ©The American University in Cairo 2019-2022. All rights reserved.")
         return EX_OK
     }
 
