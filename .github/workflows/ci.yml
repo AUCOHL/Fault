@@ -31,11 +31,6 @@ jobs:
         # if: ${{ env.BRANCH_NAME == 'main' }}
         run: |
           python3 .github/scripts/generate_tag.py
-      - name: Tag Commit
-        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
-        uses: tvdias/github-tagger@v0.0.1
-        with:
-          tag: "${{ env.NEW_TAG }}"
           repo-token: "${{ secrets.MY_TOKEN }}"
       - name: Log in to the Container registry
         if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
@@ -51,3 +46,9 @@ jobs:
           docker image tag aucohl/fault:latest ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:latest
+      # Last, because this triggers the AppImage CI
+      - name: Tag Commit
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        uses: tvdias/github-tagger@v0.0.1
+        with:
+          tag: "${{ env.NEW_TAG }}"
