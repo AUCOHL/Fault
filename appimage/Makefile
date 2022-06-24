@@ -1,6 +1,7 @@
 RESOURCES = $(shell find rsc/ -type f)
 ARCH = $(shell uname -m)
 APPIMAGE = Fault-$(ARCH).AppImage
+FAULT_IMAGE_NAME=aucohl/fault:latest
 
 all: $(APPIMAGE)
 
@@ -8,8 +9,7 @@ all: $(APPIMAGE)
 squashfs-root/build/bin/fault: ../Dockerfile Makefile
 	rm -rf squashfs-root
 	mkdir -p ./squashfs-root/lib ;\
-	docker build -t fault_build -f ../Dockerfile ..
-	id=$$(docker create fault_build) ; \
+	id=$$(docker create $(FAULT_IMAGE_NAME)) ; \
 	docker cp $$id:/build ./squashfs-root/build ; \
 	docker rm -v $$id
 

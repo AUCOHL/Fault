@@ -8,7 +8,7 @@ on:
 
 jobs:
   push_to_pypi:
-    name: Build (and publish, if applicable)
+    name: Build/Publish Docker
     runs-on: ubuntu-20.04
     steps:
       - name: Check out Git repository
@@ -51,12 +51,3 @@ jobs:
           docker image tag aucohl/fault:latest ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:latest
-      - name: Build AppImage
-        run: |
-          cd appimage
-          make
-      - name: Test AppImage
-        run: |
-          ./Fault-x86_64.AppImage self-test
-      - name: Release AppImage
-        run: |
