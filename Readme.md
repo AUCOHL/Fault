@@ -1,5 +1,5 @@
 # 🧪 Fault
-![Swift 5.2+](https://img.shields.io/badge/Swift-5.2-orange?logo=swift)
+![Swift 5.2+](https://img.shields.io/badge/Swift-5.2-orange?logo=swift) ![Docker Image Available for x86-64](https://img.shields.io/static/v1?logo=docker&label=docker&message=x86_64) ![AppImage Available for Linux x86-64](https://img.shields.io/static/v1?label=appimage&message=x86_64&color=blue)
 
 Fault is a complete open source design for testing (DFT) Solution that includes automatic test pattern generation for netlists, scan chain stitching, synthesis scripts and a number of other convenience features.
 

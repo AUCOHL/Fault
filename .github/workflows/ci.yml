@@ -23,12 +23,12 @@ jobs:
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
       - name: Build Image
         run: |
-          docker build -t aucohl/fault:latest .
+          docker build --target runner -t aucohl/fault:latest .
       - name: Run Smoke Test
         run: |
-          docker run --rm -w /fault aucohl/fault:latest swift test
+          docker run --rm -w /test aucohl/fault:latest sh /test/smoke_test.sh
       - name: Check for new version
-        if: ${{ env.BRANCH_NAME == 'main' }}
+        # if: ${{ env.BRANCH_NAME == 'main' }}
         run: |
           cd ${GITHUB_WORKSPACE}/ && ./venv/bin/python3 .github/scripts/generate_tag.py
       - name: Tag Commit
@@ -51,3 +51,12 @@ jobs:
           docker image tag aucohl/fault:latest ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:$NEW_TAG
           docker push ghcr.io/aucohl/fault:latest
+      - name: Build AppImage
+        run: |
+          cd appimage
+          make
+      - name: Test AppImage
+        run: |
+          ./Fault-x86_64.AppImage self-test
+      - name: Release AppImage
+        run: |

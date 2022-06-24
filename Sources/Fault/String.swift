@@ -26,10 +26,15 @@ extension String {
         return (terminationStatus: task.terminationStatus, output: output!)
     }
 
-    func sh() -> Int32 {
+    func sh(silent: Bool = false) -> Int32 {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = ["sh", "-c", self]
+
+        if (silent) {
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+        }
 
         do {
             try task.run()

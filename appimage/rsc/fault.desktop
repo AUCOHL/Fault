@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Fault
+Icon=fault
+Exec=fault
+Comment=Fault, a full open source DFT solution
+Categories=Development;
+Terminal=true

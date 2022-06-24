@@ -56,7 +56,7 @@ final class FaultTests: XCTestCase {
 
         // 2. Simulate
         process = newProcess()
-        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileCut, fileCut]
+        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut]
         try process.startAndBlock()
         print("2/6")
 

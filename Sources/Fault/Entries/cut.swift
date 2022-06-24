@@ -29,7 +29,7 @@ func cut(arguments: [String]) -> Int32 {
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Hard module inputs to ignore when cutting seperated by commas. (Defautl: none)"
+        helpMessage: "Hard module inputs to ignore when cutting seperated by commas. (Default: none)"
     )
     cli.addOptions(ignored)
 
