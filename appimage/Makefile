@@ -1,7 +1,7 @@
 RESOURCES = $(shell find rsc/ -type f)
 ARCH = $(shell uname -m)
 APPIMAGE = Fault-$(ARCH).AppImage
-FAULT_IMAGE_NAME=aucohl/fault:latest
+FAULT_IMAGE_NAME ?= aucohl/fault:latest
 
 all: $(APPIMAGE)
 
@@ -22,6 +22,7 @@ $(APPIMAGE): squashfs-root/build/bin/fault appimagetool $(RESOURCES)
 	mkdir -p ./squashfs-root/test
 	cp ../Tests/RTL/spm.v ./squashfs-root/test/spm.v
 	cp -r ../Tech/osu035 ./squashfs-root/test/osu035
+	cp ../Tests/smoke_test.sh ./squashfs-root/test/smoke_test.sh
 	./appimagetool ./squashfs-root
 
 PREFIX ?= /usr/local
