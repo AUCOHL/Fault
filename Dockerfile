@@ -93,4 +93,4 @@ ENV PATH=/build/bin:$PATH\
     FAULT_IVERILOG=/build/bin/iverilog\
     FAULT_VVP=/build/bin/vvp
 
-ENTRYPOINT [ "/bin/bash" ]
+CMD [ "/bin/bash" ]
