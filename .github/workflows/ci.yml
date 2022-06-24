@@ -26,7 +26,7 @@ jobs:
           docker build --target runner -t aucohl/fault:latest .
       - name: Run Smoke Test
         run: |
-          docker run --rm -w /test aucohl/fault:latest /bin/sh /test/smoke_test.sh
+          docker run --rm -w /test aucohl/fault:latest python3 /test/smoke_test.py
       - name: Check for new version
         # if: ${{ env.BRANCH_NAME == 'main' }}
         run: |

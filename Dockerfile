@@ -78,7 +78,7 @@ WORKDIR /
 FROM centos:centos7 AS runner
 COPY --from=builder /build /build
 WORKDIR /test
-COPY ./Tests/smoke_test.sh .
+COPY ./Tests/smoke_test.py .
 COPY ./Tests/RTL/spm.v .
 COPY ./Tech/osu035 ./osu035
 

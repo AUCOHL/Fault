@@ -29,7 +29,7 @@ func assemble(arguments: [String]) -> Int32 {
 
     let goldenFilePath = StringOption(
         shortFlag: "O",
-        longFlag: "golden-output",
+        longFlag: "goldenOutput",
         helpMessage: "Path to the golden output file. (Default: <json input> + .out.bin)"
     )
     cli.addOptions(goldenFilePath)
