@@ -28,7 +28,7 @@ jobs:
         run: |
           docker run --rm -w /test aucohl/fault:latest python3 /test/smoke_test.py
       - name: Check for new version
-        # if: ${{ env.BRANCH_NAME == 'main' }}
+        if: ${{ env.BRANCH_NAME == 'main' }}
         run: |
           python3 .github/scripts/generate_tag.py
       - name: Log in to the Container registry
