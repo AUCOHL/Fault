@@ -1,0 +1,15 @@
+#!/bin/sh
+export CURDIR=$(dirname $(readlink -f "${0}"))
+export PATH="${CURDIR}/build/bin:${CURDIR}/usr/bin:$PATH"
+export LD_LIBRARY_PATH="${CURDIR}/build/lib:${CURDIR}/usr/lib:$LD_LIBRARY_PATH"
+export FAULT_IVL_BASE="${CURDIR}/build/lib/ivl"
+export FAULT_IVERILOG="${CURDIR}/build/bin/iverilog"
+export FAULT_VVP="${CURDIR}/build/bin/vvp"
+export PYTHON_LIBRARY="${CURDIR}/build/lib/libpython3.6m.so"
+export PYTHONPATH="${CURDIR}/build/lib/pythonpath"
+
+if [ "$1" = "smoke-test" ]; then
+    python3 ${CURDIR}/test/smoke_test.py
+else
+    exec "${CURDIR}/build/bin/fault" $@
+fi

@@ -1,3 +1,7 @@
 /.build
 /Netlists
 /Dockerfile
+/appimage
+/.git
+/.github
+/.dockerignore

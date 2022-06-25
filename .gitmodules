@@ -1,3 +1,0 @@
-[submodule "Pyverilog"]
-	path = Submodules/Pyverilog
-	url = https://github.com/PyHDI/Pyverilog

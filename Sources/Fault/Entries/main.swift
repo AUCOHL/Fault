@@ -6,7 +6,7 @@ import Defile
 import OrderedDictionary
 import BigInt
 
-let VERSION = "0.4.4"
+let VERSION = "0.5.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -32,6 +32,26 @@ let subcommands: OrderedDictionary = [
     "tap": (func: jtagCreate, desc: "JTAG port insertion"),
     "bench": (func: bench, desc: "verilog netlist to bench format conversion")
 ]
+
+let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
+if yosysTest != EX_OK {
+    Stderr.print("Yosys must be installed to PATH on your computer  for Fault to work. Fault will now quit.")
+    exit(EX_UNAVAILABLE)
+}
+
+func getPythonVersions() -> (python: String, pyverilog: String) {
+    // Test Yosys, Python
+    do {
+        let pythonVersion = try Python.attemptImport("platform").python_version()
+        let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
+        return (python: "\(pythonVersion)", pyverilog: "\(pyverilogVersion)")
+    } catch {
+        Stderr.print("\(error)")
+        exit(EX_UNAVAILABLE)
+    }
+}
+
+let _ = getPythonVersions() // Just to check
 
 
 func main(arguments: [String]) -> Int32 {
@@ -61,9 +81,15 @@ func main(arguments: [String]) -> Int32 {
     let filePath = StringOption(
         shortFlag: "o",
         longFlag: "output",
-        helpMessage: "Path to the output JSON & SVF files. (Default: input + .tv.json, input + .tv.svf)"
+        helpMessage: "Path to the output JSON file. (Default: input + .tv.json)"
     )
     cli.addOptions(filePath)
+
+    let svfFilePath = StringOption(
+        longFlag: "output-svf",
+        helpMessage: "Path to the output SVF file. (Default: input + .tv.svf)"
+    )
+    cli.addOptions(svfFilePath)
 
     let cellsOption = StringOption(
         shortFlag: "c",
@@ -171,7 +197,9 @@ func main(arguments: [String]) -> Int32 {
     }
 
     if version.value {
+        let versions = getPythonVersions()
         print("Fault \(VERSION). ©The American University in Cairo 2019-2022. All rights reserved.")
+        print("Using Python \(versions.python) and Pyverilog \(versions.pyverilog).")
         return EX_OK
     }
 
@@ -231,8 +259,8 @@ func main(arguments: [String]) -> Int32 {
         )
     }
 
-    let jsonOutput = "\(filePath.value ?? file).tv.json"
-    let svfOutput = "\(filePath.value  ?? file).tv.svf"
+    let jsonOutput = filePath.value ?? "\(file).tv.json"
+    let svfOutput = svfFilePath.value ?? "\(file).tv.svf"
     var ignoredInputs: Set<String>
         = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
     

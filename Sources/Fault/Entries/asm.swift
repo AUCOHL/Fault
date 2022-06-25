@@ -22,9 +22,17 @@ func assemble(arguments: [String]) -> Int32 {
     let filePath = StringOption(
         shortFlag: "o",
         longFlag: "output",
-        helpMessage: "Path to the output file. (Default: <json input> + .bin)"
+        helpMessage: "Path to the output vector file. (Default: <json input> + .vec.bin)"
     )
     cli.addOptions(filePath)
+
+
+    let goldenFilePath = StringOption(
+        shortFlag: "O",
+        longFlag: "goldenOutput",
+        helpMessage: "Path to the golden output file. (Default: <json input> + .out.bin)"
+    )
+    cli.addOptions(goldenFilePath)
 
     do {
         try cli.parse()
@@ -51,8 +59,8 @@ func assemble(arguments: [String]) -> Int32 {
     let json = jsonArgs[0]
     let netlist = vArgs[0]
 
-    let vectorOutput = (filePath.value ?? json) + ".vec.bin"
-    let goldenOutput = (filePath.value ?? json) + ".out.bin"
+    let vectorOutput = filePath.value ?? "\(json).vec.bin"
+    let goldenOutput = goldenFilePath.value ?? "\(json).out.bin"
 
     guard let jsonString = File.read(json) else {
         Stderr.print("Could not read file '\(json)'")
