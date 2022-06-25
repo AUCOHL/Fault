@@ -6,7 +6,7 @@ import Defile
 import OrderedDictionary
 import BigInt
 
-let VERSION = "APPIMAGE_TEST3"
+let VERSION = "0.5.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
