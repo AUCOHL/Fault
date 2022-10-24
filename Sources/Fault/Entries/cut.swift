@@ -16,7 +16,7 @@ func cut(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell names ,comma,speerated (Default: DFF)."
+        helpMessage: "Flip-flop cell names,comma,separated (Default: DFF)."
     )
     cli.addOptions(dffOpt)
 

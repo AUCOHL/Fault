@@ -13,14 +13,15 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Export Repo URL
         run: echo "REPO_URL=https://github.com/${{ github.repository }}" >> $GITHUB_ENV
       - name: Export Branch Name
         run: echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - name: Set default for env.NEW_TAG
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
+      - name: Write Hash
+        run: |
+          echo "GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
       - name: Build Image
         run: |
           docker build --target runner -t aucohl/fault:latest .
@@ -32,13 +33,18 @@ jobs:
         run: |
           python3 .github/scripts/generate_tag.py
       - name: Log in to the Container registry
-        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        if: ${{ env.BRANCH_NAME == 'main' }}
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Push to GHCR
+      - name: Push to GHCR (Commit)
+        if: ${{ env.BRANCH_NAME == 'main' }}
+        run: |
+          docker image tag aucohl/fault:latest ghcr.io/aucohl/fault:${{ env.GIT_COMMIT_HASH }}
+          docker push ghcr.io/aucohl/fault:${{ env.GIT_COMMIT_HASH }}
+      - name: Push to GHCR (Tag)
         if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
         run: |
           docker image tag aucohl/fault:latest ghcr.io/aucohl/fault:latest
