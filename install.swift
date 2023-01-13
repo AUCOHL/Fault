@@ -101,7 +101,7 @@ if action == .install {
     print("Installing Fault…")
 
     print("Compiling…")
-    let compilationResult = "swift build -c release \(coreCount)".shOutput()
+    let compilationResult = "swift build -c release -j \(coreCount)".shOutput()
     if compilationResult.terminationStatus != EX_OK {
         print("Compiling Fault failed.")
         print(compilationResult)
