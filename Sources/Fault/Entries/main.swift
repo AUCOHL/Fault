@@ -6,7 +6,7 @@ import Defile
 import OrderedDictionary
 import BigInt
 
-let VERSION = "0.5.1"
+let VERSION = "0.5.2"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -39,14 +39,20 @@ if yosysTest != EX_OK {
     exit(EX_UNAVAILABLE)
 }
 
-func getPythonVersions() -> (python: String, pyverilog: String) {
+let pythonVersions = ({ 
     // Test Yosys, Python
     do {
         let pythonVersion = try Python.attemptImport("platform").python_version()
-
-        if let pythonpath = env["PYTHONPATH"] {
-            let sys = Python.import("sys")
-            sys.path.append(pythonpath)
+        let sys = Python.import("sys")
+        if let pythonPath = env["PYTHONPATH"] {
+            sys.path.append(pythonPath)
+        } else {
+            let pythonPathProcess = "python3 -c \"import sys; print(':'.join(sys.path), end='')\"".shOutput()
+            let pythonPath = pythonPathProcess.output
+            let pythonPathComponents = pythonPath.components(separatedBy: ":")
+            for component in pythonPathComponents {
+                sys.path.append(component)
+            }
         }
         
         let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
@@ -55,9 +61,7 @@ func getPythonVersions() -> (python: String, pyverilog: String) {
         Stderr.print("\(error)")
         exit(EX_UNAVAILABLE)
     }
-}
-
-let _ = getPythonVersions() // Just to check
+}) () // Just to check
 
 
 func main(arguments: [String]) -> Int32 {
@@ -203,9 +207,8 @@ func main(arguments: [String]) -> Int32 {
     }
 
     if version.value {
-        let versions = getPythonVersions()
         print("Fault \(VERSION). ©The American University in Cairo 2019-2022. All rights reserved.")
-        print("Using Python \(versions.python) and Pyverilog \(versions.pyverilog).")
+        print("Using Python \(pythonVersions.python) and Pyverilog \(pythonVersions.pyverilog).")
         return EX_OK
     }
 

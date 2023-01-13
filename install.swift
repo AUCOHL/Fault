@@ -138,7 +138,6 @@ if action == .install {
     let venvLibPath = "\(venvPath)/lib"
     let venvLibVersions = try! fileManager.contentsOfDirectory(atPath: venvLibPath)
     let venvLibVersion = "\(venvLibPath)/\(venvLibVersions[0])/site-packages"
-    
 
     let libPythonProcess = "\(venvPath)/bin/find_libpython".shOutput()
     if libPythonProcess.terminationStatus != EX_OK {

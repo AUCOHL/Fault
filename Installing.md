@@ -52,7 +52,7 @@ To uninstall this, you can simply invoke `fault uninstall`.
 
 ## Without installation
 ### Building
-With everything set up properly, run `swift build -c release` from the root of the repository. That'll be it: You can find the binary under `.build/release/Fault`, but you can also run it simply by typing `swift run Fault`.
+With everything set up properly, run `swift build -c release` from the root of the repository. That'll be it: You can find the binary under `.build/release/Fault`.
 
 ### Notes
-Both `fault uninstall` and `fault -V` will not function. Please note you will need to install all the dependencies anyway.
+Both `fault uninstall` and `fault -V` will not function. Please note you will need to install all the binary dependencies: IcarusVerilog, Yosys, etc.
