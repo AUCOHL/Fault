@@ -2,7 +2,7 @@
 * Git
 * Clang 12.0+
 * Swift 5.2+
-* Python 3.6+ with PIP
+* Python 3.6+ with PIP, venv
 * Yosys 0.9+
     * 0.22+ recommended
 * Icarus Verilog 10.2+
@@ -32,18 +32,12 @@ Ubuntu 20.04 or higher is required.
 
 Using apt:
 
-`sudo apt-get install git clang python3 python3-dev yosys iverilog`
+`sudo apt-get install git clang python3 python3-dev python3-pip python3-venv yosys iverilog`
 
 Then install the Swift programming language: instructions are on [swift.org](https://swift.org/download/#using-downloads).
 
-## Both
-You'll need Pyverilog: In the root of the repository, type:
-
-```sh
-python3 -m pip install -r ./requirements.txt
-```
-
-You can optionally install Atalanta and PODEM if you want to use them for test vector generation. Please note they fall under proprietary licenses and are not open-source.
+### Atalanta/PODEM (Optional)
+You can optionally install Atalanta and PODEM if you want to use them for test vector generation. Please note they fall under proprietary licenses.
 
 ```bash
 EXEC_PREFIX=</usr/local/bin> sudo $(which swift) ./atalanta_podem_build.swift

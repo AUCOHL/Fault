@@ -120,8 +120,38 @@ if action == .install {
         exit(EX_CANTCREAT)
     }
 
+    let venvPath = "\(path)/FaultInstall/venv"
+    
+    let venvCreate = "python3 -m venv '\(venvPath)'".shOutput()
+    if venvCreate.terminationStatus != EX_OK {
+        print("Could not create Python virtual environment.")
+        exit(EX_CANTCREAT)
+    }
+    
+    let pipInstall = "'\(venvPath)/bin/python3' -m pip install -r ./requirements.txt".shOutput()
+    if pipInstall.terminationStatus != EX_OK {
+        print("Could not install Python dependencies.")
+        exit(EX_UNAVAILABLE)
+    }
+
+    let fileManager = FileManager()
+    let venvLibPath = "\(venvPath)/lib"
+    let venvLibVersions = try! fileManager.contentsOfDirectory(atPath: venvLibPath)
+    let venvLibVersion = "\(venvLibPath)/\(venvLibVersions[0])/site-packages"
+    
+
+    let libPythonProcess = "\(venvPath)/bin/find_libpython".shOutput()
+    if libPythonProcess.terminationStatus != EX_OK {
+        print("Failed to extract Python library.")
+        exit(EX_UNAVAILABLE)
+    }
+
+    let libPython = libPythonProcess.output
+
+
     let launchScript = """
-    #!/bin/sh
+    #!/bin/bash
+    set -e
 
     export FAULT_INSTALL_PATH="\(path)"
     export FAULT_INSTALL="$FAULT_INSTALL_PATH/FaultInstall"
@@ -146,7 +176,8 @@ if action == .install {
         echo "Done."
         exit 0
     fi
-
+    export PYTHONPATH=\(venvLibVersion)
+    export PYTHON_LIBRARY=\(libPython)
     "$FAULT_INSTALL/fault" $@
     rm -f parser.out parsetab.py
     rm -rf __pycache__
@@ -155,7 +186,7 @@ if action == .install {
     let _ = "echo '\(launchScript)' > '\(path)/fault'".shOutput().terminationStatus
     let _ = "chmod +x '\(path)/fault'".shOutput().terminationStatus
 
-    let _ = "cp .build/debug/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
+    let _ = "cp .build/release/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
 
     print("Installed.")
 }

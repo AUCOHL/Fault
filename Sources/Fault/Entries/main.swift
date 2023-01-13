@@ -43,6 +43,12 @@ func getPythonVersions() -> (python: String, pyverilog: String) {
     // Test Yosys, Python
     do {
         let pythonVersion = try Python.attemptImport("platform").python_version()
+
+        if let pythonpath = env["PYTHONPATH"] {
+            let sys = Python.import("sys")
+            sys.path.append(pythonpath)
+        }
+        
         let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
         return (python: "\(pythonVersion)", pyverilog: "\(pyverilogVersion)")
     } catch {
