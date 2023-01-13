@@ -41,6 +41,7 @@ if yosysTest != EX_OK {
 
 let pythonVersions = ({ 
     // Test Yosys, Python
+    () -> (python: String, pyverilog: String) in
     do {
         let pythonVersion = try Python.attemptImport("platform").python_version()
         let sys = Python.import("sys")
