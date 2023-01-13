@@ -12,7 +12,7 @@ If you don't feel like using (or can't use) Docker, you can try [Installing.md](
 # Running
 ## Subcommands
 ### synth
-Synth is a synthesis script included with Fault that generates both a netlist and a cut-away version.
+Synth is a synthesis script included with Fault that generates a netlist. You may elect to use your own synthesis script, but this is provided for your convenience.
 
 To run it, `fault synth --top <your-top-module> --liberty <your-liberty-file> <your-file>`. 
 
@@ -26,7 +26,7 @@ This exposes the D-flipflops as ports for use with the main script.
 For more options, you can invoke `fault cut --help`.
 
 ### main
-`fault --cellModel <your-cell-models> <your-file>`.
+`fault --clock <clockName> --cellModel <your-cell-models> <your-file>`.
 
 A set of assumptions are made about the input file:
 * It is a netlist

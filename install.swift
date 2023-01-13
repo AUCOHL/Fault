@@ -47,6 +47,9 @@ if CommandLine.arguments.count > 1 {
     exit(EX_USAGE)
 }
 
+let processInfo = ProcessInfo()
+let coreCount = processInfo.activeProcessorCount
+
 if action == .install {
     print("Checking dependencies…")
 
@@ -98,7 +101,7 @@ if action == .install {
     print("Installing Fault…")
 
     print("Compiling…")
-    let compilationResult = "swift build".shOutput()
+    let compilationResult = "swift build -c release \(coreCount)".shOutput()
     if compilationResult.terminationStatus != EX_OK {
         print("Compiling Fault failed.")
         print(compilationResult)
