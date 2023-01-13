@@ -10,6 +10,7 @@ Netlists
 /podem*/
 /Testbench*/
 /DerivedData
+/venv
 
 *.out
 *.vcd

@@ -1,11 +1,38 @@
 import XCTest
 import class Foundation.Bundle
 
+var env = ProcessInfo.processInfo.environment
+
 extension Process {
   func startAndBlock() throws {
     try self.launch()
     self.waitUntilExit()
   }
+}
+
+extension String {
+    func shOutput() -> (terminationStatus: Int32, output: String) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        task.arguments = ["sh", "-c", self]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+
+        do {
+            try task.run()
+        } catch {
+            print("Could not launch task `\(self)': \(error)")
+            exit(EX_UNAVAILABLE)
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+        let output = String(data: data, encoding: .utf8)
+
+        return (terminationStatus: task.terminationStatus, output: output!)
+    }
 }
 
 final class FaultTests: XCTestCase {
@@ -14,11 +41,28 @@ final class FaultTests: XCTestCase {
             return
         }
 
+        // Dependencies
+        let venvPath = "\(env["PWD"]!)/venv"
+
+        let venv = "python3 -m venv \(venvPath)".shOutput()
+        XCTAssertEqual(venv.terminationStatus, 0)
+
+        let reqs = "./venv/bin/python3 -m pip install -r ./requirements.txt".shOutput()
+        XCTAssertEqual(reqs.terminationStatus, 0)
+
+        let fileManager = FileManager()
+        let venvLibPath = "\(venvPath)/lib"
+        let venvLibVersions = try! fileManager.contentsOfDirectory(atPath: venvLibPath)
+        let venvLibVersion = "\(venvLibPath)/\(venvLibVersions[0])/site-packages"
+
+        // Fault Tests
         let binary = productsDirectory.appendingPathComponent("Fault")
 
         let newProcess = { ()-> Process in
           let new = Process()
           new.executableURL = binary
+          new.environment = ProcessInfo.processInfo.environment
+          new.environment!["PYTHONPATH"] = venvLibVersion
           return new
         }
 
