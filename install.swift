@@ -32,6 +32,28 @@ extension String {
 
         return (terminationStatus: task.terminationStatus, output: output!)
     }
+
+    func sh(silent: Bool = false) -> Int32 {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        task.arguments = ["sh", "-c", self]
+
+        if (silent) {
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+        }
+
+        do {
+            try task.run()
+        } catch {
+            print("Could not launch task `\(self)': \(error)")
+            exit(EX_UNAVAILABLE)
+        }
+
+        task.waitUntilExit()
+
+        return task.terminationStatus
+    }
 }
 
 enum Action {
@@ -47,20 +69,31 @@ if CommandLine.arguments.count > 1 {
     exit(EX_USAGE)
 }
 
-let processInfo = ProcessInfo()
-let coreCount = processInfo.activeProcessorCount
+let coreCount = ProcessInfo.processInfo.activeProcessorCount
 
 if action == .install {
     print("Checking dependencies…")
 
+    let python3 = "python3 -V".shOutput()
+    if python3.terminationStatus != EX_OK {
+        print("python3 not found in PATH. The setup will fail.")
+        exit(EX_UNAVAILABLE)
+    } else {
+        let components = python3.output.components(separatedBy: " ")
+        if components[1].compare("3.6", options: .numeric) == .orderedAscending {
+            print("Warning: Python 3 may be out of date. (Recommended ver: 3.6+)")
+        }
+    }
+
+
     let ivlPath = "[ -d '\(iverilogBase)' ]".shOutput()
     if ivlPath.terminationStatus != EX_OK {
-        print("Warning: The directory \(iverilogBase) was not found.")
+        print("Warning: The directory \(iverilogBase) was not found. You may need to export the environment variable 'FAULT_IVL_BASE' when using Fault.")
     }
 
     let iverilog = "'\(iverilogExecutable)' -B '\(iverilogBase)' -V".shOutput()
     if iverilog.terminationStatus != EX_OK {
-        print("Warning: Icarus Verilog does not seem to be installed.")
+        print("Warning: Cannot detect an installation of Icarus Verilog. 'iverilog' will need to be in PATH when using Fault.")
     } else {
         let components = iverilog.output.components(separatedBy: " ")
         if components[3].compare("10.2", options: .numeric) == .orderedAscending {
@@ -68,19 +101,9 @@ if action == .install {
         }
     }
 
-    let python3 = "python3 -V".shOutput()
-    if python3.terminationStatus != EX_OK {
-        print("Warning: Python 3 does not seem to be installed.")
-    } else {
-        let components = python3.output.components(separatedBy: " ")
-        if components[1].compare("3.6", options: .numeric) == .orderedAscending {
-            print("Warning: Python 3 may be out of date. (Recommended ver: 3.6)")
-        }
-    }
-
     let yosys = "'\(yosysExecutable)' -V".shOutput()
     if yosys.terminationStatus != EX_OK {
-        print("Warning: Yosys does not seem to be installed.")
+        print("Warning: Yosys does not seem to be installed. 'yosys' will need to be in PATH when using Fault.")
     } else {
         let components = yosys.output.components(separatedBy: " ")
         if components[1].compare("0.7", options: .numeric) == .orderedAscending {
@@ -90,51 +113,53 @@ if action == .install {
 
     let atalanta = "'\(atalantaExecutable)'".shOutput()
     if atalanta.terminationStatus != EX_OK {
-        print("Warning: Atalanta does not seem to be installed.")
+        print("Optional component atalanta does not seem to be installed.")
     }
 
     let podem = "'\(podemExecutable)'".shOutput()
     if podem.terminationStatus != EX_OK {
-        print("Warning: PODEM does not seem to be installed.")
+        print("Optional component podem does not seem to be installed.")
     }
     
     print("Installing Fault…")
 
+    let fileManager = FileManager()
+
     print("Compiling…")
-    let compilationResult = "swift build -c release -j \(coreCount)".shOutput()
-    if compilationResult.terminationStatus != EX_OK {
-        print("Compiling Fault failed.")
-        print(compilationResult)
+    let compilationResult = "swift build -c release -j \(coreCount)".sh()
+    if compilationResult != EX_OK {
+        print("Compiling Fault failed with exit code \(compilationResult).")
         exit(EX_DATAERR)
     }
 
-    let folder = "mkdir -p '\(path)'".shOutput()
-    if folder.terminationStatus != EX_OK {
-        print("Could not create folder.")
+    do {
+        try fileManager.createDirectory(atPath: path, withIntermediateDirectories: true)
+    } catch {
+        print("Could not create folder '\(path)'")
         exit(EX_CANTCREAT)
     }
 
-    let internalFolder = "mkdir -p '\(path)/FaultInstall'".shOutput()
-    if internalFolder.terminationStatus != EX_OK {
-        print("Could not create folder.")
+    do {
+        try fileManager.createDirectory(atPath: "\(path)/FaultInstall", withIntermediateDirectories: true)
+    } catch {
+        print("Could not create folder '\(path)'")
         exit(EX_CANTCREAT)
     }
 
     let venvPath = "\(path)/FaultInstall/venv"
     
-    let venvCreate = "python3 -m venv '\(venvPath)'".shOutput()
-    if venvCreate.terminationStatus != EX_OK {
-        print("Could not create Python virtual environment.")
+    let venvCreate = "python3 -m venv '\(venvPath)'".sh()
+    if venvCreate != EX_OK {
+        print("Could not create Python virtual environment: process failed with exit code \(venvCreate).")
         exit(EX_CANTCREAT)
     }
     
-    let pipInstall = "'\(venvPath)/bin/python3' -m pip install -r ./requirements.txt".shOutput()
-    if pipInstall.terminationStatus != EX_OK {
-        print("Could not install Python dependencies.")
+    let pipInstall = "'\(venvPath)/bin/python3' -m pip install -r ./requirements.txt".sh()
+    if pipInstall != EX_OK {
+        print("Could not install Python dependencies: process failed with exit code \(pipInstall).")
         exit(EX_UNAVAILABLE)
     }
 
-    let fileManager = FileManager()
     let venvLibPath = "\(venvPath)/lib"
     let venvLibVersions = try! fileManager.contentsOfDirectory(atPath: venvLibPath)
     let venvLibVersion = "\(venvLibPath)/\(venvLibVersions[0])/site-packages"
@@ -182,10 +207,26 @@ if action == .install {
     rm -rf __pycache__
     """
 
-    let _ = "echo '\(launchScript)' > '\(path)/fault'".shOutput().terminationStatus
-    let _ = "chmod +x '\(path)/fault'".shOutput().terminationStatus
+    let faultScriptPath = "\(path)/fault"
+    if !fileManager.createFile(
+        atPath: faultScriptPath,
+        contents: launchScript.data(using: .utf8),
+        attributes: [.posixPermissions: 0o755]
+    ) {
+        print("Failed to create Fault launch script at \(faultScriptPath).")
+        exit(EX_CANTCREAT)
+    }
 
-    let _ = "cp .build/release/Fault '\(path)/FaultInstall/fault'".shOutput().terminationStatus
+    let faultBinaryPath = "\(path)/FaultInstall/fault"
+    do {
+        try fileManager.copyItem(
+            atPath: ".build/release/Fault",
+            toPath: faultBinaryPath
+        )
+    } catch {
+        print("Failed to copy Fault binary to \(faultBinaryPath).")
+        exit(EX_CANTCREAT)
+    }
 
     print("Installed.")
 }
