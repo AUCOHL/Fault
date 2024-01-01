@@ -131,7 +131,7 @@ func cut(arguments: [String]) -> Int32 {
         Stderr.print("No module found.")
         exit(EX_DATAERR)
     }
-    
+
     var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
     if let sclConfigPath = sclConfigOpt.value {
         guard let sclConfigYML = File.read(sclConfigPath) else {

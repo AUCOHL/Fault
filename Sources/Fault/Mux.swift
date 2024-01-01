@@ -57,7 +57,7 @@ class MuxCreator {
                 "keep"
             )
         )
-        
+
         // Hook
         var hook = outputWire
         if muxInfo.invertedOutput {
