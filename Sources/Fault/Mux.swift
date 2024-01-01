@@ -52,12 +52,19 @@ class MuxCreator {
             Python.tuple(),
             Python.tuple([instance])
         )
+        let pragma = Node.Pragma(
+            Node.PragmaEntry(
+                "keep"
+            )
+        )
+        
         // Hook
         var hook = outputWire
         if muxInfo.invertedOutput {
             hook = Node.Unot(hook)
         }
         return ([
+            pragma,
             instanceDecl,
         ], [
             outputWireDecl,

@@ -74,7 +74,8 @@ enum Synthesis {
         # cleanup
         opt_clean -purge
 
-        write_verilog -noattr -noexpr \(output)
+        write_verilog -noexpr \(output).attrs.v
+        write_verilog -noexpr -noattr \(output)
         """
     }
 }
