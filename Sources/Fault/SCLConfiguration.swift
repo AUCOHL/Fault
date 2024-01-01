@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import PythonKit
 
 class DFFMatch: Codable, CustomStringConvertible {
     var name: String
@@ -28,6 +29,17 @@ class DFFMatch: Codable, CustomStringConvertible {
     var description: String {
         "<DFFMatch \(name): @\(clk) \(d) -> \(q)>"
     }
+}
+
+func getMatchingDFFInfo(from list: [DFFMatch], for cell: String, fnmatch: PythonObject) -> DFFMatch? {
+    for dffinfo in list {
+        for name in dffinfo.name.components(separatedBy: ",") {
+            if Bool(fnmatch.fnmatch(cell, name))! {
+                return dffinfo
+            }
+        }
+    }
+    return nil
 }
 
 class MuxInfo: Codable {

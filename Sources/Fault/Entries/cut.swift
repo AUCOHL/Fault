@@ -16,6 +16,7 @@ import CommandLineKit
 import Defile
 import Foundation
 import PythonKit
+import Yams
 
 func cut(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -30,20 +31,27 @@ func cut(arguments: [String]) -> Int32 {
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell names,comma,separated (Default: DFF)."
+        helpMessage: "Override for flip-flop cell names. Comma-delimited. (Default: DFF)."
     )
     cli.addOptions(dffOpt)
 
+    let sclConfigOpt = StringOption(
+        shortFlag: "s",
+        longFlag: "sclConfig",
+        helpMessage: "Path for the YAML SCL config file. Recommended."
+    )
+    cli.addOptions(sclConfigOpt)
+
     let blackbox = StringOption(
         longFlag: "blackbox",
-        helpMessage: "Blackbox module definitions (.v) seperated by commas. (Default: none)"
+        helpMessage: "Blackbox module definitions (.v). Comma-delimited. (Default: none)"
     )
     cli.addOptions(blackbox)
 
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Hard module inputs to ignore when cutting seperated by commas. (Default: none)"
+        helpMessage: "Module inputs to ignore when cutting. Comma-delimited. (Default: none)"
     )
     cli.addOptions(ignored)
 
@@ -80,9 +88,6 @@ func cut(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
-
-    let dffNames
-        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter { $0 != "" } ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
 
     let output = filePath.value ?? "\(file).cut.v"
 
@@ -126,6 +131,24 @@ func cut(arguments: [String]) -> Int32 {
         Stderr.print("No module found.")
         exit(EX_DATAERR)
     }
+    
+    var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
+    if let sclConfigPath = sclConfigOpt.value {
+        guard let sclConfigYML = File.read(sclConfigPath) else {
+            Stderr.print("File not found: \(sclConfigPath)")
+            return EX_NOINPUT
+        }
+        let decoder = YAMLDecoder()
+        do {
+            sclConfig = try decoder.decode(SCLConfiguration.self, from: sclConfigYML)
+        } catch {
+            Stderr.print("Invalid YAML file \(sclConfigPath):  \(error).")
+            return EX_DATAERR
+        }
+    }
+    if let dffOverride = dffOpt.value {
+        sclConfig.dffMatches.last!.name = dffOverride
+    }
 
     let hardIgnoredInputs
         = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
@@ -135,6 +158,8 @@ func cut(arguments: [String]) -> Int32 {
         var declarations: [PythonObject] = []
         var items: [PythonObject] = []
 
+        let fnmatch = Python.import("fnmatch")
+
         for item in definition.items {
             var include = true
 
@@ -142,12 +167,12 @@ func cut(arguments: [String]) -> Int32 {
             // Process gates
             if type == "InstanceList" {
                 let instance = item.instances[0]
-                let instanceName = String(describing: instance.module)
-                if dffNames.contains(instanceName) {
-                    let instanceName = String(describing: instance.name)
-                    let outputName = "\\" + instanceName + ".q"
+                let moduleName = String(describing: instance.module)
+                if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
+                    let moduleName = String(describing: instance.name)
+                    let outputName = "\\" + moduleName + ".q"
 
-                    let inputIdentifier = Node.Identifier(instanceName)
+                    let inputIdentifier = Node.Identifier(moduleName)
                     let outputIdentifier = Node.Identifier(outputName)
 
                     include = false
@@ -155,25 +180,25 @@ func cut(arguments: [String]) -> Int32 {
                     var qArg: PythonObject?
 
                     for hook in instance.portlist {
-                        if hook.portname == "D" {
+                        if String(describing: hook.portname) == dffinfo.d {
                             dArg = hook.argname
                         }
-                        if hook.portname == "Q" {
+                        if String(describing: hook.portname) == dffinfo.q {
                             qArg = hook.argname
                         }
                     }
 
                     guard let d = dArg, let q = qArg else {
                         Stderr.print(
-                            "Cell \(instanceName) missing either a 'D' or 'Q' port."
+                            "Cell \(moduleName) missing either a 'D' or 'Q' port."
                         )
                         return EX_DATAERR
                     }
 
-                    ports.append(Node.Port(instanceName, Python.None, Python.None, Python.None))
+                    ports.append(Node.Port(moduleName, Python.None, Python.None, Python.None))
                     ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
 
-                    declarations.append(Node.Input(instanceName))
+                    declarations.append(Node.Input(moduleName))
                     declarations.append(Node.Output(outputName))
 
                     let inputAssignment = Node.Assign(
@@ -188,7 +213,7 @@ func cut(arguments: [String]) -> Int32 {
                     items.append(inputAssignment)
                     items.append(outputAssignment)
 
-                } else if let blakcboxName = isolatedName, blakcboxName == instanceName {
+                } else if let blakcboxName = isolatedName, blakcboxName == moduleName {
                     include = false
 
                     guard let isolatedDefinition = isolatedOptional else {
@@ -211,14 +236,14 @@ func cut(arguments: [String]) -> Int32 {
                                 var statement: PythonObject
                                 var assignStatement: PythonObject
                                 if input {
-                                    name = "\\" + instanceName + "_\(portName)_\(i).q"
+                                    name = "\\" + moduleName + "_\(portName)_\(i).q"
                                     statement = Node.Output(name)
                                     assignStatement = Node.Assign(
                                         Node.Lvalue(Node.Identifier(name)),
                                         Node.Rvalue(element)
                                     )
                                 } else {
-                                    name = instanceName + "_\(portName)_\(i)"
+                                    name = moduleName + "_\(portName)_\(i)"
                                     statement = Node.Input(name)
                                     assignStatement = Node.Assign(
                                         Node.Lvalue(element),
@@ -239,14 +264,14 @@ func cut(arguments: [String]) -> Int32 {
                             var statement: PythonObject
                             var assignStatement: PythonObject
                             if input {
-                                name = "\\" + instanceName + "_\(portName).q"
+                                name = "\\" + moduleName + "_\(portName).q"
                                 statement = Node.Output(name)
                                 assignStatement = Node.Assign(
                                     Node.Lvalue(Node.Identifier(name)),
                                     Node.Rvalue(hook.argname)
                                 )
                             } else {
-                                name = instanceName + ".\(portName)"
+                                name = moduleName + ".\(portName)"
                                 statement = Node.Input(name)
                                 assignStatement = Node.Assign(
                                     Node.Lvalue(hook.argname),
@@ -267,7 +292,7 @@ func cut(arguments: [String]) -> Int32 {
         }
 
         if declarations.count == 0 {
-            print("[Warning]: Failed to detect flip-flop cells named: \(dffNames).")
+            print("[Warning]: Failed to detect any flip-flop cells.")
         }
 
         definition.portlist.ports = ports

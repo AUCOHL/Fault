@@ -18,17 +18,6 @@ import Foundation
 import PythonKit
 import Yams
 
-func getMatchingDFFInfo(from list: [DFFMatch], for cell: String, fnmatch: PythonObject) -> DFFMatch? {
-    for dffinfo in list {
-        for name in dffinfo.name.components(separatedBy: ",") {
-            if Bool(fnmatch.fnmatch(cell, name))! {
-                return dffinfo
-            }
-        }
-    }
-    return nil
-}
-
 func scanChainCreate(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
@@ -49,7 +38,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Inputs,to,ignore,separated,by,commas."
+        helpMessage: "Inputs to ignore. Comma-delimited."
     )
     cli.addOptions(ignored)
 
@@ -68,13 +57,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let clockInv = StringOption(
         longFlag: "invClock",
-        helpMessage: "Inverter clk tree source cell name (Default: none)"
+        helpMessage: "Inverter clk tree source cell name. (Default: none)"
     )
     cli.addOptions(clockInv)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        helpMessage: "Reset signal to add to --ignoring and use in simulation.  (Required.)"
+        helpMessage: "Reset signal to add to --ignoring and use in simulation. (Required.)"
     )
     cli.addOptions(resetOpt)
 
@@ -94,14 +83,14 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let sclConfigOpt = StringOption(
         shortFlag: "s",
         longFlag: "sclConfig",
-        helpMessage: "Name for the YAML SCL config file. Recommended."
+        helpMessage: "Path for the YAML SCL config file. Recommended."
     )
     cli.addOptions(sclConfigOpt)
 
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Optional override for the DFF names from the PDK config."
+        helpMessage: "Optional override for the DFF names from the PDK config. Comma-delimited. "
     )
     cli.addOptions(dffOpt)
 
@@ -113,7 +102,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let defs = StringOption(
         longFlag: "define",
-        helpMessage: "define statements to include during simulations. (Default: none)"
+        helpMessage: "define statements to include during simulations.  Comma-delimited. (Default: none)"
     )
     cli.addOptions(defs)
 
