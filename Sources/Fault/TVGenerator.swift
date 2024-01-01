@@ -1,13 +1,27 @@
-import Foundation 
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import BigInt
 import Defile
+import Foundation
 
 protocol ExternalTestVectorGenerator {
     init()
     func generate(file: String, module: String) -> ([TestVector], [Port])
 }
 
-class ETVGFactory {
+enum ETVGFactory {
     private static var registry: [String: ExternalTestVectorGenerator.Type] = [:]
 
     static func register<T: ExternalTestVectorGenerator>(name: String, type: T.Type) -> Bool {
@@ -23,7 +37,7 @@ class ETVGFactory {
     }
 
     static var validNames: [String] {
-        return [String](registry.keys)
+        [String](registry.keys)
     }
 }
 
@@ -31,13 +45,12 @@ class Atalanta: ExternalTestVectorGenerator {
     required init() {}
 
     func generate(file: String, module: String) -> ([TestVector], [Port]) {
-        
         let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
         defer {
-           let _ = "rm -rf '\(folderName)'".sh()
+            let _ = "rm -rf '\(folderName)'".sh()
         }
 
         let output = "\(folderName)/\(module).test"
@@ -46,7 +59,7 @@ class Atalanta: ExternalTestVectorGenerator {
         if atalanta != EX_OK {
             exit(atalanta)
         }
-        
+
         do {
             let (testvectors, inputs) = try TVSet.readFromTest(file: output)
             return (vectors: testvectors, inputs: inputs)
@@ -68,7 +81,7 @@ class PODEM: ExternalTestVectorGenerator {
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
         let _ = "mkdir -p '\(folderName)'".sh()
         defer {
-           let _ = "rm -rf '\(folderName)'".sh()
+            let _ = "rm -rf '\(folderName)'".sh()
         }
 
         let output = "\(folderName)/\(module).out"
@@ -77,7 +90,7 @@ class PODEM: ExternalTestVectorGenerator {
         if podem != EX_OK {
             exit(podem)
         }
-         do {
+        do {
             let (testvectors, inputs) = try TVSet.readFromText(file: output)
             return (vectors: testvectors, inputs: inputs)
         } catch {
@@ -90,19 +103,19 @@ class PODEM: ExternalTestVectorGenerator {
 }
 
 // MARK: Random Generators
+
 class SwiftRNG: URNG {
     required init() {}
 
     func generate(bits: Int) -> BigUInt {
-        return BigUInt.randomInteger(withMaximumWidth: bits)
+        BigUInt.randomInteger(withMaximumWidth: bits)
     }
 
     static let registered = URNGFactory.register(name: "swift", type: SwiftRNG.self)
 }
 
-
 class LFSR: URNG {
-    static let taps: [UInt: Array<UInt>] = [
+    static let taps: [UInt: [UInt]] = [
         // nbits : Feedback Polynomial
         2: [2, 1],
         3: [3, 2],
@@ -135,23 +148,23 @@ class LFSR: URNG {
         30: [30, 6, 4, 1],
         31: [31, 28],
         32: [32, 30, 26, 25],
-        64: [64, 63, 61, 60]  
-    ];
+        64: [64, 63, 61, 60],
+    ]
 
     var seed: UInt
     var polynomialHex: UInt
-    let nbits: UInt 
-    
-    required init(nbits: UInt = 64) {     
-        let max: UInt = (nbits == 64) ? UInt(pow(Double(2),Double(63))-1) : (1 << nbits) - 1  
-        let polynomial =  LFSR.taps[nbits]!
+    let nbits: UInt
 
-        self.seed = UInt.random(in: 1...max)
+    required init(nbits: UInt = 64) {
+        let max: UInt = (nbits == 64) ? UInt(pow(Double(2), Double(63)) - 1) : (1 << nbits) - 1
+        let polynomial = LFSR.taps[nbits]!
+
+        seed = UInt.random(in: 1 ... max)
         self.nbits = nbits
-        self.polynomialHex = 0
+        polynomialHex = 0
 
         for tap in polynomial {
-             self.polynomialHex = self.polynomialHex | (1 << (nbits-tap));
+            polynomialHex = polynomialHex | (1 << (nbits - tap))
         }
     }
 
@@ -163,16 +176,16 @@ class LFSR: URNG {
         var parityVal: UInt = 0
         var numberTemp = number
         while numberTemp != 0 {
-            parityVal ^= 1 
+            parityVal ^= 1
             numberTemp = numberTemp & (numberTemp - 1)
         }
         return parityVal
     }
 
     func rand() -> UInt {
-        let feedbackBit: UInt = LFSR.parity(number: self.seed & self.polynomialHex)
-        self.seed = (self.seed >> 1) | (feedbackBit << (self.nbits - 1))
-        return self.seed
+        let feedbackBit: UInt = LFSR.parity(number: seed & polynomialHex)
+        seed = (seed >> 1) | (feedbackBit << (nbits - 1))
+        return seed
     }
 
     func generate(bits: Int) -> BigUInt {

@@ -1,12 +1,26 @@
-import Foundation
-import CoreFoundation // Not automatically imported on Linux
-import CommandLineKit
-import PythonKit
-import Defile
-import OrderedDictionary
-import BigInt
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-let VERSION = "0.5.2"
+import BigInt
+import CommandLineKit
+import CoreFoundation // Not automatically imported on Linux
+import Defile
+import Foundation
+import OrderedDictionary
+import PythonKit
+
+let VERSION = "0.6.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -14,13 +28,13 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 
-let _ = [ // Register all RNGs
+_ = [ // Register all RNGs
     SwiftRNG.registered,
-    LFSR.registered
+    LFSR.registered,
 ]
-let _ = [ // Register all TVGens
+_ = [ // Register all TVGens
     Atalanta.registered,
-    PODEM.registered
+    PODEM.registered,
 ]
 
 let subcommands: OrderedDictionary = [
@@ -30,7 +44,7 @@ let subcommands: OrderedDictionary = [
     "asm": (func: assemble, desc: "test vector assembly"),
     "compact": (func: compactTestVectors, desc: "test vector static compaction"),
     "tap": (func: jtagCreate, desc: "JTAG port insertion"),
-    "bench": (func: bench, desc: "verilog netlist to bench format conversion")
+    "bench": (func: bench, desc: "verilog netlist to bench format conversion"),
 ]
 
 let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
@@ -39,7 +53,7 @@ if yosysTest != EX_OK {
     exit(EX_UNAVAILABLE)
 }
 
-let pythonVersions = ({ 
+let pythonVersions = {
     // Test Yosys, Python
     () -> (python: String, pyverilog: String) in
     do {
@@ -55,18 +69,18 @@ let pythonVersions = ({
                 sys.path.append(component)
             }
         }
-        
+
         let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
         return (python: "\(pythonVersion)", pyverilog: "\(pyverilogVersion)")
     } catch {
         Stderr.print("\(error)")
         exit(EX_UNAVAILABLE)
     }
-}) () // Just to check
-
+}() // Just to check
 
 func main(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
+
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let defaultTVCount = "100"
@@ -135,7 +149,7 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "Ceiling for Test Vector increments: if this number is reached, no more increments will occur regardless the coverage. (Default: \(defaultCeiling).)"
     )
     cli.addOptions(ceiling)
-    
+
     let rng = StringOption(
         longFlag: "rng",
         helpMessage: "Type of the RNG used in Internal TV Generation: LFSR or swift. (Default: swift.)"
@@ -157,7 +171,7 @@ func main(arguments: [String]) -> Int32 {
     cli.addOptions(bench)
 
     let sampleRun = BoolOption(
-        longFlag: "sampleRun", 
+        longFlag: "sampleRun",
         helpMessage: "Generate only one testbench for inspection, do not delete it."
     )
     cli.addOptions(sampleRun)
@@ -168,7 +182,7 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
     )
     cli.addOptions(ignored)
-    
+
     let holdLow = BoolOption(
         longFlag: "holdLow",
         helpMessage: "Hold ignored inputs to low in the simulation instead of high. (Default: holdHigh)"
@@ -192,7 +206,7 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "define statements to include during simulations. (Default: none)"
     )
     cli.addOptions(defs)
-    
+
     let include = StringOption(
         longFlag: "inc",
         helpMessage: "Verilog files to include during simulations. (Default: none)"
@@ -227,14 +241,14 @@ func main(arguments: [String]) -> Int32 {
         Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
     }
-    
+
     let randomGenerator = rng.value ?? defaultRNG
 
     guard
         let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
-        Int(ceiling.value ?? defaultCeiling) != nil && URNGFactory.validNames.contains(randomGenerator) && ((tvGen.value == nil) == (bench.value == nil))
+        Int(ceiling.value ?? defaultCeiling) != nil, URNGFactory.validNames.contains(randomGenerator), (tvGen.value == nil) == (bench.value == nil)
     else {
         cli.printUsage()
         return EX_USAGE
@@ -251,19 +265,19 @@ func main(arguments: [String]) -> Int32 {
         Stderr.print("Option --clock is required.")
         Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
-    }    
+    }
 
     guard let cells = cellsOption.value else {
         Stderr.print("Option --cellModel is required.")
         Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
-    }    
+    }
 
     if !fileManager.fileExists(atPath: cells) {
         Stderr.print("Cell model file '\(cells)' not found.")
         return EX_NOINPUT
     }
-    if !cells.hasSuffix(".v") && !cells.hasSuffix(".sv") {
+    if !cells.hasSuffix(".v"), !cells.hasSuffix(".sv") {
         Stderr.print(
             "Warning: Cell model file provided does not end with .v or .sv."
         )
@@ -271,22 +285,22 @@ func main(arguments: [String]) -> Int32 {
 
     let jsonOutput = filePath.value ?? "\(file).tv.json"
     let svfOutput = svfFilePath.value ?? "\(file).tv.svf"
-    var ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    
+    var ignoredInputs
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+
     ignoredInputs.insert(clockName)
 
     let behavior
-        = Array<Simulator.Behavior>(
+        = [Simulator.Behavior](
             repeating: holdLow.value ? .holdLow : .holdHigh,
             count: ignoredInputs.count
         )
-    let defines: Set<String>
-        = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    let defines
+        = Set<String>(defs.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
-    let includeFiles: Set<String>
-        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    
+    let includeFiles
+        = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+
     var includeString = ""
     for file in includeFiles {
         if !fileManager.fileExists(atPath: file) {
@@ -297,11 +311,13 @@ func main(arguments: [String]) -> Int32 {
             `include "\(file)"
         """
     }
- 
+
     // MARK: Importing Python and Pyverilog
+
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     // MARK: Parsing and Processing
+
     let parseResult = parse([file])
     let ast = parseResult[0]
     let description = ast[dynamicMember: "description"]
@@ -323,7 +339,8 @@ func main(arguments: [String]) -> Int32 {
     print("Processing module \(definition.name)…")
 
     // MARK: TV Generation Mode Selection
-    var tvSetVectors:[TestVector] = []
+
+    var tvSetVectors: [TestVector] = []
     var tvSetInputs: [Port] = []
 
     if let tvSetTest = tvSet.value {
@@ -332,18 +349,18 @@ func main(arguments: [String]) -> Int32 {
             return EX_NOINPUT
         }
         do {
-            if tvSetTest.hasSuffix(".json"){
+            if tvSetTest.hasSuffix(".json") {
                 (tvSetVectors, tvSetInputs) = try TVSet.readFromJson(file: tvSetTest)
             } else {
                 (tvSetVectors, tvSetInputs) = try TVSet.readFromText(file: tvSetTest)
             }
-        } catch{
+        } catch {
             cli.printUsage()
             return EX_USAGE
         }
         print("Read \(tvSetVectors.count) vectors.")
     }
-    
+
     if let tvGenerator = tvGen.value, ETVGFactory.validNames.contains(tvGenerator) {
         let etvgen = ETVGFactory.get(name: tvGenerator)!
         let benchUnwrapped = bench.value! // Program exits if tvGen.value isn't nil and bench.value is or vice versa
@@ -366,14 +383,14 @@ func main(arguments: [String]) -> Int32 {
     let finalTvCeiling = Int(
         ceiling.value ?? (
             tvSetVectors.count == 0 ?
-            defaultCeiling:
-            String(tvSetVectors.count)
+                defaultCeiling :
+                String(tvSetVectors.count)
         )
     )!
 
     do {
         let (ports, inputs, outputs) = try Port.extract(from: definition)
-        
+
         if inputs.count == 0 {
             print("Module has no inputs.")
             return EX_OK
@@ -382,8 +399,9 @@ func main(arguments: [String]) -> Int32 {
             print("Module has no outputs.")
             return EX_OK
         }
-       
+
         // MARK: Discover fault points
+
         var faultPoints: Set<String> = []
         var gateCount = 0
         var inputsMinusIgnored: [Port] = []
@@ -397,7 +415,7 @@ func main(arguments: [String]) -> Int32 {
                 !ignoredInputs.contains($0.name)
             }
         }
-        
+
         for (_, port) in ports {
             if ignoredInputs.contains(port.name) {
                 continue
@@ -407,14 +425,14 @@ func main(arguments: [String]) -> Int32 {
             } else {
                 let minimum = min(port.from, port.to)
                 let maximum = max(port.from, port.to)
-                for i in minimum...maximum {
+                for i in minimum ... maximum {
                     faultPoints.insert("\(port.name)[\(i)]")
                 }
             }
         }
 
         var warnAboutDFF = false
-        
+
         for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
 
@@ -438,6 +456,7 @@ func main(arguments: [String]) -> Int32 {
         print("Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports.")
 
         // MARK: Simulation
+
         let startTime = CFAbsoluteTimeGetCurrent()
 
         print("Performing simulations…")
@@ -464,15 +483,15 @@ func main(arguments: [String]) -> Int32 {
             using: iverilogExecutable,
             with: vvpExecutable
         )
-        
+
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
         print("Simulations concluded: Coverage \(result.coverage * 100)%")
-        
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
-        
+
         let tvInfo = TVInfo(
             inputs: inputsMinusIgnored,
             outputs: outputs,
@@ -490,7 +509,7 @@ func main(arguments: [String]) -> Int32 {
         try File.open(jsonOutput, mode: .write) {
             try $0.print(string)
         }
-        
+
         try File.open(svfOutput, mode: .write) {
             try $0.print(svfString)
         }

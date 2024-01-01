@@ -1,7 +1,21 @@
-import Foundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
-import PythonKit
 import Defile
+import Foundation
+import PythonKit
 
 func jtagCreate(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -55,15 +69,15 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let testvectors = StringOption(
         shortFlag: "t",
         longFlag: "testVectors",
-        helpMessage:  ".bin file for test vectors."
+        helpMessage: ".bin file for test vectors."
     )
     cli.addOptions(testvectors)
 
     let goldenOutput = StringOption(
         shortFlag: "g",
         longFlag: "goldenOutput",
-        helpMessage: 
-            " .bin file for golden output."
+        helpMessage:
+        " .bin file for golden output."
     )
     cli.addOptions(goldenOutput)
 
@@ -110,7 +124,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ("tdi", "JTAG test data input"),
         ("tdo", "JTAG test data output"),
         ("tdo_paden_o", "TDO Enable pad (active low) "),
-        ("trst", "JTAG test reset (active low)")
+        ("trst", "JTAG test reset (active low)"),
     ] {
         let option = StringOption(
             longFlag: name,
@@ -119,7 +133,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         cli.addOptions(option)
         names[name] = (default: name, option: option)
     }
-    
+
     do {
         try cli.parse()
     } catch {
@@ -146,27 +160,26 @@ func jtagCreate(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
-    
-    let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)  
-    
+
+    let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)
+
     guard let clockName = clockOpt.value else {
         Stderr.print("Option --clock is required.")
         Stderr.print("Invoke fault jtag --help for more info.")
         return EX_USAGE
     }
-    
+
     guard let resetName = resetOpt.value else {
         Stderr.print("Option --reset is required.")
         Stderr.print("Invoke fault jtag --help for more info.")
         return EX_USAGE
     }
 
+    var ignoredInputs
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
-    var ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    
-    let defines: Set<String>
-        = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    let defines
+        = Set<String>(defs.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
@@ -181,7 +194,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         Stderr.print("Liberty file '\(libertyFile)' not found.")
         return EX_NOINPUT
     }
-    
+
     if !libertyFile.hasSuffix(".lib") {
         Stderr.print(
             "Warning: Liberty file provided does not end with .lib."
@@ -193,7 +206,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
-        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
+        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
             Stderr.print(
                 "Warning: Cell model file provided does not end with .v or .sv."
             )
@@ -216,9 +229,9 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
     }
 
-    let includeFiles: Set<String>
-        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    
+    let includeFiles
+        = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+
     var includeString = ""
     for file in includeFiles {
         if !fileManager.fileExists(atPath: file) {
@@ -229,11 +242,12 @@ func jtagCreate(arguments: [String]) -> Int32 {
             `include "\(file)"
         """
     }
- 
+
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
 
     // MARK: Importing Python and Pyverilog
+
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     let Node = Python.import("pyverilog.vparser.ast")
@@ -242,6 +256,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
 
     // MARK: Parse
+
     let ast = parse([args[0]])[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
@@ -258,7 +273,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         return EX_DATAERR
     }
 
-    let sinName = names["sin"]!.option.value 
+    let sinName = names["sin"]!.option.value
         ?? names["sin"]!.default
     let soutName = names["sout"]!.option.value
         ?? names["sout"]!.default
@@ -266,27 +281,28 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ?? names["shift"]!.default
     let testName = names["test"]!.option.value
         ?? names["test"]!.default
-    let tmsName = names["tms"]!.option.value 
+    let tmsName = names["tms"]!.option.value
         ?? names["tms"]!.default
-    let tdiName = names["tdi"]!.option.value 
+    let tdiName = names["tdi"]!.option.value
         ?? names["tdi"]!.default
-    let tdoName = names["tdo"]!.option.value 
+    let tdoName = names["tdo"]!.option.value
         ?? names["tdo"]!.default
-    let tdoenableName = names["tdo_paden_o"]!.option.value 
+    let tdoenableName = names["tdo_paden_o"]!.option.value
         ?? names["tdo_paden_o"]!.default
-    let tckName = names["tck"]!.option.value 
+    let tckName = names["tck"]!.option.value
         ?? names["tck"]!.default
-    let trstName = names["trst"]!.option.value 
+    let trstName = names["trst"]!.option.value
         ?? names["trst"]!.default
 
     // MARK: Internal signals
+
     print("Creating top module…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__DESIGN__UNDER__TEST__"
 
     do {
         let (_, inputs, outputs) = try Port.extract(from: definition)
-        definition.name = Python.str(alteredName);
+        definition.name = Python.str(alteredName)
         let ports = Python.list(definition.portlist.ports)
 
         let chainPorts: [String] = [
@@ -294,24 +310,30 @@ func jtagCreate(arguments: [String]) -> Int32 {
             soutName,
             shiftName,
             tckName,
-            testName
-        ] 
+            testName,
+        ]
         let topModulePorts = Python.list(ports.filter {
             !chainPorts.contains(String($0.name)!)
         })
 
         topModulePorts.append(Node.Port(
-            tmsName, Python.None, Python.None, Python.None))
+            tmsName, Python.None, Python.None, Python.None
+        ))
         topModulePorts.append(Node.Port(
-            tckName, Python.None, Python.None, Python.None))
+            tckName, Python.None, Python.None, Python.None
+        ))
         topModulePorts.append(Node.Port(
-            tdiName, Python.None, Python.None, Python.None))
+            tdiName, Python.None, Python.None, Python.None
+        ))
         topModulePorts.append(Node.Port(
-            tdoName, Python.None, Python.None, Python.None))
+            tdoName, Python.None, Python.None, Python.None
+        ))
         topModulePorts.append(Node.Port(
-            trstName, Python.None, Python.None, Python.None))
+            trstName, Python.None, Python.None, Python.None
+        ))
         topModulePorts.append(Node.Port(
-            tdoenableName, Python.None, Python.None, Python.None))
+            tdoenableName, Python.None, Python.None, Python.None
+        ))
 
         let statements = Python.list()
         statements.append(Node.Input(tmsName))
@@ -323,7 +345,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
         let portArguments = Python.list()
         for input in inputs {
-            if(!chainPorts.contains(input.name)){
+            if !chainPorts.contains(input.name) {
                 let inputStatement = Node.Input(input.name)
                 portArguments.append(Node.PortArg(
                     input.name,
@@ -337,8 +359,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     inputStatement.width = width
                 }
                 statements.append(inputStatement)
-            }
-            else {
+            } else {
                 let portIdentifier = input.name
                 portArguments.append(Node.PortArg(
                     input.name,
@@ -348,7 +369,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
 
         for output in outputs {
-            if(!chainPorts.contains(output.name)){
+            if !chainPorts.contains(output.name) {
                 let outputStatement = Node.Output(output.name)
                 if output.width > 1 {
                     let width = Node.Width(
@@ -364,17 +385,18 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 Node.Identifier(output.name)
             ))
         }
-            
-        // MARK: tap module 
-        print("Stitching tap port…") 
+
+        // MARK: tap module
+
+        print("Stitching tap port…")
         let tapInfo = TapInfo.default
 
         let tapCreator = TapCreator(
             name: "tap_wrapper",
             using: Node
         )
-        let tapModule =  tapCreator.create(
-            tapInfo: tapInfo, 
+        let tapModule = tapCreator.create(
+            tapInfo: tapInfo,
             tms: tmsName,
             tck: tckName,
             tdi: tdiName,
@@ -412,28 +434,25 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
         let tempDir = "\(NSTemporaryDirectory())"
 
-
         let tapLocation = "\(tempDir)/top.v"
         let wrapperLocation = "\(tempDir)/wrapper.v"
 
         do {
-            try File.open(tapLocation, mode: .write) { 
+            try File.open(tapLocation, mode: .write) {
                 try $0.print(TapCreator.top)
             }
             try File.open(wrapperLocation, mode: .write) {
                 try $0.print(TapCreator.wrapper)
             }
 
-        } catch {
-
-        }
+        } catch {}
 
         let tapDefinition =
             parse([tapLocation])[0][dynamicMember: "description"].definitions
-        
+
         let wrapperDefinition =
             parse([wrapperLocation])[0][dynamicMember: "description"].definitions
-        
+
         try? File.delete(tapLocation)
         try? File.delete(wrapperLocation)
 
@@ -446,7 +465,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         try File.open(intermediate, mode: .write) {
             try $0.print(Generator.visit(ast))
         }
-                
+
         let _ = Synthesis.script(
             for: definitionName,
             in: [intermediate],
@@ -466,6 +485,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 )
 
                 // MARK: Yosys
+
                 print("Resynthesizing with yosys…")
                 let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
@@ -493,6 +513,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
         }
 
         // MARK: Verification
+
         if let model = verifyOpt.value {
             print("Verifying tap port integrity…")
             let ast = parse([netlist])[0]
@@ -533,7 +554,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 with: vvpExecutable
             )
             print("Done.")
-            if (verified) {
+            if verified {
                 print("Tap port verified successfully.")
             } else {
                 print("Tap port verification failed.")
@@ -545,10 +566,11 @@ func jtagCreate(arguments: [String]) -> Int32 {
             }
 
             // MARK: Test bench
+
             if let tvFile = testvectors.value {
                 print("Generating testbench for test vectors…")
                 let behavior
-                    = Array<Simulator.Behavior>(
+                    = [Simulator.Behavior](
                         repeating: .holdHigh,
                         count: ignoredInputs.count
                     )
@@ -557,7 +579,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 let testbecnh = netlist + ".tv" + ".tb.sv"
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
-                    in: netlist, 
+                    in: netlist,
                     isolating: blackbox.value,
                     with: model,
                     ports: ports,
@@ -574,7 +596,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     tdo: tdoName,
                     trst: trstName,
                     output: testbecnh,
-                    chainLength: internalCount + boundaryCount, 
+                    chainLength: internalCount + boundaryCount,
                     vecbinFile: testvectors.value!,
                     outbinFile: goldenOutput.value!,
                     vectorCount: vectorCount,
@@ -585,21 +607,20 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )
-                if (verified) {
+                if verified {
                     print("Test vectors verified successfully.")
                 } else {
                     print("Test vector simulation failed.")
                     if !resetActiveLow.value { // default is ignored inputs are held high
                         print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
                     }
-                }  
+                }
             }
         }
     } catch {
         Stderr.print("Internal software error: \(error)")
         return EX_SOFTWARE
     }
-    
-    return EX_OK
 
+    return EX_OK
 }

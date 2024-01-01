@@ -1,3 +1,17 @@
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import Foundation
 import PythonKit
 
@@ -6,7 +20,7 @@ class BoundaryScanRegisterCreator {
     private var inputName: String
     private var outputName: String
     var counter: Int = 0
-    
+
     var clock: String
     var reset: String
     var resetActive: Simulator.Active
@@ -30,22 +44,22 @@ class BoundaryScanRegisterCreator {
         using Node: PythonObject
     ) {
         self.name = name
-        self.inputName = "\(name)_input"
-        self.outputName = "\(name)_output"
+        inputName = "\(name)_input"
+        outputName = "\(name)_output"
 
         self.clock = clock
-        self.clockIdentifier = Node.Identifier(clock)
+        clockIdentifier = Node.Identifier(clock)
 
         self.reset = reset
-        self.resetIdentifier = Node.Identifier(reset)
+        resetIdentifier = Node.Identifier(reset)
 
         self.resetActive = resetActive
 
         self.testing = testing
-        self.testingIdentifier = Node.Identifier(testing)
+        testingIdentifier = Node.Identifier(testing)
 
         self.shift = shift
-        self.shiftIdentifier = Node.Identifier(shift)
+        shiftIdentifier = Node.Identifier(shift)
 
         self.Node = Node
     }
@@ -66,8 +80,8 @@ class BoundaryScanRegisterCreator {
         let ordinalConstant = Node.Constant(ordinal)
 
         let name = input ? inputName : outputName
-        let dinArg = (max == 0) ? dinIdentifier: Node.Pointer(dinIdentifier, ordinalConstant)
-        let doutArg = (max == 0) ?  doutIdentifier: Node.Pointer(doutIdentifier, ordinalConstant)
+        let dinArg = (max == 0) ? dinIdentifier : Node.Pointer(dinIdentifier, ordinalConstant)
+        let doutArg = (max == 0) ? doutIdentifier : Node.Pointer(doutIdentifier, ordinalConstant)
 
         let portArguments = [
             Node.PortArg("din", dinArg),
@@ -77,7 +91,7 @@ class BoundaryScanRegisterCreator {
             Node.PortArg("clock", clockIdentifier),
             Node.PortArg("reset", resetIdentifier),
             Node.PortArg("testing", testingIdentifier),
-            Node.PortArg("shift", shiftIdentifier)
+            Node.PortArg("shift", shiftIdentifier),
         ]
 
         let submoduleInstance = Node.Instance(
@@ -97,7 +111,7 @@ class BoundaryScanRegisterCreator {
     }
 
     var inputDefinition: String {
-        return """
+        """
         module \(inputName) (
             din,
             dout,
@@ -123,12 +137,12 @@ class BoundaryScanRegisterCreator {
             assign sout = store;
             assign dout = testing ? store : din;
         endmodule
-            
+
         """
     }
 
     var outputDefinition: String {
-        return """
+        """
         module \(outputName) (
             din,
             dout,
@@ -153,7 +167,7 @@ class BoundaryScanRegisterCreator {
             assign sout = store;
             assign dout = din;
         endmodule
-            
+
         """
     }
 }

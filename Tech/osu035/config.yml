@@ -10,3 +10,4 @@ muxInfo:
   b: B
   s: S
   "y": "Y"
+  invertedOutput: true

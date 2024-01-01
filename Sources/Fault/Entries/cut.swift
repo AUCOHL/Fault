@@ -1,7 +1,21 @@
-import Foundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
-import PythonKit
 import Defile
+import Foundation
+import PythonKit
 
 func cut(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -67,13 +81,13 @@ func cut(arguments: [String]) -> Int32 {
         return EX_NOINPUT
     }
 
-    let dffNames: Set<String>
-        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter {$0 != ""} ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
+    let dffNames
+        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter { $0 != "" } ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
 
     let output = filePath.value ?? "\(file).cut.v"
 
     // MARK: Importing Python and Pyverilog
-    
+
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     let Node = Python.import("pyverilog.vparser.ast")
@@ -107,14 +121,14 @@ func cut(arguments: [String]) -> Int32 {
             break
         }
     }
-    
+
     guard let definition = definitionOptional else {
         Stderr.print("No module found.")
         exit(EX_DATAERR)
     }
 
-    let hardIgnoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    let hardIgnoredInputs
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
     do {
         let ports = Python.list(definition.portlist.ports)
@@ -173,23 +187,23 @@ func cut(arguments: [String]) -> Int32 {
 
                     items.append(inputAssignment)
                     items.append(outputAssignment)
-                    
+
                 } else if let blakcboxName = isolatedName, blakcboxName == instanceName {
                     include = false
-                    
-                    guard let isolatedDefinition = isolatedOptional  else {
+
+                    guard let isolatedDefinition = isolatedOptional else {
                         Stderr.print("No module definition for blackbox \(blakcboxName)")
                         exit(EX_DATAERR)
                     }
 
                     let (_, inputs, _) = try Port.extract(from: isolatedDefinition)
-                    let bbInputNames = inputs.map { $0.name }
+                    let bbInputNames = inputs.map(\.name)
 
                     for hook in instance.portlist {
                         let portName = String(describing: hook.portname)
                         let hookType = Python.type(hook.argname).__name__
                         let input = bbInputNames.contains(portName)
-                        
+
                         if hookType == "Concat" {
                             let list = hook.argname.list
                             for (i, element) in list.enumerated() {
@@ -203,16 +217,13 @@ func cut(arguments: [String]) -> Int32 {
                                         Node.Lvalue(Node.Identifier(name)),
                                         Node.Rvalue(element)
                                     )
-                                    
-                                }
-                                else {
-                                    name =  instanceName + "_\(portName)_\(i)"
+                                } else {
+                                    name = instanceName + "_\(portName)_\(i)"
                                     statement = Node.Input(name)
                                     assignStatement = Node.Assign(
                                         Node.Lvalue(element),
                                         Node.Rvalue(Node.Identifier(name))
                                     )
-                                    
                                 }
                                 items.append(assignStatement)
                                 declarations.append(statement)
@@ -228,8 +239,8 @@ func cut(arguments: [String]) -> Int32 {
                             var statement: PythonObject
                             var assignStatement: PythonObject
                             if input {
-                                name = "\\" + instanceName + "_\(portName).q" 
-                                statement = Node.Output(name) 
+                                name = "\\" + instanceName + "_\(portName).q"
+                                statement = Node.Output(name)
                                 assignStatement = Node.Assign(
                                     Node.Lvalue(Node.Identifier(name)),
                                     Node.Rvalue(hook.argname)
@@ -245,11 +256,11 @@ func cut(arguments: [String]) -> Int32 {
                             items.append(assignStatement)
                             declarations.append(statement)
                             ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                        } 
+                        }
                     }
                 }
             }
-            
+
             if include {
                 items.append(item)
             }
@@ -258,7 +269,7 @@ func cut(arguments: [String]) -> Int32 {
         if declarations.count == 0 {
             print("[Warning]: Failed to detect flip-flop cells named: \(dffNames).")
         }
-        
+
         definition.portlist.ports = ports
         definition.items = Python.tuple(declarations + items)
 
@@ -269,7 +280,7 @@ func cut(arguments: [String]) -> Int32 {
     } catch {
         Stderr.print("An internal software error has occurred.")
         return EX_SOFTWARE
-    }   
-    
+    }
+
     return EX_OK
 }

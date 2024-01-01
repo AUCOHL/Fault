@@ -15,13 +15,7 @@ Make your changes and then submit them as a pull requests to the `main` branch.
 
 Consult [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more information on using pull requests.
 
-## The Approval Process
-For a PR to be merged, there are two requirements:
-
-- It must pass all automated checks.
-- An OpenLane team member must inspect and approve the PR.
-
 # Licensing and Copyright
-Please add you (or your employer's) copyright headers to any files to which you have made major edits.
+Please add your (or your employer's) copyright headers to any files to which you have made major edits.
 
 Please note all code contributions must have the same license as Fault, i.e., the Apache License, version 2.0. 

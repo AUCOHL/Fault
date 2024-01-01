@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Fault",
     platforms: [
-        .macOS(.v11) // executableURL and a bunch of other things are not available before High Sierra
+        .macOS(.v11), // executableURL and a bunch of other things are not available before High Sierra
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -16,7 +16,7 @@ let package = Package(
         .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
         .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.2.1"),
-        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6")
+        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -29,6 +29,6 @@ let package = Package(
         .testTarget(
             name: "FaultTests",
             dependencies: ["Fault"]
-        )
+        ),
     ]
 )

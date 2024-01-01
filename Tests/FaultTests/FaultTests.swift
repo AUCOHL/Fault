@@ -1,13 +1,13 @@
-import XCTest
 import class Foundation.Bundle
+import XCTest
 
 var env = ProcessInfo.processInfo.environment
 
 extension Process {
-  func startAndBlock() throws {
-    try self.launch()
-    self.waitUntilExit()
-  }
+    func startAndBlock() throws {
+        try launch()
+        waitUntilExit()
+    }
 }
 
 extension String {
@@ -58,12 +58,12 @@ final class FaultTests: XCTestCase {
         // Fault Tests
         let binary = productsDirectory.appendingPathComponent("Fault")
 
-        let newProcess = { ()-> Process in
-          let new = Process()
-          new.executableURL = binary
-          new.environment = ProcessInfo.processInfo.environment
-          new.environment!["PYTHONPATH"] = venvLibVersion
-          return new
+        let newProcess = { () -> Process in
+            let new = Process()
+            new.executableURL = binary
+            new.environment = ProcessInfo.processInfo.environment
+            new.environment!["PYTHONPATH"] = venvLibVersion
+            return new
         }
 
         let liberty = "Tech/osu035/osu035_stdcells.lib"
@@ -73,7 +73,7 @@ final class FaultTests: XCTestCase {
         let topModule = "SPM"
         let clock = "clk"
         let reset = "rst"
-        let ignoredInputs = "\(reset)" 
+        let ignoredInputs = "\(reset)"
 
         let fileSynth = "Netlists/" + fileName + ".netlist.v"
         let fileCut = fileSynth + ".cut.v"
@@ -87,14 +87,12 @@ final class FaultTests: XCTestCase {
         process.arguments = ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName]
         try process.startAndBlock()
 
-
         XCTAssertEqual(process.terminationStatus, 0)
         print("1/6")
         // 1. Cut
         process = newProcess()
         process.arguments = ["cut", "-o", fileCut, fileSynth]
         try process.startAndBlock()
-
 
         XCTAssertEqual(process.terminationStatus, 0)
 
@@ -103,7 +101,6 @@ final class FaultTests: XCTestCase {
         process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut]
         try process.startAndBlock()
         print("2/6")
-
 
         XCTAssertEqual(process.terminationStatus, 0)
 
@@ -114,7 +111,6 @@ final class FaultTests: XCTestCase {
         try process.startAndBlock()
         print("3/6")
 
-
         XCTAssertEqual(process.terminationStatus, 0)
 
         // 4. Assemble
@@ -122,7 +118,6 @@ final class FaultTests: XCTestCase {
         process.arguments = ["asm", fileJson, fileChained]
         try process.startAndBlock()
         print("4/6")
-
 
         XCTAssertEqual(process.terminationStatus, 0)
 
@@ -143,17 +138,17 @@ final class FaultTests: XCTestCase {
 
     /// Returns path to the built products directory.
     var productsDirectory: URL {
-      #if os(macOS)
-        for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
-            return bundle.bundleURL.deletingLastPathComponent()
-        }
-        fatalError("couldn't find the products directory")
-      #else
-        return Bundle.main.bundleURL
-      #endif
+        #if os(macOS)
+            for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
+                return bundle.bundleURL.deletingLastPathComponent()
+            }
+            fatalError("couldn't find the products directory")
+        #else
+            return Bundle.main.bundleURL
+        #endif
     }
 
     static var allTests = [
-        ("testFull", testFull)
+        ("testFull", testFull),
     ]
 }

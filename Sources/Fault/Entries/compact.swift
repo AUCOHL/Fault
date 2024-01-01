@@ -1,6 +1,20 @@
-import Foundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
 import Defile
+import Foundation
 import PythonKit
 
 func compactTestVectors(arguments: [String]) -> Int32 {
@@ -58,8 +72,8 @@ func compactTestVectors(arguments: [String]) -> Int32 {
     let file = args[0]
 
     if !fileManager.fileExists(atPath: file) {
-       Stderr.print("File '\(file)' not found.")
-       return EX_NOINPUT
+        Stderr.print("File '\(file)' not found.")
+        return EX_NOINPUT
     }
 
     if let modelTest = verifyOpt.value {
@@ -67,7 +81,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
             Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
-        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
+        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
             Stderr.print(
                 "Warning: Cell model file provided does not end with .v or .sv.\n"
             )
@@ -118,7 +132,7 @@ func compactTestVectors(arguments: [String]) -> Int32 {
         try File.open(output, mode: .write) {
             try $0.print(string)
         }
-        
+
         if let modelTest = verifyOpt.value {
             print("Running simulations using the compacted set…")
             let verifiedOutput = "\(output).verified.json"
@@ -130,10 +144,10 @@ func compactTestVectors(arguments: [String]) -> Int32 {
                 "-m", "100",
                 "--tvSet", output,
                 "-o", verifiedOutput,
-                netlistOpt.value!
+                netlistOpt.value!,
             ]
             exit(main(arguments: mainArguments))
-        } 
+        }
     } catch {
         Stderr.print(error.localizedDescription)
         return EX_NOINPUT

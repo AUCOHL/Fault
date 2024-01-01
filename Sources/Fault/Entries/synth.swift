@@ -1,6 +1,20 @@
-import Foundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
 import Defile
+import Foundation
 
 func synth(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -16,7 +30,7 @@ func synth(arguments: [String]) -> Int32 {
 
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Required.)")
     cli.addOptions(topModule)
-    
+
     do {
         try cli.parse()
     } catch {
@@ -35,7 +49,7 @@ func synth(arguments: [String]) -> Int32 {
         Stderr.print("At least one Verilog file is required.")
         Stderr.print("Invoke fault synth --help for more info.")
         return EX_USAGE
-    }      
+    }
 
     let fileManager = FileManager()
     let files = args
@@ -63,7 +77,7 @@ func synth(arguments: [String]) -> Int32 {
         Stderr.print("Liberty file '\(libertyFile)' not found.")
         return EX_NOINPUT
     }
-    
+
     if !libertyFile.hasSuffix(".lib") {
         Stderr.print(
             "Warning: Liberty file provided does not end with .lib."
@@ -78,7 +92,7 @@ func synth(arguments: [String]) -> Int32 {
     let result = "echo '\(script)' | '\(yosysExecutable)'".sh()
 
     if result != EX_OK {
-        Stderr.print("A yosys error has occurred.");
+        Stderr.print("A yosys error has occurred.")
         return Int32(result)
     }
 

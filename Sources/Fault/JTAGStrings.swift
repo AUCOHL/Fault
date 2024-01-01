@@ -1,3 +1,17 @@
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 extension TapCreator {
     static let info = """
     {
@@ -49,7 +63,7 @@ extension TapCreator {
     output shift; 
     output test;
     output sin;
-    
+
     wire chain_tdi_i;
     wire __trst_high__;
     wire tdo_padoe_o;
@@ -58,7 +72,7 @@ extension TapCreator {
     wire run_test_idle_o;
     wire test_logic_reset_o;
     wire exit1_dr_o;
-    
+
     assign chain_tdi_i = sout;
 
     // negate trst (active low according to the standard) 
@@ -90,7 +104,7 @@ extension TapCreator {
 
     endmodule
     """
-    
+
     static let top: String = """
     //////////////////////////////////////////////////////////////////////
     ////                                                              ////
@@ -232,13 +246,13 @@ extension TapCreator {
                     sample_preload_select_o,
                     mbist_select_o,
                     debug_select_o,
-                
+
                     // Select signals for internal scan-chain 
                     preload_chain_o,
 
                     // TDO signal that is connected to TDI of sub-modules.
                     tdo_o, 
-                    
+
                     // TDI signals from sub-modules
                     debug_tdi_i,     // from debug module
                     bs_chain_tdi_i,  // from Boundary Scan Chain
