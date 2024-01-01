@@ -1,6 +1,20 @@
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import BigInt
 import Foundation
 import PythonKit
-import BigInt
 
 class TapCreator {
     var name: String
@@ -12,8 +26,8 @@ class TapCreator {
         self.name = name
         self.Node = Node
     }
-    
-    func create(  
+
+    func create(
         tapInfo: TapInfo,
         tms: String,
         tck: String,
@@ -25,11 +39,11 @@ class TapCreator {
         sout: String,
         shift: String,
         test: String
-    )-> ( tapModule: PythonObject, wires: [PythonObject]) {
+    ) -> (tapModule: PythonObject, wires: [PythonObject]) {
         let pads = tapInfo.tap
         let chain = tapInfo.chain
 
-        let wireDeclarations: [PythonObject] = [ 
+        let wireDeclarations: [PythonObject] = [
             Node.Wire(pads.tdo),
             Node.Wire(pads.tdoEnable_n),
             Node.Wire(pads.tms),
@@ -38,7 +52,7 @@ class TapCreator {
             Node.Wire(chain.sin),
             Node.Wire(chain.sout),
             Node.Wire(chain.shift),
-            Node.Wire(chain.test)
+            Node.Wire(chain.test),
         ]
 
         let portArguments = [
@@ -83,18 +97,18 @@ class TapCreator {
             Node.PortArg(
                 chain.shift,
                 Node.Identifier(shift)
-            )
+            ),
         ]
 
         let submoduleInstance = Node.Instance(
-            self.name,
-            "__" + self.name + "__",
+            name,
+            "__" + name + "__",
             Python.tuple(portArguments),
             Python.tuple()
         )
 
         let tapModule = Node.InstanceList(
-            self.name,
+            name,
             Python.tuple(),
             Python.tuple([submoduleInstance])
         )
@@ -135,10 +149,10 @@ struct Chain: Codable {
     var test: String
 
     init(
-       sin: String,
-       sout: String,
-       shift: String,
-       test: String
+        sin: String,
+        sout: String,
+        shift: String,
+        test: String
     ) {
         self.sin = sin
         self.sout = sout
@@ -151,7 +165,7 @@ struct Chain: Codable {
 struct TapInfo: Codable {
     var tap: Tap
     var chain: Chain
-    
+
     init(
         tap: Tap,
         chain: Chain

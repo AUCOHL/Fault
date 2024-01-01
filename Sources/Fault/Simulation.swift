@@ -1,9 +1,23 @@
-import Foundation
-import Defile
-import PythonKit
-import BigInt
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-class Simulator {
+import BigInt
+import Defile
+import Foundation
+import PythonKit
+
+enum Simulator {
     enum Behavior: Int {
         case holdHigh = 1
         case holdLow = 0
@@ -14,7 +28,7 @@ class Simulator {
         for faultPoints: Set<String>,
         in file: String,
         module: String,
-        with cells: String, 
+        with cells: String,
         ports: [String: Port],
         inputs: [Port],
         ignoring ignoredInputs: Set<String>,
@@ -27,8 +41,8 @@ class Simulator {
         filePrefix: String = ".",
         defines: Set<String> = [],
         includes: String,
-        using iverilogExecutable: String,
-        with vvpExecutable: String
+        using _: String,
+        with _: String
     ) throws -> (faults: [String], goldenOutput: String) {
         var portWires = ""
         var portHooks = ""
@@ -42,7 +56,7 @@ class Simulator {
         }
 
         let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p \(folderName)".sh()
+        _ = "mkdir -p \(folderName)".sh()
 
         var inputAssignment = ""
         var fmtString = ""
@@ -73,29 +87,28 @@ class Simulator {
             defineStatements += "-D\(def) "
         }
 
-        var outputCount = 0 
+        var outputCount = 0
         var outputComparison = ""
         var outputAssignment = ""
         for output in outputs {
             let name = (output.name.hasPrefix("\\")) ? output.name : "\\\(output.name)"
             outputComparison += " ( \(name) != \(name).gm ) || "
             if output.width > 1 {
-                for i in 0..<output.width {
+                for i in 0 ..< output.width {
                     outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(output.name)[\(i)] ; \n"
                     outputCount += 1
                 }
-            }
-            else {
+            } else {
                 outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(name) ; \n"
                 outputCount += 1
             }
         }
         outputComparison = String(outputComparison.dropLast(3))
 
-        var faultForces = ""    
+        var faultForces = ""
         for fault in faultPoints {
             faultForces += "        force uut.\(fault) = \(stuckAt) ; \n"
-            faultForces += "        #1 ; \n"   
+            faultForces += "        #1 ; \n"
             faultForces += "        if (difference) $display(\"\(fault)\") ; \n"
             faultForces += "        #1 ; \n"
             faultForces += "        release uut.\(fault) ;\n"
@@ -124,24 +137,24 @@ class Simulator {
             \(module) gm(
                 \(portHooksGM.dropLast(2))
             );
-           
+
             \(goldenOutput ?
             "wire [\(outputCount - 1):0] goldenOutput; \n \(outputAssignment)" : "")
 
             wire difference ;
             assign difference = (\(outputComparison));
-            
+
             integer counter;
 
             initial begin
         \(inputAssignment)
         \(faultForces)
-        \(goldenOutput ? "        $displayb(\"%b\", goldenOutput);": "" )
+        \(goldenOutput ? "        $displayb(\"%b\", goldenOutput);" : "")
                 $finish;
             end
 
         endmodule
-        """;
+        """
 
         let tbName = "\(folderName)/tb.sv"
         try File.open(tbName, mode: .write) {
@@ -168,7 +181,7 @@ class Simulator {
         let output = File.read(intermediate)!
         defer {
             if cleanUp {
-                let _ = "rm -rf \(folderName)".sh()
+                _ = "rm -rf \(folderName)".sh()
             }
         }
 
@@ -184,7 +197,7 @@ class Simulator {
                 print("[Warning]: golden output contains x or z.")
             }
         }
-       
+
         return (faults: faults, goldenOutput: gmOutput)
     }
 
@@ -211,7 +224,6 @@ class Simulator {
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
-        
         var testVectorHash: Set<TestVector> = []
 
         var coverageList: [TVCPair] = []
@@ -224,20 +236,20 @@ class Simulator {
 
         var totalTVAttempts = 0
         var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
-        
+
         let simulateOnly = (TVSet.count != 0)
         let rng: URNG = URNGFactory.get(name: randomGenerator)!
 
-        while coverage < minimumCoverage && totalTVAttempts < ceiling {
+        while coverage < minimumCoverage, totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
                 print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
             }
 
             var futureList: [Future] = []
             var testVectors: [TestVector] = []
-            for index in 0..<tvAttempts {
+            for index in 0 ..< tvAttempts {
                 var testVector: TestVector = []
-                if (simulateOnly){
+                if simulateOnly {
                     testVector = TVSet[totalTVAttempts + index]
                 } else {
                     for input in inputs {
@@ -304,11 +316,11 @@ class Simulator {
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
-                        
-                        return (Covers: Coverage(sa0: sa0, sa1: sa1) , Output: output)
+
+                        return (Covers: Coverage(sa0: sa0, sa1: sa1), Output: output)
                     } catch {
                         print("IO Error @ vector \(vector)")
-                        return (Covers: Coverage(sa0: [], sa1: []) , Output: "")
+                        return (Covers: Coverage(sa0: [], sa1: []), Output: "")
                     }
                 }
                 futureList.append(future)
@@ -337,7 +349,7 @@ class Simulator {
             coverage =
                 Float(sa0Covered.count + sa1Covered.count) /
                 Float(2 * faultPoints.count)
-           
+
             totalTVAttempts += tvAttempts
             let remainingTV = ceiling - totalTVAttempts
             tvAttempts = (remainingTV < increment) ? remainingTV : increment
@@ -358,14 +370,14 @@ class Simulator {
         case high
     }
 
-   static func simulate(
+    static func simulate(
         verifying module: String,
         in file: String,
         isolating blackbox: String?,
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
-        outputs: [Port],
+        outputs _: [Port],
         chainLength: Int,
         clock: String,
         tck: String,
@@ -378,10 +390,9 @@ class Simulator {
         output: String,
         defines: Set<String> = [],
         includes: String,
-        using iverilogExecutable: String,
-        with vvpExecutable: String
+        using _: String,
+        with _: String
     ) throws -> Bool {
-
         var portWires = ""
         var portHooks = ""
         for (rawName, port) in ports {
@@ -394,15 +405,15 @@ class Simulator {
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
-                inputAssignment += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
+                inputAssignment += "        \(name) = \(resetActive == .low ? 0 : 1) ;\n"
             } else {
                 inputAssignment += "        \(name) = 0 ;\n"
             }
         }
 
         var serial = "0"
-        for _ in 0..<chainLength-1 {
-            serial += "\(Int.random(in: 0...1))"
+        for _ in 0 ..< chainLength - 1 {
+            serial += "\(Int.random(in: 0 ... 1))"
         }
 
         var clockCreator = ""
@@ -420,7 +431,7 @@ class Simulator {
         for def in defines {
             defineStatements += "-D\(def) "
         }
-    
+
         let bench = """
         \(String.boilerplate)
         \(includes)
@@ -469,7 +480,7 @@ class Simulator {
 
         return try Simulator.run(
             define: defineStatements,
-            bench: bench, 
+            bench: bench,
             output: output
         )
     }
@@ -481,7 +492,7 @@ class Simulator {
         with cells: String,
         ports: [String: Port],
         inputs: [Port],
-        outputs: [Port],
+        outputs _: [Port],
         chainLength: Int,
         clock: String,
         reset: String,
@@ -494,8 +505,8 @@ class Simulator {
         output: String,
         defines: Set<String> = [],
         includes: String,
-        using iverilogExecutable: String,
-        with vvpExecutable: String
+        using _: String,
+        with _: String
     ) throws -> Bool {
         var portWires = ""
         var portHooks = ""
@@ -509,12 +520,11 @@ class Simulator {
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
-                inputInit += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
-            } 
-            else {
+                inputInit += "        \(name) = \(resetActive == .low ? 0 : 1) ;\n"
+            } else {
                 inputInit += "        \(name) = 0 ;\n"
             }
-        } 
+        }
 
         var clockCreator = ""
         if !clock.isEmpty {
@@ -526,11 +536,11 @@ class Simulator {
             resetToggler = "\(reset) = ~\(reset);"
         }
 
-        var serial: String = ""
-        for _ in 0..<chainLength {
-            serial += "\(Int.random(in: 0...1))"
+        var serial = ""
+        for _ in 0 ..< chainLength {
+            serial += "\(Int.random(in: 0 ... 1))"
         }
-        
+
         var include = ""
         if let blackboxFile = blackbox {
             include = "`include \"\(blackboxFile)\""
@@ -541,7 +551,7 @@ class Simulator {
             defineStatements += "-D\(def) "
         }
 
-        let bench =  """
+        let bench = """
         \(String.boilerplate)
 
         \(includes)
@@ -611,13 +621,13 @@ class Simulator {
 
         \(Simulator.createTasks(tms: tms, tdi: tdi))
         endmodule
-        """    
-        
+        """
+
         return try Simulator.run(
             define: defineStatements,
-            bench: bench, 
+            bench: bench,
             output: output
-        ) 
+        )
     }
 
     static func simulate(
@@ -629,7 +639,7 @@ class Simulator {
         inputs: [Port],
         ignoring ignoredInputs: Set<String>,
         behavior: [Behavior],
-        outputs: [Port],
+        outputs _: [Port],
         clock: String,
         reset: String,
         resetActive: Active = .low,
@@ -639,18 +649,17 @@ class Simulator {
         tdo: String,
         trst: String,
         output: String,
-        chainLength: Int ,
+        chainLength _: Int,
         vecbinFile: String,
         outbinFile: String,
-        vectorCount: Int, 
+        vectorCount: Int,
         vectorLength: Int,
         outputLength: Int,
         defines: Set<String> = [],
         includes: String,
-        using iverilogExecutable: String,
-        with vvpExecutable: String
+        using _: String,
+        with _: String
     ) throws -> Bool {
-    
         var portWires = ""
         var portHooks = ""
         for (rawName, port) in ports {
@@ -669,17 +678,15 @@ class Simulator {
         for input in inputs {
             let name = (input.name.hasPrefix("\\")) ? input.name : "\\\(input.name)"
             if input.name == reset {
-                inputAssignment += "        \(name) = \( resetActive == .low ? 0 : 1 ) ;\n"
+                inputAssignment += "        \(name) = \(resetActive == .low ? 0 : 1) ;\n"
             } else if input.name == tms {
                 inputAssignment += "        \(name) = 1 ;\n"
-            }
-            else {
+            } else {
                 inputAssignment += "        \(name) = 0 ;\n"
-                if (input.name != clock && !tapPorts.contains(input.name)){
-                }
+                if input.name != clock, !tapPorts.contains(input.name) {}
             }
-        }        
-    
+        }
+
         var clockCreator = ""
         if !clock.isEmpty {
             clockCreator = "always #(`CLOCK_PERIOD / 2) \(clock) = ~\(clock);"
@@ -689,14 +696,14 @@ class Simulator {
             resetToggler = "\(reset) = ~\(reset);"
         }
         var testStatements = ""
-        for i in 0..<vectorCount {  
+        for i in 0 ..< vectorCount {
             testStatements += "        test(__vectors__[\(i)], __gmOutput__[\(i)]) ;\n"
         }
         var include = ""
         if let blackboxFile = blackbox {
             include = "`include \"\(blackboxFile)\""
         }
-        
+
         var defineStatements = ""
         for def in defines {
             defineStatements += "-D\(def) "
@@ -714,7 +721,7 @@ class Simulator {
         `endif
         module testbench;
         \(portWires)
-            
+
             \(clockCreator)
             always #(`CLOCK_PERIOD / 2) \(tck) = ~\(tck);
 
@@ -754,7 +761,7 @@ class Simulator {
                 input [\(vectorLength - 1):0] __vector__;
                 input [\(outputLength - 1):0] __goldenOutput__;
                 begin
-                   
+
                     // Preload Scan-Chain with TV
 
                     shiftIR(__preloadChain__);
@@ -810,7 +817,7 @@ class Simulator {
 
         return try Simulator.run(
             define: defineStatements,
-            bench: bench, 
+            bench: bench,
             output: output
         )
     }
@@ -821,7 +828,6 @@ class Simulator {
         output: String,
         clean: Bool = true
     ) throws -> Bool {
-        
         try File.open(output, mode: .write) {
             try $0.print(bench)
         }
@@ -834,8 +840,7 @@ class Simulator {
         }
         let iverilogResult =
             "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
-        
-      
+
         if iverilogResult.terminationStatus != EX_OK {
             Stderr.print("An iverilog error has occurred: ")
             Stderr.print(iverilogResult.output)
@@ -850,50 +855,50 @@ class Simulator {
         return vvpTask.output.contains("SUCCESS_STRING")
     }
 
-    private static func createTasks (tms: String, tdi: String) -> String {
-        return """
-        task shiftIR;
-            input[3:0] __instruction__;
-            integer i;
-            begin
-                for (i = 0; i< 5; i = i + 1) begin
-                    \(tms) = __tmsPattern__[i];
-                    #(`CLOCK_PERIOD) ;
-                end
-
-                // At shift-IR: shift new instruction on tdi line
-                for (i = 0; i < 4; i = i + 1) begin
-                    \(tdi) = __instruction__[i];
-                    if(i == 3) begin
-                        \(tms) = __tmsPattern__[5];     // exit-ir
+    private static func createTasks(tms: String, tdi: String) -> String {
+        """
+            task shiftIR;
+                input[3:0] __instruction__;
+                integer i;
+                begin
+                    for (i = 0; i< 5; i = i + 1) begin
+                        \(tms) = __tmsPattern__[i];
+                        #(`CLOCK_PERIOD) ;
                     end
+
+                    // At shift-IR: shift new instruction on tdi line
+                    for (i = 0; i < 4; i = i + 1) begin
+                        \(tdi) = __instruction__[i];
+                        if(i == 3) begin
+                            \(tms) = __tmsPattern__[5];     // exit-ir
+                        end
+                        #(`CLOCK_PERIOD) ;
+                    end
+
+                    \(tms) = __tmsPattern__[6];     // update-ir 
+                    #(`CLOCK_PERIOD) ;
+                    \(tms) = __tmsPattern__[7];     // run test-idle
+                    #(`CLOCK_PERIOD * 3) ;
+                end
+            endtask
+
+            task enterShiftDR;
+                begin
+                    \(tms) = 1;     // select DR
+                    #(`CLOCK_PERIOD) ;
+                    \(tms) = 0;     // capture DR -- shift DR
+                    #(`CLOCK_PERIOD * 2) ;
+                end
+            endtask
+
+            task exitDR;
+                begin
+                    \(tms) = 1;     // Exit DR -- update DR
+                    #(`CLOCK_PERIOD * 2) ;
+                    \(tms) = 0;     // Run test-idle
                     #(`CLOCK_PERIOD) ;
                 end
-
-                \(tms) = __tmsPattern__[6];     // update-ir 
-                #(`CLOCK_PERIOD) ;
-                \(tms) = __tmsPattern__[7];     // run test-idle
-                #(`CLOCK_PERIOD * 3) ;
-            end
-        endtask
-
-        task enterShiftDR;
-            begin
-                \(tms) = 1;     // select DR
-                #(`CLOCK_PERIOD) ;
-                \(tms) = 0;     // capture DR -- shift DR
-                #(`CLOCK_PERIOD * 2) ;
-            end
-        endtask
-
-        task exitDR;
-            begin
-                \(tms) = 1;     // Exit DR -- update DR
-                #(`CLOCK_PERIOD * 2) ;
-                \(tms) = 0;     // Run test-idle
-                #(`CLOCK_PERIOD) ;
-            end
-        endtask
-    """
+            endtask
+        """
     }
 }

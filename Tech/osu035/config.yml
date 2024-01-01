@@ -1,0 +1,13 @@
+dffMatches:
+  # Default match should be the last element
+  - name: DFFSR,DFFNEGX1,DFFPOSX1
+    d: D
+    q: Q
+    clk: CLK
+muxInfo:
+  name: MUX2X1
+  a: A
+  b: B
+  s: S
+  "y": "Y"
+  invertedOutput: true

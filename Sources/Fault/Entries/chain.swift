@@ -1,7 +1,22 @@
-import Foundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
-import PythonKit
 import Defile
+import Foundation
+import PythonKit
+import Yams
 
 func scanChainCreate(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -23,7 +38,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Inputs,to,ignore,separated,by,commas."
+        helpMessage: "Inputs to ignore. Comma-delimited."
     )
     cli.addOptions(ignored)
 
@@ -33,7 +48,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         helpMessage: "Verify scan chain using given cell model."
     )
     cli.addOptions(verifyOpt)
-    
+
     let clockOpt = StringOption(
         longFlag: "clock",
         helpMessage: "Clock signal to add to --ignoring and use in simulation. (Required.)."
@@ -42,13 +57,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let clockInv = StringOption(
         longFlag: "invClock",
-        helpMessage: "Inverted clk tree source cell name (Default: none)"
+        helpMessage: "Inverter clk tree source cell name. (Default: none)"
     )
     cli.addOptions(clockInv)
 
     let resetOpt = StringOption(
         longFlag: "reset",
-        helpMessage: "Reset signal to add to --ignoring and use in simulation.  (Required.)"
+        helpMessage: "Reset signal to add to --ignoring and use in simulation. (Required.)"
     )
     cli.addOptions(resetOpt)
 
@@ -65,10 +80,17 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(liberty)
 
+    let sclConfigOpt = StringOption(
+        shortFlag: "s",
+        longFlag: "sclConfig",
+        helpMessage: "Path for the YAML SCL config file. Recommended."
+    )
+    cli.addOptions(sclConfigOpt)
+
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell names ,comma,seperated (Default: DFFSR,DFFNEGX1,DFFPOSX1)"
+        helpMessage: "Optional override for the DFF names from the PDK config. Comma-delimited. "
     )
     cli.addOptions(dffOpt)
 
@@ -80,7 +102,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let defs = StringOption(
         longFlag: "define",
-        helpMessage: "define statements to include during simulations. (Default: none)"
+        helpMessage: "define statements to include during simulations.  Comma-delimited. (Default: none)"
     )
     cli.addOptions(defs)
 
@@ -106,7 +128,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         ("clockDR", "Input/Output scan-cell clock DR"),
         ("update", "Input/Output scan-cell update"),
         ("test", "test mode enable"),
-        ("tck", "test clock")
+        ("tck", "test clock"),
     ] {
         let option = StringOption(
             longFlag: name,
@@ -142,13 +164,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
-        
+
     guard let clockName = clockOpt.value else {
         Stderr.print("Option --clock is required.")
         Stderr.print("Invoke fault chain --help for more info.")
         return EX_USAGE
     }
-    
+
     guard let resetName = resetOpt.value else {
         Stderr.print("Option --reset is required.")
         Stderr.print("Invoke fault chain --help for more info.")
@@ -159,6 +181,24 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         Stderr.print("Option --liberty is required.")
         Stderr.print("Invoke fault chain --help for more info.")
         return EX_USAGE
+    }
+
+    var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
+    if let sclConfigPath = sclConfigOpt.value {
+        guard let sclConfigYML = File.read(sclConfigPath) else {
+            Stderr.print("File not found: \(sclConfigPath)")
+            return EX_NOINPUT
+        }
+        let decoder = YAMLDecoder()
+        do {
+            sclConfig = try decoder.decode(SCLConfiguration.self, from: sclConfigYML)
+        } catch {
+            Stderr.print("Invalid YAML file \(sclConfigPath):  \(error).")
+            return EX_DATAERR
+        }
+    }
+    if let dffOverride = dffOpt.value {
+        sclConfig.dffMatches.last!.name = dffOverride
     }
 
     if !fileManager.fileExists(atPath: libertyFile) {
@@ -177,7 +217,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             Stderr.print("Cell model file '\(modelTest)' not found.")
             return EX_NOINPUT
         }
-        if !modelTest.hasSuffix(".v") && !modelTest.hasSuffix(".sv") {
+        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
             Stderr.print(
                 "Warning: Cell model file provided does not end with .v or .sv.\n"
             )
@@ -187,21 +227,19 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
     let bsrLocation = output + ".bsr.v"
-    
-    let dffNames: Set<String>
-        = Set<String>(dffOpt.value?.components(separatedBy: ",").filter {$0 != ""} ?? ["DFFSR", "DFFNEGX1", "DFFPOSX1"])
-    var ignoredInputs: Set<String>
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
 
-    let defines: Set<String>
-        = Set<String>(defs.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
+    var ignoredInputs
+        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+
+    let defines
+        = Set<String>(defs.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
 
-    let includeFiles: Set<String>
-        = Set<String>(include.value?.components(separatedBy: ",").filter {$0 != ""} ?? [])
-    
+    let includeFiles
+        = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+
     var includeString = ""
     for file in includeFiles {
         if !fileManager.fileExists(atPath: file) {
@@ -214,14 +252,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     }
 
     // MARK: Importing Python and Pyverilog
+
     let parse = Python.import("pyverilog.vparser.parser").parse
 
     let Node = Python.import("pyverilog.vparser.ast")
 
     let Generator =
         Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
-    
+
     // MARK: Parse
+
     let ast = parse([args[0]])[0]
     let description = ast[dynamicMember: "description"]
     var definitionOptional: PythonObject?
@@ -262,6 +302,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     }
 
     // MARK: Internal signals
+
     print("Chaining internal flip-flops…")
     let definitionName = String(describing: definition.name)
     let alteredName = "__UNIT__UNDER__FINANGLING__"
@@ -283,10 +324,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         let clkSourceName = "__clk_source__"
         let clkSourceId = Node.Identifier(clkSourceName)
 
-        let invClkSourceName: String = "__clk_source_n__"
-        var invClkSourceId: PythonObject? 
+        let invClkSourceName = "__clk_source_n__"
+        var invClkSourceId: PythonObject?
 
         // MARK: Register chaining original module
+
         var previousOutput = inputIdentifier
 
         let statements = Python.list()
@@ -310,9 +352,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
         definition.portlist.ports = Python.tuple(ports)
 
-        var wireDeclarations: [PythonObject] = [] 
-        var wrapperCells: [PythonObject] = []
+        var wireDeclarations: [PythonObject] = []
+        var cellDeclarations: [PythonObject] = []
 
+        let fnmatch = Python.import("fnmatch")
+
+        var muxCreator: MuxCreator? = nil
+        if let muxInfo = sclConfig.muxInfo {
+            muxCreator = MuxCreator(using: Node, muxInfo: muxInfo)
+        }
         var warn = false
         var blackbox = false
         var blackboxItem: PythonObject?
@@ -321,27 +369,36 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             // Process gates
             if type == "InstanceList" {
                 let instance = itemDeclaration.instances[0]
-                let instanceName = String(describing: instance.module)
-                if dffNames.contains(instanceName) {
+                let moduleName = String(describing: instance.module)
+                let instanceName = String(describing: instance.name)
+                if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
                     for hook in instance.portlist {
-                        if hook.portname == "CLK" {
+                        let portnameStr = String(describing: hook.portname)
+                        if portnameStr == dffinfo.clk {
                             if String(describing: hook.argname) == clockName {
                                 hook.argname = clkSourceId
-                            }
-                            else {
+                            } else {
                                 warn = true
                             }
                         }
-                        if hook.portname == "D" {
-                            let ternary = Node.Cond(
-                                shiftIdentifier,
-                                previousOutput,
-                                hook.argname
-                            )
-                            hook.argname = ternary
+                        if portnameStr == dffinfo.d {
+                            if let mc = muxCreator {
+                                let (muxCellDecls, muxWireDecls, muxOut) = mc.create(for: instanceName, selection: shiftIdentifier, a: previousOutput, b: hook.argname)
+                                hook.argname = muxOut
+                                cellDeclarations += muxCellDecls
+                                wireDeclarations += muxWireDecls
+
+                            } else {
+                                let ternary = Node.Cond(
+                                    shiftIdentifier,
+                                    previousOutput,
+                                    hook.argname
+                                )
+                                hook.argname = ternary
+                            }
                         }
 
-                        if hook.portname == "Q" {
+                        if portnameStr == dffinfo.q {
                             previousOutput = hook.argname
                         }
                     }
@@ -353,19 +410,20 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                         )
                     )
 
-                } else if let name = isolatedName, name == instanceName {
+                } else if let name = isolatedName, name == moduleName {
                     // MARK: Isolating hard blocks
+
                     print("Chaining blackbox module…")
                     let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
-                    let isolatedInputs = inputs.map { $0.name }
-                    
+                    let isolatedInputs = inputs.map(\.name)
+
                     var counter = 0
-                    
+
                     let scCreator = BoundaryScanRegisterCreator(
                         name: "BoundaryScanRegister",
                         clock: tckName,
                         reset: resetName,
-                        resetActive: resetActiveLow.value ? .low : .high,                
+                        resetActive: resetActiveLow.value ? .low : .high,
                         testing: testName,
                         shift: shiftName,
                         using: Node
@@ -378,7 +436,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
                         if hookType == "Concat" {
                             var list: [PythonObject] = []
-                            for (i, element) in  hook.argname.list.enumerated() {
+                            for (i, element) in hook.argname.list.enumerated() {
                                 let elementName = String(describing: element.name)
                                 if ignoredInputs.contains(elementName) {
                                     continue
@@ -389,10 +447,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     let doutName = elementName + "_\(i)" + "__dout"
                                     let doutStatement = Node.Wire(doutName)
 
-                                    wrapperCells.append(doutStatement)
-                                    list.append(Node.Identifier(doutName))   
-                                    
-                                    wrapperCells.append(
+                                    cellDeclarations.append(doutStatement)
+                                    list.append(Node.Identifier(doutName))
+
+                                    cellDeclarations.append(
                                         scCreator.create(
                                             ordinal: 0,
                                             max: 0,
@@ -403,16 +461,16 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                             input: !input
                                         )
                                     )
-                                    kind = .bypassInput  
+                                    kind = .bypassInput
 
                                 } else {
                                     let dinName = elementName + "_\(i)" + "__din"
                                     let dinStatement = Node.Wire(dinName)
 
-                                    wrapperCells.append(dinStatement)
-                                    list.append(Node.Identifier(dinName))   
-                                    
-                                    wrapperCells.append(
+                                    cellDeclarations.append(dinStatement)
+                                    list.append(Node.Identifier(dinName))
+
+                                    cellDeclarations.append(
                                         scCreator.create(
                                             ordinal: 0,
                                             max: 0,
@@ -427,11 +485,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 }
                                 internalOrder.append(
                                     ChainRegister(
-                                        name: instanceName + "_\(portName)_\(i)",  
+                                        name: moduleName + "_\(portName)_\(i)",
                                         kind: kind
                                     )
-                                ) 
-                                previousOutput = 
+                                )
+                                previousOutput =
                                     Node.Identifier(inputName.uniqueName(counter + 1))
                                 counter += 1
                             }
@@ -442,7 +500,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             if ignoredInputs.contains(argName) {
                                 continue
                             }
-                        
+
                             var kind: ChainRegister.Kind
                             if input {
                                 let doutName = argName + "__dout"
@@ -450,8 +508,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
                                 statements.append(doutStatement)
                                 hook.argname = Node.Identifier(doutName)
-                                    
-                                wrapperCells.append(
+
+                                cellDeclarations.append(
                                     scCreator.create(
                                         ordinal: 0,
                                         max: 0,
@@ -462,15 +520,15 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                         input: !input
                                     )
                                 )
-                                kind = .bypassInput 
-                            } else { 
+                                kind = .bypassInput
+                            } else {
                                 let dinName = argName + "__din"
                                 let dinStatement = Node.Wire(dinName)
 
-                                wrapperCells.append(dinStatement)
+                                cellDeclarations.append(dinStatement)
                                 hook.argname = Node.Identifier(dinName)
-                                    
-                                wrapperCells.append(
+
+                                cellDeclarations.append(
                                     scCreator.create(
                                         ordinal: 0,
                                         max: 0,
@@ -483,33 +541,33 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 )
                                 kind = .bypassOutput
                             }
-                           
+
                             internalOrder.append(
                                 ChainRegister(
-                                    name: instanceName + "_\(hook.portname)",
+                                    name: moduleName + "_\(hook.portname)",
                                     kind: kind
                                 )
-                            ) 
+                            )
                             previousOutput = Node.Identifier(inputName.uniqueName(counter + 1))
                             counter += 1
                         }
                     }
 
-                    for i in 0...counter {
+                    for i in 0 ... counter {
                         wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
                     }
 
                     blackbox = true
                 }
 
-                if let invClockName = clockInv.value, instanceName == invClockName  { 
+                if let invClockName = clockInv.value, moduleName == invClockName {
                     for hook in instance.portlist {
                         if String(describing: hook.argname) == clockName {
                             invClkSourceId = Node.Identifier(invClkSourceName)
                             hook.argname = invClkSourceId!
                         }
                     }
-                }   
+                }
             }
 
             if !blackbox {
@@ -517,14 +575,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             } else {
                 blackboxItem = itemDeclaration
             }
-
         }
 
         if warn {
             print("[Warning]: Detected flip-flops with clock different from \(clockName).")
         }
 
-        var assignStatements: [PythonObject] =  []
+        var assignStatements: [PythonObject] = []
         let finalAssignment = Node.Assign(
             Node.Lvalue(outputIdentifier),
             Node.Rvalue(previousOutput)
@@ -541,31 +598,32 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             Node.Rvalue(clockCond)
         )
         assignStatements.append(clkSourceAssignment)
-        
+
         if let invClkId = invClkSourceId {
             let invClockCond = Node.Cond(
                 Node.Identifier(testName),
                 Node.Unot(Node.Identifier(tckName)),
                 Node.Identifier(clockName)
             )
-    
+
             let invClockAssignment = Node.Assign(
                 Node.Lvalue(invClkId),
                 Node.Rvalue(invClockCond)
             )
             assignStatements.append(invClockAssignment)
         }
-        
+
         if let item = blackboxItem {
-            wrapperCells.append(item)
+            cellDeclarations.append(item)
         }
-        
-        definition.items = Python.tuple(statements + wireDeclarations + wrapperCells + assignStatements)
+
+        definition.items = Python.tuple(statements + wireDeclarations + cellDeclarations + assignStatements)
         definition.name = Python.str(alteredName)
-        
-        print("Internal scan chain successfuly constructed. Length: " , internalOrder.count)
+
+        print("Internal scan chain successfuly constructed. Length: ", internalOrder.count)
 
         // MARK: Chaining boundary registers
+
         print("Creating and chaining boundary flip-flops…")
         var order: [ChainRegister] = []
         let boundaryCount: Int = try {
@@ -580,7 +638,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(Node.Input(testName))
 
             if let clock = clockOpt.value {
-                statements.append(Node.Input(clock))            
+                statements.append(Node.Input(clock))
             }
 
             let portArguments = Python.list()
@@ -595,7 +653,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             )
 
             var counter = 0
-            
+
             let initialAssignment = Node.Assign(
                 Node.Lvalue(Node.Identifier(inputName.uniqueName(0))),
                 Node.Rvalue(inputIdentifier)
@@ -605,7 +663,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             for input in inputs {
                 let inputStatement = Node.Input(input.name)
 
-                if (input.name != clockName && input.name != resetName){
+                if input.name != clockName, input.name != resetName {
                     statements.append(inputStatement)
                 }
                 if ignoredInputs.contains(input.name) {
@@ -615,7 +673,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     ))
                     continue
                 }
-                
+
                 let doutName = String(describing: input.name) + "__dout"
                 let doutStatement = Node.Wire(doutName)
                 if input.width > 1 {
@@ -636,7 +694,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 let minimum = min(input.from, input.to)
                 let maximum = max(input.from, input.to)
 
-                for i in (minimum)...(maximum) {
+                for i in minimum ... maximum {
                     statements.append(
                         bsrCreator.create(
                             ordinal: i,
@@ -677,7 +735,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 inputName,
                 Node.Identifier(inputName.uniqueName(counter))
             ))
-            
+
             counter += 1 // as a skip
             order += internalOrder
 
@@ -705,18 +763,18 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     output.name,
                     Node.Identifier(dinName)
                 ))
-                
+
                 let minimum = min(output.from, output.to)
                 let maximum = max(output.from, output.to)
 
-                for i in (minimum)...(maximum) {
+                for i in minimum ... maximum {
                     statements.append(
                         bsrCreator.create(
                             ordinal: i,
                             max: maximum,
                             din: dinName,
                             dout: output.name,
-                            sin:  inputName.uniqueName(counter),
+                            sin: inputName.uniqueName(counter),
                             sout: inputName.uniqueName(counter + 1),
                             input: false
                         )
@@ -753,7 +811,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             statements.append(boundaryAssignment)
 
             var wireDeclarations: [PythonObject] = []
-            for i in 0...counter {
+            for i in 0 ... counter {
                 wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
             }
 
@@ -771,7 +829,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             let boundaryScanRegisters =
                 parse([bsrLocation])[0][dynamicMember: "description"].definitions
-            
+
             let definitions = Python.list(description.definitions)
             definitions.extend(boundaryScanRegisters)
             definitions.append(supermodel)
@@ -779,18 +837,19 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             return counter - 1 // Accounting for skip
         }()
-        
-        
-        print("Boundary scan cells successfuly chained. Length: " , boundaryCount)
 
+        print("Boundary scan cells successfuly chained. Length: ", boundaryCount)
+        if internalOrder.count == 0 {
+            print("Warning: No internal scan elements found. Are your DFFs configured properly?")
+        }
         let chainLength = boundaryCount + internalOrder.count
-        print("Total scan-chain length: " , chainLength)
+        print("Total scan-chain length: ", chainLength)
 
         let metadata = ChainMetadata(
             boundaryCount: boundaryCount,
             internalCount: internalOrder.count,
             order: order,
-            shift: shiftName, 
+            shift: shiftName,
             sin: inputName,
             sout: outputName
         )
@@ -798,13 +857,12 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             Stderr.print("Could not generate metadata string.")
             return EX_SOFTWARE
         }
-    
+
         try File.open(intermediate, mode: .write) {
             try $0.print(Generator.visit(ast))
         }
 
         let netlist: String = {
-            
             if !skipSynth.value {
                 let script = Synthesis.script(
                     for: definitionName,
@@ -815,6 +873,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 )
 
                 // MARK: Yosys
+
                 print("Resynthesizing with yosys…")
                 let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
@@ -827,7 +886,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 return intermediate
             }
         }()
-        
+
         guard let content = File.read(netlist) else {
             throw "Could not re-read created file."
         }
@@ -839,6 +898,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         }
 
         // MARK: Verification
+
         if let model = verifyOpt.value {
             print("Verifying scan chain integrity…")
             let ast = parse([netlist])[0]
@@ -859,7 +919,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
             let verified = try Simulator.simulate(
                 verifying: definitionName,
-                in: netlist, 
+                in: netlist,
                 isolating: isolated.value,
                 with: model,
                 ports: ports,
@@ -880,8 +940,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
-            print("done")
-            if (verified) {
+            if verified {
                 print("Scan chain verified successfully.")
             } else {
                 print("Scan chain verification failed.")
@@ -890,13 +949,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                 }
                 if internalOrder.count == 0 {
-                    print("・Ensure that D flip-flop cell name starts with \(dffNames).")
+                    print("・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides.")
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
             }
         }
         print("Done.")
-    
+
     } catch {
         Stderr.print("Internal software error: \(error)")
         return EX_SOFTWARE

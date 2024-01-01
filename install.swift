@@ -38,7 +38,7 @@ extension String {
         task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = ["sh", "-c", self]
 
-        if (silent) {
+        if silent {
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
         }
@@ -85,7 +85,6 @@ if action == .install {
         }
     }
 
-
     let ivlPath = "[ -d '\(iverilogBase)' ]".shOutput()
     if ivlPath.terminationStatus != EX_OK {
         print("Warning: The directory \(iverilogBase) was not found. You may need to export the environment variable 'FAULT_IVL_BASE' when using Fault.")
@@ -120,7 +119,7 @@ if action == .install {
     if podem.terminationStatus != EX_OK {
         print("Optional component podem does not seem to be installed.")
     }
-    
+
     print("Installing Fault…")
 
     let fileManager = FileManager()
@@ -147,13 +146,13 @@ if action == .install {
     }
 
     let venvPath = "\(path)/FaultInstall/venv"
-    
+
     let venvCreate = "python3 -m venv '\(venvPath)'".sh()
     if venvCreate != EX_OK {
         print("Could not create Python virtual environment: process failed with exit code \(venvCreate).")
         exit(EX_CANTCREAT)
     }
-    
+
     let pipInstall = "'\(venvPath)/bin/python3' -m pip install -r ./requirements.txt".sh()
     if pipInstall != EX_OK {
         print("Could not install Python dependencies: process failed with exit code \(pipInstall).")
@@ -171,7 +170,6 @@ if action == .install {
     }
 
     let libPython = libPythonProcess.output
-
 
     let launchScript = """
     #!/bin/bash

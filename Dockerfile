@@ -70,6 +70,8 @@ RUN cp /lib64/libtcl8.5.so /build/lib
 # Fault Setup
 WORKDIR /fault
 COPY . .
+ENV CC=clang
+ENV CXX=clang++
 RUN swift build --static-swift-stdlib -c release
 RUN cp /fault/.build/x86_64-unknown-linux-gnu/release/Fault /build/bin/fault
 WORKDIR /

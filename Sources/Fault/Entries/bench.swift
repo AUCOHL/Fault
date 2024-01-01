@@ -1,11 +1,26 @@
-import Foundation
-import CoreFoundation
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import CommandLineKit
-import PythonKit
+import CoreFoundation
 import Defile
+import Foundation
+import PythonKit
 
 func bench(arguments: [String]) -> Int32 {
     // MARK: CommandLine Processing
+
     let cli = CommandLineKit.CommandLine(arguments: arguments)
 
     let help = BoolOption(
@@ -55,7 +70,7 @@ func bench(arguments: [String]) -> Int32 {
         Stderr.print("File '\(file)' not found.")
         return EX_NOINPUT
     }
-    
+
     let output = filePath.value ?? "\(file).bench"
 
     guard let cellModel = cellsOption.value else {
@@ -76,7 +91,7 @@ func bench(arguments: [String]) -> Int32 {
         cellModelsFile = "\(cellModel).json"
 
         let cellModels =
-        "grep -E -- \"\\bmodule\\b|\\bendmodule\\b|and|xor|or|not(\\s+|\\()|buf|input.*;|output.*;\" \(cellModel)".shOutput();
+            "grep -E -- \"\\bmodule\\b|\\bendmodule\\b|and|xor|or|not(\\s+|\\()|buf|input.*;|output.*;\" \(cellModel)".shOutput()
         let pattern = "(?s)(?:module).*?(?:endmodule)"
 
         var cellDefinitions = ""
@@ -84,54 +99,54 @@ func bench(arguments: [String]) -> Int32 {
             cellDefinitions = String(cellModels.output[range])
         }
         do {
+            let regex = try NSRegularExpression(pattern: pattern)
+            let range = NSRange(cellModels.output.startIndex..., in: cellModels.output)
+            let results = regex.matches(in: cellModels.output, range: range)
+            let matches = results.map { String(cellModels.output[Range($0.range, in: cellModels.output)!]) }
 
-        let regex = try NSRegularExpression(pattern: pattern)
-        let range = NSRange(cellModels.output.startIndex..., in: cellModels.output)
-        let results = regex.matches(in: cellModels.output, range: range)   
-        let matches = results.map { String(cellModels.output[Range($0.range, in: cellModels.output)!])}     
-        
-        cellDefinitions = matches.joined(separator: "\n")
+            cellDefinitions = matches.joined(separator: "\n")
 
-        let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p \(folderName)".sh()
-        
-        defer {
-            let _ = "rm -rf \(folderName)".sh()
-        }
-        let CellFile = "\(folderName)/cells.v"
-    
-        try File.open(CellFile, mode: .write) {
-            try $0.print(cellDefinitions)
-        }
+            let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
+            let _ = "mkdir -p \(folderName)".sh()
 
-        // MARK: Importing Python and Pyverilog
-        let parse = Python.import("pyverilog.vparser.parser").parse
+            defer {
+                let _ = "rm -rf \(folderName)".sh()
+            }
+            let CellFile = "\(folderName)/cells.v"
 
-        // MARK: Parse
-        let ast = parse([CellFile])[0]
-        let description = ast[dynamicMember: "description"]
+            try File.open(CellFile, mode: .write) {
+                try $0.print(cellDefinitions)
+            }
 
-        let cells = try BenchCircuit.extract(definitions: description.definitions)
-        let circuit = BenchCircuit(cells: cells)
-        let encoder = JSONEncoder()
-        
-        encoder.outputFormatting = .prettyPrinted
-        let data = try encoder.encode(circuit)
+            // MARK: Importing Python and Pyverilog
 
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw "Could not create utf8 string."
-        }
+            let parse = Python.import("pyverilog.vparser.parser").parse
 
-        try File.open(cellModelsFile, mode: .write) {
-            try $0.print(string)
-        }
+            // MARK: Parse
+
+            let ast = parse([CellFile])[0]
+            let description = ast[dynamicMember: "description"]
+
+            let cells = try BenchCircuit.extract(definitions: description.definitions)
+            let circuit = BenchCircuit(cells: cells)
+            let encoder = JSONEncoder()
+
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(circuit)
+
+            guard let string = String(data: data, encoding: .utf8) else {
+                throw "Could not create utf8 string."
+            }
+
+            try File.open(cellModelsFile, mode: .write) {
+                try $0.print(string)
+            }
 
         } catch {
             Stderr.print("Internal error: \(error)")
             return EX_SOFTWARE
         }
-    }
-    else if !cellModel.hasSuffix(".json") {
+    } else if !cellModel.hasSuffix(".json") {
         Stderr.print(
             "Warning: Cell model file provided does not end with .v or .sv or .json."
         )
@@ -141,6 +156,7 @@ func bench(arguments: [String]) -> Int32 {
     }
     do {
         // MARK: Processing Library Cells
+
         let data = try Data(contentsOf: URL(fileURLWithPath: cellModelsFile), options: .mappedIfSafe)
         guard let benchCells = try? JSONDecoder().decode(BenchCircuit.self, from: data) else {
             Stderr.print("File '\(cellsOption.value!)' is invalid.")
@@ -152,9 +168,11 @@ func bench(arguments: [String]) -> Int32 {
         }
 
         // MARK: Importing Python and Pyverilog
+
         let parse = Python.import("pyverilog.vparser.parser").parse
 
         // MARK: Parse
+
         let ast = parse([file])[0]
         let description = ast[dynamicMember: "description"]
         var definitionOptional: PythonObject?
@@ -176,17 +194,16 @@ func bench(arguments: [String]) -> Int32 {
         var inputNames: [String] = []
         var usedInputs: [String] = []
         var floatingOutputs: [String] = []
-        var benchStatements: String = ""
+        var benchStatements = ""
         for input in inputs {
             if input.width > 1 {
-                let range = (input.from > input.to) ? input.to...input.from : input.from...input.to
+                let range = (input.from > input.to) ? input.to ... input.from : input.from ... input.to
                 for index in range {
                     let name = "\(input.name)[\(index)]"
                     inputNames.append(name)
                     benchStatements += "INPUT(\(name)) \n"
                 }
-            }
-            else {
+            } else {
                 let name = input.name
                 inputNames.append(name)
                 benchStatements += "INPUT(\(name)) \n"
@@ -194,29 +211,27 @@ func bench(arguments: [String]) -> Int32 {
         }
 
         for item in definition.items {
-            
             let type = Python.type(item).__name__
             // Process gates
             if type == "InstanceList" {
                 let instance = item.instances[0]
-                let cellName =  String(describing: instance.module)
+                let cellName = String(describing: instance.module)
                 let instanceName = String(describing: instance.name)
                 let cell = cellsDict[cellName]!
 
-                var inputs: [String:String] = [:]
+                var inputs: [String: String] = [:]
                 var outputs: [String] = []
                 for hook in instance.portlist {
                     let portname = String(describing: hook.portname)
-                    let type =  Python.type(hook.argname).__name__
-            
-                    if  portname == cell.output {
+                    let type = Python.type(hook.argname).__name__
+
+                    if portname == cell.output {
                         if type == "Pointer" {
                             outputs.append("\(hook.argname.var)[\(hook.argname.ptr)]")
                         } else {
                             outputs.append(String(describing: hook.argname))
                         }
-                    }
-                    else {
+                    } else {
                         if type == "Pointer" {
                             inputs[portname] = "\(hook.argname.var)[\(hook.argname.ptr)]"
                         } else {
@@ -224,21 +239,19 @@ func bench(arguments: [String]) -> Int32 {
                         }
                     }
                 }
-                
-                let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
-                benchStatements += "\(statements) \n" 
-                
-                usedInputs.append(contentsOf: Array(inputs.values))
-            }
-            else if type == "Assign"{
 
+                let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
+                benchStatements += "\(statements) \n"
+
+                usedInputs.append(contentsOf: Array(inputs.values))
+            } else if type == "Assign" {
                 var right = ""
                 if Python.type(item.right.var).__name__ == "Pointer" {
                     right = "\(item.right.var.var)[\(item.right.var.ptr)]"
                 } else {
                     right = "\(item.right.var)"
                 }
-                
+
                 var left = ""
                 if Python.type(item.left.var).__name__ == "Pointer" {
                     left = "\(item.left.var.var)[\(item.left.var.ptr)]"
@@ -255,7 +268,6 @@ func bench(arguments: [String]) -> Int32 {
 
                     usedInputs.append(right)
                 }
-                    
             }
         }
         let ignoredInputs = inputNames.filter { !usedInputs.contains($0) }
@@ -264,19 +276,18 @@ func bench(arguments: [String]) -> Int32 {
         let filteredOutputs = outputs.filter { !floatingOutputs.contains($0.name) }
         for output in filteredOutputs {
             if output.width > 1 {
-                let range = (output.from > output.to) ? output.to...output.from : output.from...output.to
+                let range = (output.from > output.to) ? output.to ... output.from : output.from ... output.to
                 for index in range {
                     benchStatements += "OUTPUT(\(output.name)[\(index)]) \n"
                 }
-            }
-            else {
+            } else {
                 benchStatements += "OUTPUT(\(output.name)) \n"
             }
         }
 
         var floatingStatements = ""
         for input in ignoredInputs {
-            floatingStatements += "OUTPUT(\(input)) \n"            
+            floatingStatements += "OUTPUT(\(input)) \n"
         }
 
         let boilerplate = """
@@ -294,6 +305,6 @@ func bench(arguments: [String]) -> Int32 {
         Stderr.print("Internal error: \(error)")
         return EX_SOFTWARE
     }
-    
+
     return EX_OK
 }

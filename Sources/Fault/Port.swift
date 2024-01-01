@@ -1,5 +1,19 @@
-import PythonKit
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import Foundation
+import PythonKit
 
 class Port: Codable {
     enum Polarity: String, Codable {
@@ -7,6 +21,7 @@ class Port: Codable {
         case output
         case unknown
     }
+
     var name: String
     var polarity: Polarity?
     var from: Int
@@ -14,13 +29,13 @@ class Port: Codable {
     var ordinal: Int
 
     var width: Int {
-        return from < to ? to - from + 1 : from - to + 1
+        from < to ? to - from + 1 : from - to + 1
     }
 
     init(name: String, at ordinal: Int) {
         self.name = name
-        self.from = 0
-        self.to = 0
+        from = 0
+        to = 0
         self.ordinal = ordinal
     }
 
@@ -33,7 +48,7 @@ class Port: Codable {
             let port = Port(name: "\(portDeclaration.name)", at: i)
             ports["\(portDeclaration.name)"] = port
         }
-        
+
         for itemDeclaration in definition.items {
             let type = Python.type(itemDeclaration).__name__
             // Process port declarations further
@@ -41,15 +56,15 @@ class Port: Codable {
                 let declaration = itemDeclaration.list[0]
                 let declType = Python.type(declaration).__name__
                 if declType == "Parameter" {
-                    paramaters["\(declaration.name)"] = 
+                    paramaters["\(declaration.name)"] =
                         Port.evaluate(expr: declaration.value.var, params: paramaters)
                 } else if declType == "Input" || declType == "Output" {
                     guard let port = ports["\(declaration.name)"] else {
                         throw "Unknown port \(declaration.name)"
                     }
                     if declaration.width != Python.None {
-                        let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters) 
-                        let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters) 
+                        let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters)
+                        let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters)
                         port.from = msb
                         port.to = lsb
                     }
@@ -80,39 +95,38 @@ class Port: Codable {
             let left = Port.evaluate(expr: expr.left, params: params)
             let right = Port.evaluate(expr: expr.right, params: params)
             value = Port.op[type]!(left, right)
-            break
         case "IntConst":
             value = Int("\(expr.value)")!
-            break
         case "Identifier":
             value = params["\(expr.name)"]!
-            break
         default:
-            print("Got unknow expression type \(type)");
+            print("Got unknow expression type \(type)")
             exit(EX_DATAERR)
-        }    
+        }
         return value
     }
 
     static let op = [
         "Minus": sub,
         "Plus": add,
-        "Sll": sll
+        "Sll": sll,
     ]
 }
 
 extension Port: CustomStringConvertible {
     var description: String {
-        return "Port(\(name): \(polarity ?? .unknown)[\(from)..\(to)])"
+        "Port(\(name): \(polarity ?? .unknown)[\(from)..\(to)])"
     }
 }
 
-func add (left: Int, right: Int) -> Int {
-    return left + right
+func add(left: Int, right: Int) -> Int {
+    left + right
 }
-func sub (left: Int, right: Int) -> Int {
-    return left - right 
+
+func sub(left: Int, right: Int) -> Int {
+    left - right
 }
-func sll(left: Int ,right: Int) -> Int {
-    return left << right
+
+func sll(left: Int, right: Int) -> Int {
+    left << right
 }

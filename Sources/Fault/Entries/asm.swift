@@ -1,8 +1,22 @@
-import Foundation
-import CommandLineKit
-import PythonKit
-import Defile
+// Copyright (C) 2019 The American University in Cairo
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//         http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import BigInt
+import CommandLineKit
+import Defile
+import Foundation
+import PythonKit
 
 func assemble(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -25,7 +39,6 @@ func assemble(arguments: [String]) -> Int32 {
         helpMessage: "Path to the output vector file. (Default: <json input> + .vec.bin)"
     )
     cli.addOptions(filePath)
-
 
     let goldenFilePath = StringOption(
         shortFlag: "O",
@@ -53,7 +66,7 @@ func assemble(arguments: [String]) -> Int32 {
     if jsonArgs.count != 1 || vArgs.count != 1 {
         Stderr.print("fault asm requires exactly one .json argument and one .v argument.")
         Stderr.print("Invoke fault asm --help for more info.")
-        return EX_USAGE        
+        return EX_USAGE
     }
 
     let json = jsonArgs[0]
@@ -75,10 +88,10 @@ func assemble(arguments: [String]) -> Int32 {
 
     let (chain, _, _) = ChainMetadata.extract(file: netlist)
 
-    let order = chain.filter{ $0.kind != .output }
-    let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal})
+    let order = chain.filter { $0.kind != .output }
+    let orderSorted = order.sorted(by: { $0.ordinal < $1.ordinal })
 
-    let orderOutput = chain.filter{ $0.kind != .input }
+    let orderOutput = chain.filter { $0.kind != .input }
     let outputSorted = orderOutput.sorted(by: { $0.ordinal < $1.ordinal })
 
     let jsInputOrder = tvinfo.inputs
@@ -87,8 +100,8 @@ func assemble(arguments: [String]) -> Int32 {
     var inputMap: [String: Int] = [:]
     var outputMap: [String: Int] = [:]
 
-    // Check input order 
-    let chainOrder = orderSorted.filter{ $0.kind != .bypassInput }
+    // Check input order
+    let chainOrder = orderSorted.filter { $0.kind != .bypassInput }
 
     if chainOrder.count != jsInputOrder.count {
         print("[Error]: number of inputs in the json \(jsInputOrder.count) doesn't equal to the scan-chain registers \(chainOrder.count).")
@@ -105,8 +118,8 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     for (i, output) in jsOutputOrder.enumerated() {
-        var name = (output.name.hasPrefix("\\")) ? String(output.name.dropFirst(1)): output.name
-        name = name.hasSuffix(".q") ? String(name.dropLast(2)): name
+        var name = (output.name.hasPrefix("\\")) ? String(output.name.dropFirst(1)) : output.name
+        name = name.hasSuffix(".q") ? String(name.dropLast(2)) : name
         outputMap[name] = i
     }
 
@@ -114,7 +127,7 @@ func assemble(arguments: [String]) -> Int32 {
         var padded = String(number, radix: radix)
         let length = padded.count
         if digits > length {
-            for _ in 0..<(digits - length) {
+            for _ in 0 ..< (digits - length) {
                 padded = "0" + padded
             }
         }
@@ -134,20 +147,20 @@ func assemble(arguments: [String]) -> Int32 {
         }
         var pointer = 0
         var list: [BigUInt] = []
-        let binFromhex =  String(hex, radix: 2)
+        let binFromhex = String(hex, radix: 2)
         let padLength = jsOutputLength - binFromhex.count
         let outputBinary = (String(repeating: "0", count: padLength) + binFromhex).reversed()
-        for output in jsOutputOrder{
+        for output in jsOutputOrder {
             let start = outputBinary.index(outputBinary.startIndex, offsetBy: pointer)
             let end = outputBinary.index(start, offsetBy: output.width)
-            let value = String(outputBinary[start..<end])
+            let value = String(outputBinary[start ..< end])
             list.append(BigUInt(value, radix: 2)!)
             pointer += output.width
         }
         outputDecimal.append(list)
     }
 
-    var outputLength: Int = 0 
+    var outputLength = 0
     for output in outputSorted {
         outputLength += output.width
     }
@@ -162,18 +175,18 @@ func assemble(arguments: [String]) -> Int32 {
                 value = tvcPair.vector[locus]
             } else {
                 if element.kind == .bypassInput {
-                    value = 0 
+                    value = 0
                 } else {
                     print("Chain register \(element.name) not found in the TVs.")
                     return EX_DATAERR
                 }
             }
             binaryString += pad(value, digits: element.width, radix: 2).reversed()
-        } 
+        }
         var outputBinary = ""
         for element in orderOutput {
             var value: BigUInt = 0
-            if let locus = outputMap[element.name] {  
+            if let locus = outputMap[element.name] {
                 value = outputDecimal[i][locus]
                 outputBinary += pad(value, digits: element.width, radix: 2)
             } else {
@@ -191,7 +204,7 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     let vectorCount = tvinfo.coverageList.count
-    let vectorLength = order.map{ $0.width }.reduce(0, +)
+    let vectorLength = order.map(\.width).reduce(0, +)
 
     let vecMetadata = binMetadata(count: vectorCount, length: vectorLength)
     let outMetadata = binMetadata(count: vectorCount, length: outputLength)
@@ -209,12 +222,12 @@ func assemble(arguments: [String]) -> Int32 {
             try $0.print(String.boilerplate)
             try $0.print("/* FAULT METADATA: '\(vecMetadataString)' END FAULT METADATA */")
             try $0.print(binFileVec, terminator: "")
-        }  
+        }
         try File.open(goldenOutput, mode: .write) {
             try $0.print(String.boilerplate)
             try $0.print("/* FAULT METADATA: '\(outMetadataString)' END FAULT METADATA */")
             try $0.print(binFileOut, terminator: "")
-        } 
+        }
     } catch {
         Stderr.print("Could not access file \(vectorOutput) or \(goldenOutput)")
         return EX_CANTCREAT

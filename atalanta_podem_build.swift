@@ -13,7 +13,6 @@ extension String {
 }
 
 func main() -> Int32 {
-
     let apt = "which apt-get".sh()
     if apt == 0 {
         let _ = "sudo apt-get install -y make flex bison libreadline-dev libncurses5-dev libncursesw5-dev ".sh()
@@ -22,7 +21,7 @@ func main() -> Int32 {
     let env = ProcessInfo.processInfo.environment
 
     let execPrefix = env["EXEC_PREFIX"] ?? "/usr/local/bin"
-        
+
     let previousCWD = env["PWD"]!
 
     let atalanta = installAtalanta(execPrefix: execPrefix, previousCWD: previousCWD)
@@ -30,7 +29,7 @@ func main() -> Int32 {
         let _ = "echo Failed to install Atalanta".sh()
         return atalanta
     }
-    
+
     let podem = installPODEM(execPrefix: execPrefix, previousCWD: previousCWD)
 
     if podem != 0 {
@@ -42,7 +41,6 @@ func main() -> Int32 {
 }
 
 func installAtalanta(execPrefix: String, previousCWD: String) -> Int32 {
-    
     defer {
         chdir(previousCWD)
     }
@@ -67,7 +65,6 @@ func installAtalanta(execPrefix: String, previousCWD: String) -> Int32 {
 }
 
 func installPODEM(execPrefix: String, previousCWD: String) -> Int32 {
-
     defer {
         chdir(previousCWD)
     }
@@ -80,7 +77,7 @@ func installPODEM(execPrefix: String, previousCWD: String) -> Int32 {
     chdir("podem")
 
     let make = "make".sh()
-    if make !=  0 {
+    if make != 0 {
         return make
     }
 
@@ -90,4 +87,5 @@ func installPODEM(execPrefix: String, previousCWD: String) -> Int32 {
     }
     return EX_OK
 }
+
 exit(main())
