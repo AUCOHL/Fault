@@ -2,6 +2,18 @@ import Foundation
 import CommandLineKit
 import PythonKit
 import Defile
+import Yams
+
+func getMatchingDFFInfo(from list: [DFFMatch], for cell: String, fnmatch: PythonObject) -> DFFMatch? {
+    for dffinfo in list {
+        for name in dffinfo.name.components(separatedBy: ",") {
+            if Bool(fnmatch.fnmatch(cell, name))! {
+                return dffinfo
+            }   
+        } 
+    }
+    return nil
+}
 
 func scanChainCreate(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -42,7 +54,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let clockInv = StringOption(
         longFlag: "invClock",
-        helpMessage: "Inverted clk tree source cell name (Default: none)"
+        helpMessage: "Inverter clk tree source cell name (Default: none)"
     )
     cli.addOptions(clockInv)
 
@@ -65,13 +77,21 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(liberty)
 
+    
+    let pdkConfigOpt = StringOption(
+        shortFlag: "p",
+        longFlag: "pdkConfig",
+        helpMessage: "Name for the YAML PDK config file. Recommended."
+    )
+    cli.addOptions(pdkConfigOpt)
+
     let dffOpt = StringOption(
         shortFlag: "d",
         longFlag: "dff",
-        helpMessage: "Flip-flop cell names ,comma,seperated (Default: DFFSR,DFFNEGX1,DFFPOSX1)"
+        helpMessage: "Optional override for the DFF names from the PDK config."
     )
     cli.addOptions(dffOpt)
-
+    
     let isolated = StringOption(
         longFlag: "isolating",
         helpMessage: "Isolated module definitions (.v) (Hard un-scannable blocks). (Default: none)"
@@ -160,7 +180,22 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         Stderr.print("Invoke fault chain --help for more info.")
         return EX_USAGE
     }
-
+    
+    var pdkConfig: PDKConfiguration = PDKConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
+    if let pdkConfigPath = pdkConfigOpt.value {
+        let pdkConfigYML = File.read(pdkConfigPath)!
+        let decoder = YAMLDecoder()
+        do {
+            pdkConfig = try decoder.decode(PDKConfiguration.self, from: pdkConfigYML)
+        } catch {
+            Stderr.print("Invalid YAML file \(pdkConfigPath):  \(error).")
+            return EX_DATAERR
+        }
+    }
+    if let dffOverride = dffOpt.value {
+        pdkConfig.dffMatches.last!.name = dffOverride
+    }
+    
     if !fileManager.fileExists(atPath: libertyFile) {
         Stderr.print("Liberty file '\(libertyFile)' not found.")
         return EX_NOINPUT
@@ -311,7 +346,9 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         definition.portlist.ports = Python.tuple(ports)
 
         var wireDeclarations: [PythonObject] = [] 
-        var wrapperCells: [PythonObject] = []
+        var cellDeclarations: [PythonObject] = []
+        
+        let fnmatch = Python.import("fnmatch")
 
         var warn = false
         var blackbox = false
@@ -322,9 +359,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             if type == "InstanceList" {
                 let instance = itemDeclaration.instances[0]
                 let instanceName = String(describing: instance.module)
-                if dffNames.contains(instanceName) {
+                if let dffinfo = getMatchingDFFInfo(from: pdkConfig.dffMatches, for: instanceName, fnmatch: fnmatch) {
                     for hook in instance.portlist {
-                        if hook.portname == "CLK" {
+                        let portnameStr = String(describing: hook.portname)
+                        if portnameStr == dffinfo.clk {
                             if String(describing: hook.argname) == clockName {
                                 hook.argname = clkSourceId
                             }
@@ -332,7 +370,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 warn = true
                             }
                         }
-                        if hook.portname == "D" {
+                        if portnameStr == dffinfo.d {
                             let ternary = Node.Cond(
                                 shiftIdentifier,
                                 previousOutput,
@@ -341,7 +379,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                             hook.argname = ternary
                         }
 
-                        if hook.portname == "Q" {
+                        if portnameStr == dffinfo.q {
                             previousOutput = hook.argname
                         }
                     }
@@ -389,10 +427,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     let doutName = elementName + "_\(i)" + "__dout"
                                     let doutStatement = Node.Wire(doutName)
 
-                                    wrapperCells.append(doutStatement)
+                                    cellDeclarations.append(doutStatement)
                                     list.append(Node.Identifier(doutName))   
                                     
-                                    wrapperCells.append(
+                                    cellDeclarations.append(
                                         scCreator.create(
                                             ordinal: 0,
                                             max: 0,
@@ -409,10 +447,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                     let dinName = elementName + "_\(i)" + "__din"
                                     let dinStatement = Node.Wire(dinName)
 
-                                    wrapperCells.append(dinStatement)
+                                    cellDeclarations.append(dinStatement)
                                     list.append(Node.Identifier(dinName))   
                                     
-                                    wrapperCells.append(
+                                    cellDeclarations.append(
                                         scCreator.create(
                                             ordinal: 0,
                                             max: 0,
@@ -451,7 +489,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 statements.append(doutStatement)
                                 hook.argname = Node.Identifier(doutName)
                                     
-                                wrapperCells.append(
+                                cellDeclarations.append(
                                     scCreator.create(
                                         ordinal: 0,
                                         max: 0,
@@ -467,10 +505,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                                 let dinName = argName + "__din"
                                 let dinStatement = Node.Wire(dinName)
 
-                                wrapperCells.append(dinStatement)
+                                cellDeclarations.append(dinStatement)
                                 hook.argname = Node.Identifier(dinName)
                                     
-                                wrapperCells.append(
+                                cellDeclarations.append(
                                     scCreator.create(
                                         ordinal: 0,
                                         max: 0,
@@ -557,10 +595,10 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         }
         
         if let item = blackboxItem {
-            wrapperCells.append(item)
+            cellDeclarations.append(item)
         }
         
-        definition.items = Python.tuple(statements + wireDeclarations + wrapperCells + assignStatements)
+        definition.items = Python.tuple(statements + wireDeclarations + cellDeclarations + assignStatements)
         definition.name = Python.str(alteredName)
         
         print("Internal scan chain successfuly constructed. Length: " , internalOrder.count)

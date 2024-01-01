@@ -25,3 +25,6 @@ Netlists
 *.log
 *.vvp
 parsetab.py
+
+.swiftpm/
+abc.history
