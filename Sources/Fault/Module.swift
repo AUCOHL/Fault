@@ -11,11 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+import Defile
 import Foundation
 import PythonKit
+import Collections
 
-class Port: Codable {
+struct Port: Codable {
     enum Polarity: String, Codable {
         case input
         case output
@@ -59,7 +60,7 @@ class Port: Codable {
                     paramaters["\(declaration.name)"] =
                         Port.evaluate(expr: declaration.value.var, params: paramaters)
                 } else if declType == "Input" || declType == "Output" {
-                    guard let port = ports["\(declaration.name)"] else {
+                    guard var port = ports["\(declaration.name)"] else {
                         throw "Unknown port \(declaration.name)"
                     }
                     if declaration.width != Python.None {
@@ -75,6 +76,7 @@ class Port: Codable {
                         port.polarity = .output
                         outputs.append(port)
                     }
+                    ports["\(declaration.name)"] = port
                 }
             }
         }
@@ -129,4 +131,50 @@ func sub(left: Int, right: Int) -> Int {
 
 func sll(left: Int, right: Int) -> Int {
     left << right
+}
+
+struct Module {
+    var name: String
+    var inputs: [Port]
+    var outputs: [Port]
+    var definition: PythonObject
+    var ports: [Port]
+    var portsByName: [String: Port]
+
+    init(name: String, inputs: [Port], outputs: [Port], definition: PythonObject) {
+        self.name = name
+        self.inputs = inputs
+        self.outputs = outputs
+        self.definition = definition
+        self.ports = inputs + outputs
+        self.portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
+    }
+
+    static func getModules(in files: [String]) throws -> OrderedDictionary<String, Module> {
+        let parse = Python.import("pyverilog.vparser.parser").parse
+        var result: OrderedDictionary<String, Module> = [:]
+
+        for file in files {
+            let parseResult = parse([file])
+            let ast = parseResult[0]
+            let description = ast[dynamicMember: "description"]
+            for definition in description.definitions {
+                let type = Python.type(definition).__name__
+                if type != "ModuleDef" {
+                    continue
+                }
+                let name = String(describing: definition.name)
+                let (_, inputs, outputs) = try Port.extract(from: definition)
+                result[name] = Module(name: name, inputs: inputs, outputs: outputs, definition: definition)
+            }
+        }
+
+        return result
+    }
+}
+
+extension Module: CustomStringConvertible {
+    var description: String {
+        "<Module " + (["\(name)"] + ports.map({ $0.description })).joined(separator: "\n\t") + "\n>"
+    }
 }

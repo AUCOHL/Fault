@@ -17,7 +17,7 @@ import CommandLineKit
 import CoreFoundation // Not automatically imported on Linux
 import Defile
 import Foundation
-import OrderedDictionary
+import Collections
 import PythonKit
 
 let VERSION = "0.6.0"
