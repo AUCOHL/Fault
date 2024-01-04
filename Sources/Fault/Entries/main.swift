@@ -13,11 +13,11 @@
 // limitations under the License.
 
 import BigInt
+import Collections
 import CommandLineKit
 import CoreFoundation // Not automatically imported on Linux
 import Defile
 import Foundation
-import Collections
 import PythonKit
 
 let VERSION = "0.6.0"
@@ -209,7 +209,7 @@ func main(arguments: [String]) -> Int32 {
 
     let include = StringOption(
         longFlag: "inc",
-        helpMessage: "Verilog files to include during simulations. (Default: none)"
+        helpMessage: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)"
     )
     cli.addOptions(include)
 
@@ -237,7 +237,7 @@ func main(arguments: [String]) -> Int32 {
 
     let args = cli.unparsedArguments
     if args.count != 1 {
-        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
+        Stderr.print("Invalid argument count: (\(args.count)/\(1)) (\(args))")
         Stderr.print("Invoke fault --help for more info.")
         return EX_USAGE
     }
@@ -300,17 +300,6 @@ func main(arguments: [String]) -> Int32 {
 
     let includeFiles
         = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
-
-    var includeString = ""
-    for file in includeFiles {
-        if !fileManager.fileExists(atPath: file) {
-            Stderr.print("Verilog file '\(file)' not found.")
-            return EX_NOINPUT
-        }
-        includeString += """
-            `include "\(file)"
-        """
-    }
 
     // MARK: Importing Python and Pyverilog
 
@@ -459,12 +448,14 @@ func main(arguments: [String]) -> Int32 {
 
         let startTime = CFAbsoluteTimeGetCurrent()
 
+        var models = [cells] + Array(includeFiles)
+
         print("Performing simulations…")
         let result = try Simulator.simulate(
             for: faultPoints,
             in: args[0],
             module: "\(definition.name)",
-            with: cells,
+            with: models,
             ports: ports,
             inputs: inputsMinusIgnored,
             ignoring: ignoredInputs,
@@ -479,7 +470,6 @@ func main(arguments: [String]) -> Int32 {
             sampleRun: sampleRun.value,
             clock: clock.value,
             defines: defines,
-            includes: includeString,
             using: iverilogExecutable,
             with: vvpExecutable
         )

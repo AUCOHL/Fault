@@ -28,7 +28,7 @@ enum Simulator {
         for faultPoints: Set<String>,
         in file: String,
         module: String,
-        with cells: String,
+        with models: [String],
         ports: [String: Port],
         inputs: [Port],
         ignoring ignoredInputs: Set<String>,
@@ -40,7 +40,6 @@ enum Simulator {
         clock: String?,
         filePrefix: String = ".",
         defines: Set<String> = [],
-        includes: String,
         using _: String,
         with _: String
     ) throws -> (faults: [String], goldenOutput: String) {
@@ -120,12 +119,16 @@ enum Simulator {
             clockCreator = "always #1 \(clockName) = ~\(clockName);"
         }
 
+        var includes = ""
+        for model in models {
+            includes += "`include \"\(model)\"\n"
+        }
+        includes += "`include \"\(file)\"\n"
+
         let bench = """
         \(String.boilerplate)
 
         \(includes)
-        `include "\(cells)"
-        `include "\(file)"
 
         module FaultTestbench;
 
@@ -182,6 +185,8 @@ enum Simulator {
         defer {
             if cleanUp {
                 _ = "rm -rf \(folderName)".sh()
+            } else {
+                print("Find testbenches at : \(folderName)")
             }
         }
         var faults = output.components(separatedBy: "\n").filter {
@@ -204,7 +209,7 @@ enum Simulator {
         for faultPoints: Set<String>,
         in file: String,
         module: String,
-        with cells: String,
+        with models: [String],
         ports: [String: Port],
         inputs: [Port],
         ignoring ignoredInputs: Set<String> = [],
@@ -219,7 +224,6 @@ enum Simulator {
         sampleRun: Bool,
         clock: String?,
         defines: Set<String> = [],
-        includes: String,
         using iverilogExecutable: String,
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverage: Float) {
@@ -234,13 +238,16 @@ enum Simulator {
         sa1Covered.reserveCapacity(faultPoints.count)
 
         var totalTVAttempts = 0
-        var tvAttempts = (initialVectorCount < ceiling) ? initialVectorCount : ceiling
+        var tvAttempts = min(initialVectorCount, ceiling, sampleRun ? 1 : Int.max)
 
         let simulateOnly = (TVSet.count != 0)
         let rng: URNG = URNGFactory.get(name: randomGenerator)!
 
         while coverage < minimumCoverage, totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
+                if sampleRun {
+                    break
+                }
                 print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
             }
 
@@ -265,7 +272,7 @@ enum Simulator {
             if testVectors.count < tvAttempts {
                 print("Skipped \(tvAttempts - testVectors.count) duplicate generated test vectors.")
             }
-            let tempDir = "\(NSTemporaryDirectory())"
+            let tempDir = "."
 
             for vector in testVectors {
                 let future = Future {
@@ -276,7 +283,7 @@ enum Simulator {
                                 for: faultPoints,
                                 in: file,
                                 module: module,
-                                with: cells,
+                                with: models,
                                 ports: ports,
                                 inputs: inputs,
                                 ignoring: ignoredInputs,
@@ -288,7 +295,6 @@ enum Simulator {
                                 clock: clock,
                                 filePrefix: tempDir,
                                 defines: defines,
-                                includes: includes,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -299,7 +305,7 @@ enum Simulator {
                                 for: faultPoints,
                                 in: file,
                                 module: module,
-                                with: cells,
+                                with: models,
                                 ports: ports,
                                 inputs: inputs,
                                 ignoring: ignoredInputs,
@@ -311,7 +317,6 @@ enum Simulator {
                                 clock: clock,
                                 filePrefix: tempDir,
                                 defines: defines,
-                                includes: includes,
                                 using: iverilogExecutable,
                                 with: vvpExecutable
                             )
@@ -323,9 +328,6 @@ enum Simulator {
                     }
                 }
                 futureList.append(future)
-                if sampleRun {
-                    break
-                }
             }
 
             for (i, future) in futureList.enumerated() {
@@ -372,8 +374,7 @@ enum Simulator {
     static func simulate(
         verifying module: String,
         in file: String,
-        isolating blackbox: String?,
-        with cells: String,
+        with models: [String],
         ports: [String: Port],
         inputs: [Port],
         outputs _: [Port],
@@ -388,7 +389,6 @@ enum Simulator {
         test: String,
         output: String,
         defines: Set<String> = [],
-        includes: String,
         using _: String,
         with _: String
     ) throws -> Bool {
@@ -421,10 +421,11 @@ enum Simulator {
             clockCreator += "        always #(`CLOCK_PERIOD / 2) \(tck) = ~\(tck); \n"
         }
 
-        var include = ""
-        if let blackboxFile = blackbox {
-            include = "`include \"\(blackboxFile)\""
+        var includes = ""
+        for model in models {
+            includes += "`include \"\(model)\"\n"
         }
+        includes += "`include \"\(file)\"\n"
 
         var defineStatements = ""
         for def in defines {
@@ -434,12 +435,11 @@ enum Simulator {
         let bench = """
         \(String.boilerplate)
         \(includes)
-        `include "\(cells)"
-        `include "\(file)"
-        \(include)
+
         `ifndef CLOCK_PERIOD
             `define CLOCK_PERIOD 4
         `endif
+
         module testbench;
         \(portWires)
         \(clockCreator)
@@ -469,8 +469,11 @@ enum Simulator {
                     __serial__[i] = \(sout);
                     #(`CLOCK_PERIOD);
                 end
-                if (__serial__ === __serializable__) begin
+                if (__serializable__ === __serial__) begin
+                    $display("Success: expected %b got %b", __serializable__, __serial__);
                     $display("SUCCESS_STRING");
+                end else begin
+                    $display("Failed: expected %b got %b", __serializable__, __serial__);
                 end
                 $finish;
             end
@@ -487,8 +490,7 @@ enum Simulator {
     static func simulate(
         verifying module: String,
         in file: String,
-        isolating blackbox: String?,
-        with cells: String,
+        with models: [String],
         ports: [String: Port],
         inputs: [Port],
         outputs _: [Port],
@@ -503,7 +505,6 @@ enum Simulator {
         trst: String,
         output: String,
         defines: Set<String> = [],
-        includes: String,
         using _: String,
         with _: String
     ) throws -> Bool {
@@ -540,10 +541,11 @@ enum Simulator {
             serial += "\(Int.random(in: 0 ... 1))"
         }
 
-        var include = ""
-        if let blackboxFile = blackbox {
-            include = "`include \"\(blackboxFile)\""
+        var includes = ""
+        for model in models {
+            includes += "`include \"\(model)\"\n"
         }
+        includes += "`include \"\(file)\"\n"
 
         var defineStatements = ""
         for def in defines {
@@ -554,12 +556,11 @@ enum Simulator {
         \(String.boilerplate)
 
         \(includes)
-        `include "\(cells)"
-        `include "\(file)"
-        \(include)
+
         `ifndef CLOCK_PERIOD
             `define CLOCK_PERIOD 4
         `endif
+
         module testbench;
         \(portWires)
 
@@ -632,8 +633,7 @@ enum Simulator {
     static func simulate(
         verifying module: String,
         in file: String,
-        isolating blackbox: String?,
-        with cells: String,
+        with models: [String],
         ports: [String: Port],
         inputs: [Port],
         ignoring ignoredInputs: Set<String>,
@@ -655,7 +655,6 @@ enum Simulator {
         vectorLength: Int,
         outputLength: Int,
         defines: Set<String> = [],
-        includes: String,
         using _: String,
         with _: String
     ) throws -> Bool {
@@ -696,12 +695,13 @@ enum Simulator {
         }
         var testStatements = ""
         for i in 0 ..< vectorCount {
-            testStatements += "        test(__vectors__[\(i)], __gmOutput__[\(i)]) ;\n"
+            testStatements += "        test(\(i), __vectors__[\(i)], __gmOutput__[\(i)]) ;\n"
         }
-        var include = ""
-        if let blackboxFile = blackbox {
-            include = "`include \"\(blackboxFile)\""
+        var includes = ""
+        for model in models {
+            includes += "`include \"\(model)\"\n"
         }
+        includes += "`include \"\(file)\"\n"
 
         var defineStatements = ""
         for def in defines {
@@ -712,12 +712,11 @@ enum Simulator {
 
         \(String.boilerplate)
         \(includes)
-        `include "\(cells)"
-        `include "\(file)"
-        \(include)
+
         `ifndef CLOCK_PERIOD
             `define CLOCK_PERIOD 4
         `endif
+
         module testbench;
         \(portWires)
 
@@ -728,7 +727,7 @@ enum Simulator {
                 \(portHooks.dropLast(2))
             );
 
-            integer i, __error__;
+            integer i, __all_errors__, __error__;
 
             reg [\(outputLength - 1):0] __scanInSerial__;
             reg [\(vectorLength - 1):0] __vectors__ [0:\(vectorCount - 1)];
@@ -744,6 +743,7 @@ enum Simulator {
                     $dumpfile("dut.vcd"); // DEBUG
                     $dumpvars(0, testbench);
                 `endif
+                __all_errors__ = 0;
         \(inputAssignment)
                 $readmemb("\(vecbinFile)", __vectors__);
                 $readmemb("\(outbinFile)", __gmOutput__);
@@ -752,15 +752,21 @@ enum Simulator {
                 \(trst) = 1;        
                 #(`CLOCK_PERIOD) ;
         \(testStatements)
-                $display("SUCCESS_STRING");
-                $finish;
+                if (__all_errors__ > 0) begin
+                    $error("SIMULATING_TV_FAILED");
+                    $finish;
+                end else begin
+                    $display("SUCCESS_STRING");
+                    $finish;
+                end
             end
 
             task test;
+                input [31:0] __ordinal__; // integer
                 input [\(vectorLength - 1):0] __vector__;
                 input [\(outputLength - 1):0] __goldenOutput__;
                 begin
-
+                    $display("Testing vector %0d...", __ordinal__);
                     // Preload Scan-Chain with TV
 
                     shiftIR(__preloadChain__);
@@ -788,8 +794,7 @@ enum Simulator {
                         \(tdi) = 0;
                         __scanInSerial__[i] = __tdo_pad_out__;
                         if (__scanInSerial__[i] !== __goldenOutput__[i]) begin
-                            $display("Error simulating output response at bit number %0d    \
-                            Expected %0b, Got %0b", i, __goldenOutput__[i], __scanInSerial__[i]);
+                            $display("@%0d:\\t\\tExpected %0b, Got %0b", i, __goldenOutput__[i], __scanInSerial__[i]);
                             __error__ = __error__ + 1;
                         end
                         if(i == \(outputLength - 1)) begin
@@ -797,15 +802,18 @@ enum Simulator {
                         end
                         #(`CLOCK_PERIOD) ;
                     end
+                    __all_errors__ += __error__;
                     \(tms) = 1; // update-DR
                     #(`CLOCK_PERIOD) ;
                     \(tms) = 0; // run-test-idle
                     #(`CLOCK_PERIOD) ;
 
                     if(__scanInSerial__ !== __goldenOutput__) begin
-                        $display("Simulating TV failed, number fo errors %0d : ", __error__);
-                        $error("SIMULATING_TV_FAILED");
-                        $finish;
+                        $display("Test vector simulation failed: %0d bits mismatched", __error__);
+                        $display("Expected:\\t%0b", __goldenOutput__);
+                        $display("Got:\\t\\t%0b", __scanInSerial__);
+                    end else begin
+                        $display("Passed vector %0d.", __ordinal__);
                     end
                 end
             endtask
@@ -830,6 +838,13 @@ enum Simulator {
         try File.open(output, mode: .write) {
             try $0.print(bench)
         }
+        
+        let outputLog = "\(output).log"
+        print("Starting simulation steps (log: \(outputLog))…")
+        
+        guard let outputFile = File.open(outputLog, mode: .write) else {
+            throw RuntimeError("Failed to open log file.")
+        }
 
         let aoutName = "\(output).a.out"
         defer {
@@ -837,21 +852,33 @@ enum Simulator {
                 let _ = "rm \(aoutName)".sh()
             }
         }
+        let iverilogCmd = "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1";
+        try outputFile.write(string: "$ \(iverilogCmd)\n")
+        
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1 > /dev/null".shOutput()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1".shOutput()
+        try outputFile.write(string: iverilogResult.output)
+
 
         if iverilogResult.terminationStatus != EX_OK {
-            Stderr.print("An iverilog error has occurred: ")
-            Stderr.print(iverilogResult.output)
-            exit(Int32(iverilogResult.terminationStatus))
+            throw RuntimeError("Failed to run iverilog.")
         }
-        let vvpTask = "'\(vvpExecutable)' \(aoutName)".shOutput()
+        
+        let vvpCmd = "'\(vvpExecutable)' \(aoutName)"
+        try outputFile.write(string: "$ \(vvpCmd)\n")
+        let vvpResult = vvpCmd.shOutput()
+        try outputFile.write(string: vvpResult.output)
 
-        if vvpTask.terminationStatus != EX_OK {
-            throw "Failed to run vvp."
+
+        if iverilogResult.terminationStatus != EX_OK {
+            throw RuntimeError("Failed to run vvp.")
         }
 
-        return vvpTask.output.contains("SUCCESS_STRING")
+        if vvpResult.output.contains("SUCCESS_STRING") {
+            return true
+        } else {
+            return false
+        }
     }
 
     private static func createTasks(tms: String, tdi: String) -> String {

@@ -12,11 +12,470 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import Collections
 import CommandLineKit
 import Defile
 import Foundation
 import PythonKit
 import Yams
+
+func chainInternal(
+    Node: PythonObject,
+    sclConfig: SCLConfiguration,
+    module: Module,
+    blackboxModules: OrderedDictionary<String, Module>,
+    bsrCreator: BoundaryScanRegisterCreator,
+    clockName: String,
+    resetName _: String,
+    resetActive _: Simulator.Active,
+    shiftName: String,
+    inputName: String,
+    outputName: String,
+    testName: String,
+    tckName: String,
+    invClockName: String?,
+    ignoredInputs: any Sequence<String>
+) throws -> [ChainRegister] {
+    // Modifies module definition in-place to create scan-chain.
+    // Changes name to .original to differentate from new top level.
+    print("Chaining internal flip-flops…")
+    let alteredName = "\\\(module.name).original"
+
+    var internalOrder: [ChainRegister] = []
+
+    let shiftIdentifier = Node.Identifier(shiftName)
+    let inputIdentifier = Node.Identifier(inputName)
+    let outputIdentifier = Node.Identifier(outputName)
+
+    let clkSourceName = "__clk_source__"
+    let clkSourceId = Node.Identifier(clkSourceName)
+    let invClkSourceName = "__clk_source_n__"
+    var invClkSourceId: PythonObject?
+
+    var statements: [PythonObject] = []
+    statements.append(Node.Input(inputName))
+    statements.append(Node.Output(outputName))
+    statements.append(Node.Input(shiftName))
+    statements.append(Node.Input(tckName))
+    statements.append(Node.Input(testName))
+    statements.append(Node.Wire(clkSourceName))
+
+    if invClockName != nil {
+        statements.append(Node.Wire(invClkSourceName))
+    }
+
+    var ports = [PythonObject](module.definition.portlist.ports)!
+    ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
+    ports.append(Node.Port(shiftName, Python.None, Python.None, Python.None))
+    ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
+    ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
+    ports.append(Node.Port(testName, Python.None, Python.None, Python.None))
+    module.definition.portlist.ports = Python.tuple(ports)
+
+    var counter = 0
+    let newShiftWire = {
+        () in
+        let name = "__chain_\(counter)__"
+        counter += 1
+        statements.append(Node.Decl([Node.Wire(name)]))
+        return Node.Identifier(name)
+    }
+    var previousOutput = newShiftWire()
+
+    statements.append(Node.Assign(previousOutput, inputIdentifier))
+
+    let fnmatch = Python.import("fnmatch")
+
+    var muxCreator: MuxCreator?
+    if let muxInfo = sclConfig.muxInfo {
+        muxCreator = MuxCreator(using: Node, muxInfo: muxInfo)
+    }
+    var warn = false
+    for itemDeclaration in module.definition.items {
+        let type = Python.type(itemDeclaration).__name__
+        // Process gates
+        if type == "InstanceList" {
+            let instance = itemDeclaration.instances[0]
+            let moduleName = String(describing: instance.module)
+            let instanceName = String(describing: instance.name)
+            if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
+                for hook in instance.portlist {
+                    let portnameStr = String(describing: hook.portname)
+                    if portnameStr == dffinfo.clk {
+                        if String(describing: hook.argname) == clockName {
+                            hook.argname = clkSourceId
+                        } else {
+                            warn = true
+                        }
+                    }
+                    if portnameStr == dffinfo.d {
+                        if let mc = muxCreator {
+                            let (muxCellDecls, muxWireDecls, muxOut) = mc.create(for: instanceName, selection: shiftIdentifier, a: previousOutput, b: hook.argname)
+                            hook.argname = muxOut
+                            statements += muxCellDecls
+                            statements += muxWireDecls
+
+                        } else {
+                            let ternary = Node.Cond(
+                                shiftIdentifier,
+                                previousOutput,
+                                hook.argname
+                            )
+                            hook.argname = ternary
+                        }
+                    }
+
+                    if portnameStr == dffinfo.q {
+                        previousOutput = hook.argname
+                    }
+                }
+
+                internalOrder.append(
+                    ChainRegister(
+                        name: String(describing: instance.name),
+                        kind: .dff
+                    )
+                )
+
+            } else if let blackboxModule = blackboxModules[moduleName] {
+                // MARK: Isolating hard blocks
+
+                print("Chaining blackbox module '\(blackboxModule.name)'…")
+                for hook in instance.portlist {
+                    // Note that `hook.argname` is actually an expression
+                    let portInfo = blackboxModule.portsByName["\(hook.portname)"]!
+
+                    if ignoredInputs.contains(portInfo.name) {
+                        // Leave it alone
+                        continue
+                    }
+
+                    let wireNameOriginal = "\\\(instanceName).\(portInfo.name).original"
+                    let wireNameMultiplexed = "\\\(instanceName).\(portInfo.name).multiplexed"
+                    let width = Node.Width(Node.IntConst(portInfo.from), Node.IntConst(portInfo.to))
+                    let wiresDecl = Node.Decl([Node.Wire(wireNameOriginal, width: width), Node.Wire(wireNameMultiplexed, width: width)])
+                    statements.append(wiresDecl)
+
+                    var kind: ChainRegister.Kind
+                    if portInfo.polarity == .input {
+                        statements.append(Node.Assign(Node.Identifier(wireNameOriginal), hook.argname))
+                        kind = .bypassInput
+                    } else if portInfo.polarity == .output {
+                        statements.append(Node.Assign(hook.argname, Node.Identifier(wireNameMultiplexed)))
+                        hook.argname = Node.Identifier(wireNameOriginal)
+                        kind = .bypassOutput
+                    } else {
+                        throw RuntimeError("Unknown polarity for \(instanceName)'s \(portInfo.name)")
+                    }
+
+                    for bit in portInfo.bits {
+                        let originalBit = Node.Pointer(Node.Identifier(wireNameOriginal), Node.IntConst(bit))
+                        let multiplexedBit = Node.Pointer(Node.Identifier(wireNameMultiplexed), Node.IntConst(bit))
+                        let nextOutput = newShiftWire()
+                        let decl = bsrCreator.create(
+                            group: instanceName,
+                            din: originalBit,
+                            dout: multiplexedBit,
+                            sin: "\(previousOutput)",
+                            sout: "\(nextOutput)",
+                            input: portInfo.polarity != .input // If it's an input to the macro, it's an output of the circuit we're stitching a scan-chain for
+                        )
+                        previousOutput = nextOutput
+                        statements.append(decl)
+                    }
+                    internalOrder.append(
+                        ChainRegister(
+                            name: "\(instanceName).\(portInfo.name)",
+                            kind: kind,
+                            width: portInfo.width
+                        )
+                    )
+                }
+            }
+
+            if let invClock = invClockName, moduleName == invClock {
+                for hook in instance.portlist {
+                    if String(describing: hook.argname) == clockName {
+                        invClkSourceId = Node.Identifier(invClkSourceName)
+                        hook.argname = invClkSourceId!
+                    }
+                }
+            }
+        }
+
+        statements.append(itemDeclaration)
+    }
+
+    if warn {
+        print("[Warning]: Detected flip-flops with clock different from \(clockName).")
+    }
+
+    let finalAssignment = Node.Assign(
+        Node.Lvalue(outputIdentifier),
+        Node.Rvalue(previousOutput)
+    )
+    statements.append(finalAssignment)
+
+    let clockCond = Node.Cond(
+        Node.Identifier(testName),
+        Node.Identifier(tckName),
+        Node.Identifier(clockName)
+    )
+    let clkSourceAssignment = Node.Assign(
+        Node.Lvalue(clkSourceId),
+        Node.Rvalue(clockCond)
+    )
+    statements.append(clkSourceAssignment)
+
+    if let invClkId = invClkSourceId {
+        let invClockCond = Node.Cond(
+            Node.Identifier(testName),
+            Node.Unot(Node.Identifier(tckName)),
+            Node.Identifier(clockName)
+        )
+
+        let invClockAssignment = Node.Assign(
+            Node.Lvalue(invClkId),
+            Node.Rvalue(invClockCond)
+        )
+        statements.append(invClockAssignment)
+    }
+
+    module.definition.items = Python.tuple(statements)
+    module.definition.name = Python.str(alteredName)
+
+    return internalOrder
+}
+
+func chainTop(
+    Node: PythonObject,
+    sclConfig _: SCLConfiguration,
+    module: Module,
+    blackboxModules _: OrderedDictionary<String, Module>,
+    bsrCreator: BoundaryScanRegisterCreator,
+    clockName: String,
+    resetName: String,
+    resetActive _: Simulator.Active,
+    shiftName: String,
+    inputName: String,
+    outputName: String,
+    testName: String,
+    tckName: String,
+    invClockName _: String?,
+    ignoredInputs: any Sequence<String>,
+    internalOrder: [ChainRegister]
+) throws -> (supermodel: PythonObject, order: [ChainRegister]) {
+    var order: [ChainRegister] = []
+    let ports = Python.list(module.definition.portlist.ports)
+
+    var statements: [PythonObject] = []
+    statements.append(Node.Input(inputName))
+    statements.append(Node.Output(outputName))
+    statements.append(Node.Input(resetName))
+    statements.append(Node.Input(shiftName))
+    statements.append(Node.Input(tckName))
+    statements.append(Node.Input(testName))
+    statements.append(Node.Input(clockName))
+
+    let portArguments = Python.list()
+
+    var counter = 0
+    let newShiftWire = {
+        () in
+        let name = "__chain_\(counter)__"
+        counter += 1
+        statements.append(Node.Decl([Node.Wire(name)]))
+        return Node.Identifier(name)
+    }
+    var previousOutput = newShiftWire()
+
+    let initialAssignment = Node.Assign(
+        Node.Lvalue(previousOutput),
+        Node.Rvalue(Node.Identifier(inputName))
+    )
+    statements.append(initialAssignment)
+
+    for input in module.inputs {
+        let inputStatement = Node.Input(input.name)
+
+        if input.name != clockName, input.name != resetName {
+            statements.append(inputStatement)
+        }
+        if ignoredInputs.contains(input.name) {
+            portArguments.append(Node.PortArg(
+                input.name,
+                Node.Identifier(input.name)
+            ))
+            continue
+        }
+
+        let doutName = String(describing: input.name) + "__dout"
+        let doutStatement = Node.Wire(doutName)
+        if input.width > 1 {
+            let width = Node.Width(
+                Node.Constant(input.from),
+                Node.Constant(input.to)
+            )
+            inputStatement.width = width
+            doutStatement.width = width
+        }
+        statements.append(doutStatement)
+
+        portArguments.append(Node.PortArg(
+            input.name,
+            Node.Identifier(doutName)
+        ))
+        if input.width == 1 {
+            let nextOutput = newShiftWire()
+            let decl = bsrCreator.create(
+                group: "",
+                din: Node.Identifier(input.name),
+                dout: Node.Identifier(doutName),
+                sin: "\(previousOutput)",
+                sout: "\(nextOutput)",
+                input: true
+            )
+            statements.append(decl)
+            previousOutput = nextOutput
+
+        } else {
+            for bit in input.bits {
+                let nextOutput = newShiftWire()
+                let decl = bsrCreator.create(
+                    group: "",
+                    din: Node.Pointer(Node.Identifier(input.name), Node.IntConst(bit)),
+                    dout: Node.Pointer(Node.Identifier(doutName), Node.IntConst(bit)),
+                    sin: "\(previousOutput)",
+                    sout: "\(nextOutput)",
+                    input: true
+                )
+                statements.append(decl)
+                previousOutput = nextOutput
+            }
+        }
+
+        order.append(
+            ChainRegister(
+                name: String(describing: input.name),
+                kind: .input,
+                width: input.width
+            )
+        )
+    }
+
+    portArguments.append(Node.PortArg(
+        shiftName,
+        Node.Identifier(shiftName)
+    ))
+    portArguments.append(Node.PortArg(
+        tckName,
+        Node.Identifier(tckName)
+    ))
+    portArguments.append(Node.PortArg(
+        testName,
+        Node.Identifier(testName)
+    ))
+
+    portArguments.append(Node.PortArg(
+        inputName,
+        previousOutput
+    ))
+
+    let nextOutput = newShiftWire()
+    portArguments.append(Node.PortArg(
+        outputName,
+        nextOutput
+    ))
+
+    order += internalOrder
+    previousOutput = nextOutput
+
+    for output in module.outputs {
+        let outputStatement = Node.Output(output.name)
+        let dinName = String(describing: output.name) + "_din"
+        let dinStatement = Node.Wire(dinName)
+        if output.width > 1 {
+            let width = Node.Width(
+                Node.Constant(output.from),
+                Node.Constant(output.to)
+            )
+            outputStatement.width = width
+            dinStatement.width = width
+        }
+        statements.append(outputStatement)
+        statements.append(dinStatement)
+
+        portArguments.append(Node.PortArg(
+            output.name,
+            Node.Identifier(dinName)
+        ))
+
+        if output.width == 1 {
+            let nextOutput = newShiftWire()
+            let decl = bsrCreator.create(
+                group: "",
+                din: Node.Identifier(dinName),
+                dout: Node.Identifier(output.name),
+                sin: "\(previousOutput)",
+                sout: "\(nextOutput)",
+                input: false
+            )
+            statements.append(decl)
+            previousOutput = nextOutput
+        } else {
+            for bit in output.bits {
+                let nextOutput = newShiftWire()
+                let decl = bsrCreator.create(
+                    group: "",
+                    din: Node.Pointer(Node.Identifier(dinName), Node.IntConst(bit)),
+                    dout: Node.Pointer(Node.Identifier(output.name), Node.IntConst(bit)),
+                    sin: "\(previousOutput)",
+                    sout: "\(nextOutput)",
+                    input: false
+                )
+                statements.append(decl)
+                previousOutput = nextOutput
+            }
+        }
+
+        order.append(
+            ChainRegister(
+                name: String(describing: output.name),
+                kind: .output,
+                width: output.width
+            )
+        )
+    }
+
+    let submoduleInstance = Node.Instance(
+        module.definition.name,
+        "__uuf__",
+        Python.tuple(portArguments),
+        Python.tuple()
+    )
+
+    statements.append(Node.InstanceList(
+        module.definition.name,
+        Python.tuple(),
+        Python.tuple([submoduleInstance])
+    ))
+
+    let boundaryAssignment = Node.Assign(
+        Node.Lvalue(Node.Identifier(outputName)),
+        Node.Rvalue(previousOutput)
+    )
+    statements.append(boundaryAssignment)
+
+    let supermodel = Node.ModuleDef(
+        module.name,
+        Python.None,
+        Node.Portlist(Python.tuple(ports)),
+        Python.tuple(statements)
+    )
+    print("Boundary scan cells successfully chained. Length: ", order.reduce(0) { $0 + $1.width } - internalOrder.reduce(0) { $0 + $1.width })
+
+    return (supermodel, order)
+}
 
 func scanChainCreate(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -38,7 +497,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Inputs to ignore. Comma-delimited."
+        helpMessage: "Inputs to ignore on both the top level design and all black-boxed macros. Comma-delimited."
     )
     cli.addOptions(ignored)
 
@@ -55,11 +514,11 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(clockOpt)
 
-    let clockInv = StringOption(
+    let invClock = StringOption(
         longFlag: "invClock",
-        helpMessage: "Inverter clk tree source cell name. (Default: none)"
+        helpMessage: "Inverted clk tree source cell name. (Default: none)"
     )
-    cli.addOptions(clockInv)
+    cli.addOptions(invClock)
 
     let resetOpt = StringOption(
         longFlag: "reset",
@@ -94,11 +553,17 @@ func scanChainCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(dffOpt)
 
-    let isolated = StringOption(
-        longFlag: "isolating",
-        helpMessage: "Isolated module definitions (.v) (Hard un-scannable blocks). (Default: none)"
+    let blackboxOpt = StringOption(
+        longFlag: "blackbox",
+        helpMessage: "Blackbox module names. Comma-delimited. (Default: none)"
     )
-    cli.addOptions(isolated)
+    cli.addOptions(blackboxOpt)
+
+    let blackboxModelOpt = StringOption(
+        longFlag: "blackboxModel",
+        helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)"
+    )
+    cli.addOptions(blackboxModelOpt)
 
     let defs = StringOption(
         longFlag: "define",
@@ -108,7 +573,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let include = StringOption(
         longFlag: "inc",
-        helpMessage: "Verilog files to include during simulations. (Default: none)"
+        helpMessage: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)"
     )
     cli.addOptions(include)
 
@@ -226,30 +691,17 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     let output = filePath.value ?? "\(file).chained.v"
     let intermediate = output + ".intermediate.v"
-    let bsrLocation = output + ".bsr.v"
 
     var ignoredInputs
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
-
+        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
     let defines
-        = Set<String>(defs.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+        = Set<String>(defs.value?.components(separatedBy: ",") ?? [])
 
     ignoredInputs.insert(clockName)
     ignoredInputs.insert(resetName)
 
     let includeFiles
         = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
-
-    var includeString = ""
-    for file in includeFiles {
-        if !fileManager.fileExists(atPath: file) {
-            Stderr.print("Verilog file '\(file)' not found.")
-            return EX_NOINPUT
-        }
-        includeString += """
-            `include "\(file)"
-        """
-    }
 
     // MARK: Importing Python and Pyverilog
 
@@ -262,593 +714,91 @@ func scanChainCreate(arguments: [String]) -> Int32 {
 
     // MARK: Parse
 
-    let ast = parse([args[0]])[0]
-    let description = ast[dynamicMember: "description"]
-    var definitionOptional: PythonObject?
-    for definition in description.definitions {
-        let type = Python.type(definition).__name__
-        if type == "ModuleDef" {
-            definitionOptional = definition
-            break
-        }
-    }
-
-    guard let definition = definitionOptional else {
-        Stderr.print("No module found.")
+    let modules = try! Module.getModules(in: [file])
+    guard let module = modules.values.first else {
+        Stderr.print("No modules found in file.")
         return EX_DATAERR
     }
 
-    var isolatedOptional: PythonObject?
-    var isolatedName: String?
-    if let file = isolated.value {
-        let ast = parse([file])[0]
-        let description = ast[dynamicMember: "description"]
-        for definition in description.definitions {
-            let type = Python.type(definition).__name__
-            if type == "ModuleDef" {
-                isolatedOptional = definition
-                isolatedName = String(describing: definition.name)
-                break
-            }
-        }
-    }
-
-    if let _ = isolatedOptional {
-    } else {
-        if let isolatedFile = isolated.value {
-            Stderr.print("No module defintion found in \(isolatedFile)")
-            return EX_DATAERR
-        }
-    }
-
-    // MARK: Internal signals
-
-    print("Chaining internal flip-flops…")
-    let definitionName = String(describing: definition.name)
-    let alteredName = "__UNIT__UNDER__FINANGLING__"
-
-    var internalOrder: [ChainRegister] = []
+    let blackboxModuleNames = Set<String>((blackboxOpt.value?.components(separatedBy: ",")) ?? [])
+    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
+    let blackboxModules = try! Module.getModules(in: blackboxModels, filter: blackboxModuleNames)
 
     do {
-        let (_, inputs, outputs) = try Port.extract(from: definition)
-
         let shiftName = names["shift"]!.option.value ?? names["shift"]!.default
-        let shiftIdentifier = Node.Identifier(shiftName)
         let inputName = names["sin"]!.option.value ?? names["sin"]!.default
-        let inputIdentifier = Node.Identifier(inputName)
         let outputName = names["sout"]!.option.value ?? names["sout"]!.default
-        let outputIdentifier = Node.Identifier(outputName)
         let testName = names["test"]!.option.value ?? names["test"]!.default
-
         let tckName = names["tck"]!.option.value ?? names["tck"]!.default
-        let clkSourceName = "__clk_source__"
-        let clkSourceId = Node.Identifier(clkSourceName)
 
-        let invClkSourceName = "__clk_source_n__"
-        var invClkSourceId: PythonObject?
-
-        // MARK: Register chaining original module
-
-        var previousOutput = inputIdentifier
-
-        let statements = Python.list()
-        statements.append(Node.Input(inputName))
-        statements.append(Node.Output(outputName))
-        statements.append(Node.Input(shiftName))
-        statements.append(Node.Input(tckName))
-        statements.append(Node.Input(testName))
-        statements.append(Node.Wire(clkSourceName))
-
-        if let _ = clockInv.value {
-            statements.append(Node.Wire(invClkSourceName))
-        }
-
-        let ports = Python.list(definition.portlist.ports)
-        ports.append(Node.Port(inputName, Python.None, Python.None, Python.None))
-        ports.append(Node.Port(shiftName, Python.None, Python.None, Python.None))
-        ports.append(Node.Port(outputName, Python.None, Python.None, Python.None))
-        ports.append(Node.Port(tckName, Python.None, Python.None, Python.None))
-        ports.append(Node.Port(testName, Python.None, Python.None, Python.None))
-
-        definition.portlist.ports = Python.tuple(ports)
-
-        var wireDeclarations: [PythonObject] = []
-        var cellDeclarations: [PythonObject] = []
-
-        let fnmatch = Python.import("fnmatch")
-
-        var muxCreator: MuxCreator? = nil
-        if let muxInfo = sclConfig.muxInfo {
-            muxCreator = MuxCreator(using: Node, muxInfo: muxInfo)
-        }
-        var warn = false
-        var blackbox = false
-        var blackboxItem: PythonObject?
-        for itemDeclaration in definition.items {
-            let type = Python.type(itemDeclaration).__name__
-            // Process gates
-            if type == "InstanceList" {
-                let instance = itemDeclaration.instances[0]
-                let moduleName = String(describing: instance.module)
-                let instanceName = String(describing: instance.name)
-                if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
-                    for hook in instance.portlist {
-                        let portnameStr = String(describing: hook.portname)
-                        if portnameStr == dffinfo.clk {
-                            if String(describing: hook.argname) == clockName {
-                                hook.argname = clkSourceId
-                            } else {
-                                warn = true
-                            }
-                        }
-                        if portnameStr == dffinfo.d {
-                            if let mc = muxCreator {
-                                let (muxCellDecls, muxWireDecls, muxOut) = mc.create(for: instanceName, selection: shiftIdentifier, a: previousOutput, b: hook.argname)
-                                hook.argname = muxOut
-                                cellDeclarations += muxCellDecls
-                                wireDeclarations += muxWireDecls
-
-                            } else {
-                                let ternary = Node.Cond(
-                                    shiftIdentifier,
-                                    previousOutput,
-                                    hook.argname
-                                )
-                                hook.argname = ternary
-                            }
-                        }
-
-                        if portnameStr == dffinfo.q {
-                            previousOutput = hook.argname
-                        }
-                    }
-
-                    internalOrder.append(
-                        ChainRegister(
-                            name: String(describing: instance.name),
-                            kind: .dff
-                        )
-                    )
-
-                } else if let name = isolatedName, name == moduleName {
-                    // MARK: Isolating hard blocks
-
-                    print("Chaining blackbox module…")
-                    let (_, inputs, _) = try Port.extract(from: isolatedOptional!)
-                    let isolatedInputs = inputs.map(\.name)
-
-                    var counter = 0
-
-                    let scCreator = BoundaryScanRegisterCreator(
-                        name: "BoundaryScanRegister",
-                        clock: tckName,
-                        reset: resetName,
-                        resetActive: resetActiveLow.value ? .low : .high,
-                        testing: testName,
-                        shift: shiftName,
-                        using: Node
-                    )
-
-                    for hook in instance.portlist {
-                        let hookType = Python.type(hook.argname).__name__
-                        let portName = String(describing: hook.portname)
-                        let input = isolatedInputs.contains(portName)
-
-                        if hookType == "Concat" {
-                            var list: [PythonObject] = []
-                            for (i, element) in hook.argname.list.enumerated() {
-                                let elementName = String(describing: element.name)
-                                if ignoredInputs.contains(elementName) {
-                                    continue
-                                }
-
-                                var kind: ChainRegister.Kind
-                                if input {
-                                    let doutName = elementName + "_\(i)" + "__dout"
-                                    let doutStatement = Node.Wire(doutName)
-
-                                    cellDeclarations.append(doutStatement)
-                                    list.append(Node.Identifier(doutName))
-
-                                    cellDeclarations.append(
-                                        scCreator.create(
-                                            ordinal: 0,
-                                            max: 0,
-                                            din: elementName,
-                                            dout: doutName,
-                                            sin: "\(previousOutput)",
-                                            sout: inputName.uniqueName(counter + 1),
-                                            input: !input
-                                        )
-                                    )
-                                    kind = .bypassInput
-
-                                } else {
-                                    let dinName = elementName + "_\(i)" + "__din"
-                                    let dinStatement = Node.Wire(dinName)
-
-                                    cellDeclarations.append(dinStatement)
-                                    list.append(Node.Identifier(dinName))
-
-                                    cellDeclarations.append(
-                                        scCreator.create(
-                                            ordinal: 0,
-                                            max: 0,
-                                            din: dinName,
-                                            dout: elementName,
-                                            sin: "\(previousOutput)",
-                                            sout: inputName.uniqueName(counter + 1),
-                                            input: !input
-                                        )
-                                    )
-                                    kind = .bypassOutput
-                                }
-                                internalOrder.append(
-                                    ChainRegister(
-                                        name: moduleName + "_\(portName)_\(i)",
-                                        kind: kind
-                                    )
-                                )
-                                previousOutput =
-                                    Node.Identifier(inputName.uniqueName(counter + 1))
-                                counter += 1
-                            }
-
-                            hook.argname.list = Python.tuple(list)
-                        } else {
-                            let argName = String(describing: hook.argname)
-                            if ignoredInputs.contains(argName) {
-                                continue
-                            }
-
-                            var kind: ChainRegister.Kind
-                            if input {
-                                let doutName = argName + "__dout"
-                                let doutStatement = Node.Wire(doutName)
-
-                                statements.append(doutStatement)
-                                hook.argname = Node.Identifier(doutName)
-
-                                cellDeclarations.append(
-                                    scCreator.create(
-                                        ordinal: 0,
-                                        max: 0,
-                                        din: argName,
-                                        dout: doutName,
-                                        sin: "\(previousOutput)",
-                                        sout: inputName.uniqueName(counter + 1),
-                                        input: !input
-                                    )
-                                )
-                                kind = .bypassInput
-                            } else {
-                                let dinName = argName + "__din"
-                                let dinStatement = Node.Wire(dinName)
-
-                                cellDeclarations.append(dinStatement)
-                                hook.argname = Node.Identifier(dinName)
-
-                                cellDeclarations.append(
-                                    scCreator.create(
-                                        ordinal: 0,
-                                        max: 0,
-                                        din: dinName,
-                                        dout: argName,
-                                        sin: "\(previousOutput)",
-                                        sout: inputName.uniqueName(counter + 1),
-                                        input: !input
-                                    )
-                                )
-                                kind = .bypassOutput
-                            }
-
-                            internalOrder.append(
-                                ChainRegister(
-                                    name: moduleName + "_\(hook.portname)",
-                                    kind: kind
-                                )
-                            )
-                            previousOutput = Node.Identifier(inputName.uniqueName(counter + 1))
-                            counter += 1
-                        }
-                    }
-
-                    for i in 0 ... counter {
-                        wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
-                    }
-
-                    blackbox = true
-                }
-
-                if let invClockName = clockInv.value, moduleName == invClockName {
-                    for hook in instance.portlist {
-                        if String(describing: hook.argname) == clockName {
-                            invClkSourceId = Node.Identifier(invClkSourceName)
-                            hook.argname = invClkSourceId!
-                        }
-                    }
-                }
-            }
-
-            if !blackbox {
-                statements.append(itemDeclaration)
-            } else {
-                blackboxItem = itemDeclaration
-            }
-        }
-
-        if warn {
-            print("[Warning]: Detected flip-flops with clock different from \(clockName).")
-        }
-
-        var assignStatements: [PythonObject] = []
-        let finalAssignment = Node.Assign(
-            Node.Lvalue(outputIdentifier),
-            Node.Rvalue(previousOutput)
+        let bsrCreator = BoundaryScanRegisterCreator(
+            name: "BoundaryScanRegister",
+            clock: tckName,
+            reset: resetName,
+            resetActive: resetActiveLow.value ? .low : .high,
+            testing: testName,
+            shift: shiftName,
+            using: Node
         )
-        assignStatements.append(finalAssignment)
 
-        let clockCond = Node.Cond(
-            Node.Identifier(testName),
-            Node.Identifier(tckName),
-            Node.Identifier(clockName)
+        let internalOrder = try chainInternal(
+            Node: Node,
+            sclConfig: sclConfig,
+            module: module,
+            blackboxModules: blackboxModules,
+            bsrCreator: bsrCreator,
+            clockName: clockName,
+            resetName: resetName,
+            resetActive: resetActiveLow.value ? .low : .high,
+            shiftName: shiftName,
+            inputName: inputName,
+            outputName: outputName,
+            testName: testName,
+            tckName: tckName,
+            invClockName: invClock.value,
+            ignoredInputs: ignoredInputs
         )
-        let clkSourceAssignment = Node.Assign(
-            Node.Lvalue(clkSourceId),
-            Node.Rvalue(clockCond)
-        )
-        assignStatements.append(clkSourceAssignment)
-
-        if let invClkId = invClkSourceId {
-            let invClockCond = Node.Cond(
-                Node.Identifier(testName),
-                Node.Unot(Node.Identifier(tckName)),
-                Node.Identifier(clockName)
-            )
-
-            let invClockAssignment = Node.Assign(
-                Node.Lvalue(invClkId),
-                Node.Rvalue(invClockCond)
-            )
-            assignStatements.append(invClockAssignment)
-        }
-
-        if let item = blackboxItem {
-            cellDeclarations.append(item)
-        }
-
-        definition.items = Python.tuple(statements + wireDeclarations + cellDeclarations + assignStatements)
-        definition.name = Python.str(alteredName)
-
-        print("Internal scan chain successfuly constructed. Length: ", internalOrder.count)
-
-        // MARK: Chaining boundary registers
-
-        print("Creating and chaining boundary flip-flops…")
-        var order: [ChainRegister] = []
-        let boundaryCount: Int = try {
-            let ports = Python.list(definition.portlist.ports)
-
-            var statements: [PythonObject] = []
-            statements.append(Node.Input(inputName))
-            statements.append(Node.Output(outputName))
-            statements.append(Node.Input(resetName))
-            statements.append(Node.Input(shiftName))
-            statements.append(Node.Input(tckName))
-            statements.append(Node.Input(testName))
-
-            if let clock = clockOpt.value {
-                statements.append(Node.Input(clock))
-            }
-
-            let portArguments = Python.list()
-            let bsrCreator = BoundaryScanRegisterCreator(
-                name: "BoundaryScanRegister",
-                clock: tckName,
-                reset: resetName,
-                resetActive: resetActiveLow.value ? .low : .high,
-                testing: testName,
-                shift: shiftName,
-                using: Node
-            )
-
-            var counter = 0
-
-            let initialAssignment = Node.Assign(
-                Node.Lvalue(Node.Identifier(inputName.uniqueName(0))),
-                Node.Rvalue(inputIdentifier)
-            )
-            statements.append(initialAssignment)
-
-            for input in inputs {
-                let inputStatement = Node.Input(input.name)
-
-                if input.name != clockName, input.name != resetName {
-                    statements.append(inputStatement)
-                }
-                if ignoredInputs.contains(input.name) {
-                    portArguments.append(Node.PortArg(
-                        input.name,
-                        Node.Identifier(input.name)
-                    ))
-                    continue
-                }
-
-                let doutName = String(describing: input.name) + "__dout"
-                let doutStatement = Node.Wire(doutName)
-                if input.width > 1 {
-                    let width = Node.Width(
-                        Node.Constant(input.from),
-                        Node.Constant(input.to)
-                    )
-                    inputStatement.width = width
-                    doutStatement.width = width
-                }
-                statements.append(doutStatement)
-
-                portArguments.append(Node.PortArg(
-                    input.name,
-                    Node.Identifier(doutName)
-                ))
-
-                let minimum = min(input.from, input.to)
-                let maximum = max(input.from, input.to)
-
-                for i in minimum ... maximum {
-                    statements.append(
-                        bsrCreator.create(
-                            ordinal: i,
-                            max: maximum,
-                            din: input.name,
-                            dout: doutName,
-                            sin: inputName.uniqueName(counter),
-                            sout: inputName.uniqueName(counter + 1),
-                            input: true
-                        )
-                    )
-                    counter += 1
-                }
-
-                order.append(
-                    ChainRegister(
-                        name: String(describing: input.name),
-                        kind: .input,
-                        width: input.width
-                    )
-                )
-            }
-
-            portArguments.append(Node.PortArg(
-                shiftName,
-                shiftIdentifier
-            ))
-            portArguments.append(Node.PortArg(
-                tckName,
-                Node.Identifier(tckName)
-            ))
-            portArguments.append(Node.PortArg(
-                testName,
-                Node.Identifier(testName)
-            ))
-
-            portArguments.append(Node.PortArg(
-                inputName,
-                Node.Identifier(inputName.uniqueName(counter))
-            ))
-
-            counter += 1 // as a skip
-            order += internalOrder
-
-            portArguments.append(Node.PortArg(
-                outputName,
-                Node.Identifier(inputName.uniqueName(counter))
-            ))
-
-            for output in outputs {
-                let outputStatement = Node.Output(output.name)
-                let dinName = String(describing: output.name) + "_din"
-                let dinStatement = Node.Wire(dinName)
-                if output.width > 1 {
-                    let width = Node.Width(
-                        Node.Constant(output.from),
-                        Node.Constant(output.to)
-                    )
-                    outputStatement.width = width
-                    dinStatement.width = width
-                }
-                statements.append(outputStatement)
-                statements.append(dinStatement)
-
-                portArguments.append(Node.PortArg(
-                    output.name,
-                    Node.Identifier(dinName)
-                ))
-
-                let minimum = min(output.from, output.to)
-                let maximum = max(output.from, output.to)
-
-                for i in minimum ... maximum {
-                    statements.append(
-                        bsrCreator.create(
-                            ordinal: i,
-                            max: maximum,
-                            din: dinName,
-                            dout: output.name,
-                            sin: inputName.uniqueName(counter),
-                            sout: inputName.uniqueName(counter + 1),
-                            input: false
-                        )
-                    )
-                    counter += 1
-                }
-
-                order.append(
-                    ChainRegister(
-                        name: String(describing: output.name),
-                        kind: .output,
-                        width: output.width
-                    )
-                )
-            }
-
-            let submoduleInstance = Node.Instance(
-                alteredName,
-                "__uuf__",
-                Python.tuple(portArguments),
-                Python.tuple()
-            )
-
-            statements.append(Node.InstanceList(
-                alteredName,
-                Python.tuple(),
-                Python.tuple([submoduleInstance])
-            ))
-
-            let boundaryAssignment = Node.Assign(
-                Node.Lvalue(outputIdentifier),
-                Node.Rvalue(Node.Identifier(inputName.uniqueName(counter)))
-            )
-            statements.append(boundaryAssignment)
-
-            var wireDeclarations: [PythonObject] = []
-            for i in 0 ... counter {
-                wireDeclarations.append(Node.Wire(inputName.uniqueName(i)))
-            }
-
-            let supermodel = Node.ModuleDef(
-                definitionName,
-                Python.None,
-                Node.Portlist(Python.tuple(ports)),
-                Python.tuple(wireDeclarations + statements)
-            )
-
-            try File.open(bsrLocation, mode: .write) {
-                try $0.print(bsrCreator.inputDefinition)
-                try $0.print(bsrCreator.outputDefinition)
-            }
-
-            let boundaryScanRegisters =
-                parse([bsrLocation])[0][dynamicMember: "description"].definitions
-
-            let definitions = Python.list(description.definitions)
-            definitions.extend(boundaryScanRegisters)
-            definitions.append(supermodel)
-            description.definitions = Python.tuple(definitions)
-
-            return counter - 1 // Accounting for skip
-        }()
-
-        print("Boundary scan cells successfuly chained. Length: ", boundaryCount)
-        if internalOrder.count == 0 {
+        let internalCount = internalOrder.reduce(0) { $0 + $1.width }
+        if internalCount == 0 {
             print("Warning: No internal scan elements found. Are your DFFs configured properly?")
+        } else {
+            print("Internal scan chain successfuly constructed. Length: ", internalCount)
         }
-        let chainLength = boundaryCount + internalOrder.count
-        print("Total scan-chain length: ", chainLength)
+
+        let (supermodel, finalOrder) = try chainTop(
+            Node: Node,
+            sclConfig: sclConfig,
+            module: module,
+            blackboxModules: blackboxModules,
+            bsrCreator: bsrCreator,
+            clockName: clockName,
+            resetName: resetName,
+            resetActive: resetActiveLow.value ? .low : .high,
+            shiftName: shiftName,
+            inputName: inputName,
+            outputName: outputName,
+            testName: testName,
+            tckName: tckName,
+            invClockName: invClock.value,
+            ignoredInputs: ignoredInputs,
+            internalOrder: internalOrder
+        )
+        let finalCount = finalOrder.reduce(0) { $0 + $1.width }
+
+        let finalAst = parse([bsrCreator.inputDefinition + bsrCreator.outputDefinition])[0]
+        let finalDefinitions = [PythonObject](finalAst[dynamicMember: "description"].definitions)! + [module.definition, supermodel]
+        finalAst[dynamicMember: "description"].definitions = Python.tuple(finalDefinitions)
+
+        try File.open(intermediate, mode: .write) {
+            try $0.print(Generator.visit(finalAst))
+        }
+
+        print("Total scan-chain length: ", finalCount)
 
         let metadata = ChainMetadata(
-            boundaryCount: boundaryCount,
-            internalCount: internalOrder.count,
-            order: order,
+            boundaryCount: finalCount - internalCount,
+            internalCount: internalCount,
+            order: finalOrder,
             shift: shiftName,
             sin: inputName,
             sout: outputName
@@ -858,17 +808,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             return EX_SOFTWARE
         }
 
-        try File.open(intermediate, mode: .write) {
-            try $0.print(Generator.visit(ast))
-        }
-
         let netlist: String = {
             if !skipSynth.value {
                 let script = Synthesis.script(
-                    for: definitionName,
+                    for: module.name,
                     in: [intermediate],
-                    checkHierarchy: false,
                     liberty: libertyFile,
+                    blackboxing: blackboxModels,
                     output: output
                 )
 
@@ -900,6 +846,8 @@ func scanChainCreate(arguments: [String]) -> Int32 {
         // MARK: Verification
 
         if let model = verifyOpt.value {
+            let models = [model] + Array(includeFiles) + Array(blackboxModels)
+
             print("Verifying scan chain integrity…")
             let ast = parse([netlist])[0]
             let description = ast[dynamicMember: "description"]
@@ -918,14 +866,13 @@ func scanChainCreate(arguments: [String]) -> Int32 {
             let (ports, inputs, outputs) = try Port.extract(from: definition)
 
             let verified = try Simulator.simulate(
-                verifying: definitionName,
+                verifying: module.name,
                 in: netlist,
-                isolating: isolated.value,
-                with: model,
+                with: models,
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
-                chainLength: chainLength,
+                chainLength: finalOrder.reduce(0) { $0 + $1.width },
                 clock: clockName,
                 tck: tckName,
                 reset: resetName,
@@ -936,7 +883,6 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                 test: testName,
                 output: netlist + ".tb.sv",
                 defines: defines,
-                includes: includeString,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -952,6 +898,7 @@ func scanChainCreate(arguments: [String]) -> Int32 {
                     print("・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides.")
                 }
                 print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
+                return EX_DATAERR
             }
         }
         print("Done.")

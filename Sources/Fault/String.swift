@@ -61,10 +61,6 @@ extension String {
 
         return task.terminationStatus
     }
-
-    func uniqueName(_ number: Int) -> String {
-        "__" + self + "_" + String(describing: number) + "__"
-    }
 }
 
 extension String: Error {}

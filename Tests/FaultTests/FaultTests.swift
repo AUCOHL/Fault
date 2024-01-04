@@ -5,10 +5,10 @@ var env = ProcessInfo.processInfo.environment
 
 extension Process {
     func startAndBlock() throws {
-        log("$ \(self.executableURL!.path()) \((self.arguments ?? []).joined(separator: " "))")
+        log("$ \(executableURL!.path()) \((arguments ?? []).joined(separator: " "))")
         launch()
         waitUntilExit()
-        print("Exited with: \(self.terminationStatus)")
+        print("Exited with: \(terminationStatus)")
     }
 }
 
@@ -43,103 +43,94 @@ func log(_ string: String) {
 }
 
 final class FaultTests: XCTestCase {
-    func testFull() throws {
-        guard #available(macOS 10.13, *) else {
-            return
+    func run(steps: [[String]]) throws {
+        let binary = productsDirectory.appendingPathComponent("Fault")
+        for (i, step) in steps.enumerated() {
+            log("\(i)/6")
+            let process = Process()
+            process.executableURL = binary
+            process.arguments = step
+            try process.startAndBlock()
+
+            XCTAssertEqual(process.terminationStatus, 0)
         }
+    }
 
-        // Dependencies
-        let venvPath = "\(env["PWD"]!)/venv"
-
-        let venv = "python3 -m venv \(venvPath)".shOutput()
-        XCTAssertEqual(venv.terminationStatus, 0)
-
-        let reqs = "./venv/bin/python3 -m pip install -r ./requirements.txt".shOutput()
-        XCTAssertEqual(reqs.terminationStatus, 0)
-
-        let fileManager = FileManager()
-        let venvLibPath = "\(venvPath)/lib"
-        let venvLibVersions = try! fileManager.contentsOfDirectory(atPath: venvLibPath)
-        let venvLibVersion = "\(venvLibPath)/\(venvLibVersions[0])/site-packages"
+    func testSPM() throws {
+        /*
+             This test runs the default SPM design, which is an all-digital
+             active-low design.
+         */
 
         // Fault Tests
-        let binary = productsDirectory.appendingPathComponent("Fault")
-
-        let newProcess = { () -> Process in
-            let new = Process()
-            new.executableURL = binary
-            new.environment = ProcessInfo.processInfo.environment
-            new.environment!["PYTHONPATH"] = venvLibVersion
-            return new
-        }
-
         let liberty = "Tech/osu035/osu035_stdcells.lib"
         let models = "Tech/osu035/osu035_stdcells.v"
 
-        let fileName = "Tests/RTL/spm.v"
+        let fileName = "Tests/RTL/spm/spm.v"
         let topModule = "spm"
         let clock = "clk"
         let reset = "rst"
         let ignoredInputs = "\(reset)"
 
-        let fileSynth = "Netlists/" + fileName + ".netlist.v"
-        let fileCut = fileSynth + ".cut.v"
-        let fileJson = fileCut + ".tv.json"
-        let fileChained = fileSynth + ".chained.v"
+        let base = "Netlists/" + NSString(string: fileName).deletingPathExtension
+        let fileSynth = base + ".nl.v"
+        let fileCut = base + ".cut.v"
+        let fileJson = base + ".tv.json"
+        let fileChained = base + ".chained.v"
         let fileAsmVec = fileJson + ".vec.bin"
         let fileAsmOut = fileJson + ".out.bin"
 
-        // 0. Synth
-        var process = newProcess()
-        process.arguments = ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName]
-        try process.startAndBlock()
+        for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
+            let _ = "rm -f \(file)".shOutput()
+        }
 
-        XCTAssertEqual(process.terminationStatus, 0)
-        log("1/6")
-        // 1. Cut
-        process = newProcess()
-        process.arguments = ["cut", "-o", fileCut, fileSynth]
-        try process.startAndBlock()
+        try run(steps: [
+            ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName],
+            ["cut", "-o", fileCut, fileSynth],
+            ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut],
+            ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth],
+            ["asm", fileJson, fileChained],
+            ["compact", "-o", "/dev/null", fileJson],
+            ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs],
+        ])
+    }
 
-        XCTAssertEqual(process.terminationStatus, 0)
+    func testIntegration() throws {
+        /*
+             This test runs the TripleDelay design, which has blackboxed macros.
+         */
 
-        // 2. Simulate
-        process = newProcess()
-        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut]
-        try process.startAndBlock()
-        log("2/6")
+        // Fault Tests
+        let liberty = "Tech/osu035/osu035_stdcells.lib"
+        let models = "Tech/osu035/osu035_stdcells.v"
 
-        XCTAssertEqual(process.terminationStatus, 0)
+        let fileName = "Tests/RTL/integration/triple_delay.v"
+        let topModule = "TripleDelay"
+        let clock = "clk"
+        let reset = "rst"
+        let ignoredInputs = "\(reset),rstn"
 
-        // 3. Chain
-        process = newProcess()
-        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "-i", ignoredInputs, fileSynth]
-        try process.startAndBlock()
-        log("3/6")
+        let base = "Netlists/" + NSString(string: fileName).deletingPathExtension
+        let fileSynth = base + ".nl.v"
+        let fileCut = base + ".cut.v"
+        let fileJson = base + ".tv.json"
+        let fileChained = base + ".chained.v"
+        let fileAsmVec = fileJson + ".vec.bin"
+        let fileAsmOut = fileJson + ".out.bin"
 
-        XCTAssertEqual(process.terminationStatus, 0)
+        for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
+            let _ = "rm -f \(file)".shOutput()
+        }
 
-        // 4. Assemble
-        process = newProcess()
-        process.arguments = ["asm", fileJson, fileChained]
-        try process.startAndBlock()
-        log("4/6")
-
-        XCTAssertEqual(process.terminationStatus, 0)
-
-        // 5. Compact
-        process = newProcess()
-        process.arguments = ["compact", "-o", "/dev/null", fileJson]
-        try process.startAndBlock()
-        log("5/6")
-
-        // 6. Tap
-        process = newProcess()
-        process.arguments = ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs,]
-        try process.startAndBlock()
-        log("6/6")
-
-        XCTAssertEqual(process.terminationStatus, 0)
+        try run(steps: [
+            ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", fileName],
+            ["cut", "-o", fileCut, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", "--ignoring", "clk,rst,rstn", fileSynth],
+            ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, fileCut],
+            ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
+            ["asm", fileJson, fileChained],
+            ["compact", "-o", "/dev/null", fileJson],
+            ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
+        ])
     }
 
     /// Returns path to the built products directory.
@@ -155,6 +146,7 @@ final class FaultTests: XCTestCase {
     }
 
     static var allTests = [
-        ("testFull", testFull),
+        ("testSPM", testSPM),
+        ("testIntegration", testIntegration),
     ]
 }

@@ -31,6 +31,9 @@ func synth(arguments: [String]) -> Int32 {
     let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Required.)")
     cli.addOptions(topModule)
 
+    let blackboxModelOpt = StringOption(longFlag: "blackboxModel", helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+    cli.addOptions(blackboxModelOpt)
+
     do {
         try cli.parse()
     } catch {
@@ -84,9 +87,11 @@ func synth(arguments: [String]) -> Int32 {
         )
     }
 
-    let output = filePath.value ?? "Netlists/\(module).netlist.v"
+    let output = filePath.value ?? "Netlists/\(module).nl.v"
 
-    let script = Synthesis.script(for: module, in: args, cutting: false, liberty: libertyFile, output: output)
+    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
+
+    let script = Synthesis.script(for: module, in: args, cutting: false, liberty: libertyFile, blackboxing: blackboxModels, output: output)
 
     let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
     let result = "echo '\(script)' | '\(yosysExecutable)'".sh()

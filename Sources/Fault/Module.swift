@@ -1,3 +1,4 @@
+import Collections
 // Copyright (C) 2019 The American University in Cairo
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,6 @@
 import Defile
 import Foundation
 import PythonKit
-import Collections
 
 struct Port: Codable {
     enum Polarity: String, Codable {
@@ -33,21 +33,42 @@ struct Port: Codable {
         from < to ? to - from + 1 : from - to + 1
     }
 
-    init(name: String, at ordinal: Int) {
+    var bits: [Int] {
+        from < to ? [Int](from ... to) : [Int](to ... from)
+    }
+
+    init(name: String, polarity: Polarity? = nil, from: Int = 0, to: Int = 0, at ordinal: Int) {
         self.name = name
-        from = 0
-        to = 0
+        self.polarity = polarity
+        self.from = from
+        self.to = to
         self.ordinal = ordinal
     }
 
     static func extract(from definition: PythonObject) throws -> (ports: [String: Port], inputs: [Port], outputs: [Port]) {
         var ports: [String: Port] = [:]
-        var inputs: [Port] = []
-        var outputs: [Port] = []
+
         var paramaters: [String: Int] = [:]
         for (i, portDeclaration) in definition.portlist.ports.enumerated() {
-            let port = Port(name: "\(portDeclaration.name)", at: i)
-            ports["\(portDeclaration.name)"] = port
+            var polarity: Polarity? = nil
+            var from = 0
+            var to = 0
+            var name: String!
+            if Bool(Python.hasattr(portDeclaration, "first"))! {
+                let type = "\(Python.type(portDeclaration[dynamicMember: "first"]).__name__)"
+                if type == "Input" {
+                    polarity = .input
+                } else {
+                    polarity = .output
+                }
+                let firstChild = portDeclaration[dynamicMember: "first"]
+                name = "\(firstChild.name)"
+            } else {
+                name = "\(portDeclaration.name)"
+            }
+
+            let port = Port(name: name, polarity: polarity, from: from, to: to, at: i)
+            ports[name] = port
         }
 
         for itemDeclaration in definition.items {
@@ -71,18 +92,19 @@ struct Port: Codable {
                     }
                     if declType == "Input" {
                         port.polarity = .input
-                        inputs.append(port)
                     } else {
                         port.polarity = .output
-                        outputs.append(port)
                     }
                     ports["\(declaration.name)"] = port
                 }
             }
         }
 
-        inputs.sort { $0.ordinal < $1.ordinal }
-        outputs.sort { $0.ordinal < $1.ordinal }
+        let inputs: [Port] = ports.values.filter { $0.polarity == .input }.sorted(by: { $0.ordinal < $1.ordinal })
+        let outputs: [Port] = ports.values.filter { $0.polarity == .output }.sorted(by: { $0.ordinal < $1.ordinal })
+        if ports.count != inputs.count + outputs.count {
+            throw RuntimeError("Some ports in \(definition.name) are not properly declared as an input or output.")
+        }
 
         return (ports: ports, inputs: inputs, outputs: outputs)
     }
@@ -102,7 +124,7 @@ struct Port: Codable {
         case "Identifier":
             value = params["\(expr.name)"]!
         default:
-            print("Got unknow expression type \(type)")
+            Stderr.print("Got unknown expression type \(type) while evaluating port expression \(expr)")
             exit(EX_DATAERR)
         }
         return value
@@ -146,15 +168,16 @@ struct Module {
         self.inputs = inputs
         self.outputs = outputs
         self.definition = definition
-        self.ports = inputs + outputs
-        self.portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
+        ports = inputs + outputs
+        portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
     }
 
-    static func getModules(in files: [String]) throws -> OrderedDictionary<String, Module> {
+    static func getModules(in files: [String], filter filterOpt: (any Sequence<String>)? = nil) throws -> OrderedDictionary<String, Module> {
         let parse = Python.import("pyverilog.vparser.parser").parse
         var result: OrderedDictionary<String, Module> = [:]
 
         for file in files {
+            print("Processing file \(file)…")
             let parseResult = parse([file])
             let ast = parseResult[0]
             let description = ast[dynamicMember: "description"]
@@ -164,6 +187,12 @@ struct Module {
                     continue
                 }
                 let name = String(describing: definition.name)
+                print("Processing module \(name)…")
+                if let filter = filterOpt {
+                    if !filter.contains(name) {
+                        continue
+                    }
+                }
                 let (_, inputs, outputs) = try Port.extract(from: definition)
                 result[name] = Module(name: name, inputs: inputs, outputs: outputs, definition: definition)
             }
@@ -175,6 +204,6 @@ struct Module {
 
 extension Module: CustomStringConvertible {
     var description: String {
-        "<Module " + (["\(name)"] + ports.map({ $0.description })).joined(separator: "\n\t") + "\n>"
+        "<Module " + (["\(name)"] + ports.map(\.description)).joined(separator: "\n\t") + "\n>"
     }
 }

@@ -88,11 +88,11 @@ func jtagCreate(arguments: [String]) -> Int32 {
     )
     cli.addOptions(ignored)
 
-    let blackbox = StringOption(
-        longFlag: "blackbox",
-        helpMessage: "Blackbox module (.v) to use for simulation. (Default: none)"
+    let blackboxModelOpt = StringOption(
+        longFlag: "blackboxModel",
+        helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)"
     )
-    cli.addOptions(blackbox)
+    cli.addOptions(blackboxModelOpt)
 
     let defs = StringOption(
         longFlag: "define",
@@ -102,7 +102,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
 
     let include = StringOption(
         longFlag: "inc",
-        helpMessage: "Verilog files to include during simulations. (Default: none)"
+        helpMessage: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)"
     )
     cli.addOptions(include)
 
@@ -232,17 +232,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
     let includeFiles
         = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
 
-    var includeString = ""
-    for file in includeFiles {
-        if !fileManager.fileExists(atPath: file) {
-            Stderr.print("Verilog file '\(file)' not found.")
-            return EX_NOINPUT
-        }
-        includeString += """
-            `include "\(file)"
-        """
-    }
-
     let output = filePath.value ?? "\(file).jtag.v"
     let intermediate = output + ".intermediate.v"
 
@@ -293,6 +282,8 @@ func jtagCreate(arguments: [String]) -> Int32 {
         ?? names["tck"]!.default
     let trstName = names["trst"]!.option.value
         ?? names["trst"]!.default
+
+    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
 
     // MARK: Internal signals
 
@@ -469,8 +460,8 @@ func jtagCreate(arguments: [String]) -> Int32 {
         let _ = Synthesis.script(
             for: definitionName,
             in: [intermediate],
-            checkHierarchy: false,
             liberty: libertyFile,
+            blackboxing: blackboxModels,
             output: output
         )
 
@@ -479,8 +470,8 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 let script = Synthesis.script(
                     for: definitionName,
                     in: [intermediate],
-                    checkHierarchy: false,
                     liberty: libertyFile,
+                    blackboxing: blackboxModels,
                     output: output
                 )
 
@@ -515,6 +506,8 @@ func jtagCreate(arguments: [String]) -> Int32 {
         // MARK: Verification
 
         if let model = verifyOpt.value {
+            let models = [model] + Array(includeFiles) + blackboxModels
+
             print("Verifying tap port integrity…")
             let ast = parse([netlist])[0]
             let description = ast[dynamicMember: "description"]
@@ -533,8 +526,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
             let verified = try Simulator.simulate(
                 verifying: definitionName,
                 in: netlist, // DEBUG
-                isolating: blackbox.value,
-                with: model,
+                with: models,
                 ports: ports,
                 inputs: inputs,
                 outputs: outputs,
@@ -549,7 +541,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 trst: trstName,
                 output: netlist + ".tb.sv",
                 defines: defines,
-                includes: includeString,
                 using: iverilogExecutable,
                 with: vvpExecutable
             )
@@ -580,8 +571,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
                     in: netlist,
-                    isolating: blackbox.value,
-                    with: model,
+                    with: models,
                     ports: ports,
                     inputs: inputs,
                     ignoring: ignoredInputs,
@@ -603,7 +593,6 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     vectorLength: vectorLength,
                     outputLength: outputLength,
                     defines: defines,
-                    includes: includeString,
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )

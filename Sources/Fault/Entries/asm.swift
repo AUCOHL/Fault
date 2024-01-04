@@ -110,9 +110,10 @@ func assemble(arguments: [String]) -> Int32 {
     }
 
     for (i, input) in jsInputOrder.enumerated() {
-        inputMap[input.name] = i
-        if chainOrder[i].name != input.name {
-            print("[Error]: Ordinal mismatch between TV input \(input.name) and scan-chain register \(chainOrder[i].name).")
+        let name = (input.name.hasPrefix("\\")) ? String(input.name.dropFirst(1)) : input.name
+        inputMap[name] = i
+        if chainOrder[i].name != name {
+            print("[Error]: Ordinal mismatch between TV input \(name) and scan-chain register \(chainOrder[i].name).")
             return EX_DATAERR
         }
     }
@@ -194,7 +195,7 @@ func assemble(arguments: [String]) -> Int32 {
                     outputBinary += String(repeating: "x", count: element.width)
                     print("Output is same as the loaded TV")
                 } else {
-                    print("[Error]: Mismatch between output port \(element.name) and chained netlist. ")
+                    print("[Error]: Mismatch between output port \(element.name) and chained netlist.")
                     return EX_DATAERR
                 }
             }

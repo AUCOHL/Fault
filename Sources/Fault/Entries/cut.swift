@@ -42,16 +42,22 @@ func cut(arguments: [String]) -> Int32 {
     )
     cli.addOptions(sclConfigOpt)
 
-    let blackbox = StringOption(
+    let blackboxOpt = StringOption(
         longFlag: "blackbox",
-        helpMessage: "Blackbox module definitions (.v). Comma-delimited. (Default: none)"
+        helpMessage: "Blackbox module names. Comma-delimited. (Default: none)"
     )
-    cli.addOptions(blackbox)
+    cli.addOptions(blackboxOpt)
+
+    let blackboxModelOpt = StringOption(
+        longFlag: "blackboxModel",
+        helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)"
+    )
+    cli.addOptions(blackboxModelOpt)
 
     let ignored = StringOption(
         shortFlag: "i",
         longFlag: "ignoring",
-        helpMessage: "Module inputs to ignore when cutting. Comma-delimited. (Default: none)"
+        helpMessage: "Inputs to ignore on black-boxed macros. Comma-delimited."
     )
     cli.addOptions(ignored)
 
@@ -91,6 +97,8 @@ func cut(arguments: [String]) -> Int32 {
 
     let output = filePath.value ?? "\(file).cut.v"
 
+    let ignoredInputs = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
+
     // MARK: Importing Python and Pyverilog
 
     let parse = Python.import("pyverilog.vparser.parser").parse
@@ -100,20 +108,9 @@ func cut(arguments: [String]) -> Int32 {
     let Generator =
         Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
 
-    var isolatedOptional: PythonObject?
-    var isolatedName: String?
-    if let isolatedFile = blackbox.value {
-        let ast = parse([isolatedFile])[0]
-        let description = ast[dynamicMember: "description"]
-        for definition in description.definitions {
-            let type = Python.type(definition).__name__
-            if type == "ModuleDef" {
-                isolatedOptional = definition
-                isolatedName = String(describing: definition.name)
-                break
-            }
-        }
-    }
+    let blackboxModuleNames = Set<String>((blackboxOpt.value?.components(separatedBy: ",")) ?? [])
+    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
+    let blackboxModules = try! Module.getModules(in: blackboxModels, filter: blackboxModuleNames)
 
     var definitionOptional: PythonObject?
     let ast = parse([file])[0]
@@ -150,9 +147,6 @@ func cut(arguments: [String]) -> Int32 {
         sclConfig.dffMatches.last!.name = dffOverride
     }
 
-    let hardIgnoredInputs
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
-
     do {
         let ports = Python.list(definition.portlist.ports)
         var declarations: [PythonObject] = []
@@ -167,7 +161,8 @@ func cut(arguments: [String]) -> Int32 {
             // Process gates
             if type == "InstanceList" {
                 let instance = item.instances[0]
-                let moduleName = String(describing: instance.module)
+                let moduleName = "\(instance.module)"
+                let instanceName = "\(instance.name)"
                 if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
                     let moduleName = String(describing: instance.name)
                     let outputName = "\\" + moduleName + ".q"
@@ -213,16 +208,10 @@ func cut(arguments: [String]) -> Int32 {
                     items.append(inputAssignment)
                     items.append(outputAssignment)
 
-                } else if let blakcboxName = isolatedName, blakcboxName == moduleName {
+                } else if let blackboxModule = blackboxModules[moduleName] {
                     include = false
 
-                    guard let isolatedDefinition = isolatedOptional else {
-                        Stderr.print("No module definition for blackbox \(blakcboxName)")
-                        exit(EX_DATAERR)
-                    }
-
-                    let (_, inputs, _) = try Port.extract(from: isolatedDefinition)
-                    let bbInputNames = inputs.map(\.name)
+                    let bbInputNames = blackboxModule.inputs.map(\.name)
 
                     for hook in instance.portlist {
                         let portName = String(describing: hook.portname)
@@ -236,14 +225,14 @@ func cut(arguments: [String]) -> Int32 {
                                 var statement: PythonObject
                                 var assignStatement: PythonObject
                                 if input {
-                                    name = "\\" + moduleName + "_\(portName)_\(i).q"
+                                    name = "\\\(instanceName).\(portName)[\(i)].q"
                                     statement = Node.Output(name)
                                     assignStatement = Node.Assign(
                                         Node.Lvalue(Node.Identifier(name)),
                                         Node.Rvalue(element)
                                     )
                                 } else {
-                                    name = moduleName + "_\(portName)_\(i)"
+                                    name = "\\\(instanceName).\(portName)[\(i)]"
                                     statement = Node.Input(name)
                                     assignStatement = Node.Assign(
                                         Node.Lvalue(element),
@@ -256,7 +245,7 @@ func cut(arguments: [String]) -> Int32 {
                             }
                         } else {
                             let argName = String(describing: hook.argname)
-                            if hardIgnoredInputs.contains(argName) {
+                            if ignoredInputs.contains(argName) {
                                 continue
                             }
 
@@ -264,14 +253,14 @@ func cut(arguments: [String]) -> Int32 {
                             var statement: PythonObject
                             var assignStatement: PythonObject
                             if input {
-                                name = "\\" + moduleName + "_\(portName).q"
+                                name = "\\\(instanceName).\(portName).q"
                                 statement = Node.Output(name)
                                 assignStatement = Node.Assign(
                                     Node.Lvalue(Node.Identifier(name)),
                                     Node.Rvalue(hook.argname)
                                 )
                             } else {
-                                name = moduleName + ".\(portName)"
+                                name = "\\\(instanceName).\(portName)"
                                 statement = Node.Input(name)
                                 assignStatement = Node.Assign(
                                     Node.Lvalue(hook.argname),
