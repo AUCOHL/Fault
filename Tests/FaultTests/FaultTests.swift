@@ -105,7 +105,7 @@ final class FaultTests: XCTestCase {
 
         // 2. Simulate
         process = newProcess()
-        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, "--holdLow", fileCut]
+        process.arguments = ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut]
         try process.startAndBlock()
         log("2/6")
 
@@ -113,7 +113,7 @@ final class FaultTests: XCTestCase {
 
         // 3. Chain
         process = newProcess()
-        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "-i", ignoredInputs, fileSynth]
+        process.arguments = ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth]
         try process.startAndBlock()
         log("3/6")
 
@@ -135,7 +135,7 @@ final class FaultTests: XCTestCase {
 
         // 6. Tap
         process = newProcess()
-        process.arguments = ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs,]
+        process.arguments = ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs,]
         try process.startAndBlock()
         log("6/6")
 

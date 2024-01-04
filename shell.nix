@@ -8,6 +8,7 @@ with pkgs; stdenvNoCC.mkDerivation {
     yosys
     verilog
     (python3.withPackages(ps: with ps; [pyverilog]))
+    gtkwave
   ];
   
   PYTHON_LIBRARY="${python3}/lib/lib${python3.libPrefix}${stdenvNoCC.hostPlatform.extensions.sharedLibrary}";
