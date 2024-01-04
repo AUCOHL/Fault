@@ -29,21 +29,21 @@
         }
       },
       {
-        "package": "OrderedDictionary",
-        "repositoryURL": "https://github.com/lukaskubanek/OrderedDictionary.git",
-        "state": {
-          "branch": null,
-          "revision": "9adcc6f84c470bd80a29e16887c0f94fea2a783d",
-          "version": "3.0.1"
-        }
-      },
-      {
         "package": "PythonKit",
         "repositoryURL": "https://github.com/pvieito/PythonKit",
         "state": {
           "branch": "master",
           "revision": "c77231820148515a77e9bba5016a57e5a88ef007",
           "version": null
+        }
+      },
+      {
+        "package": "swift-collections",
+        "repositoryURL": "https://github.com/apple/swift-collections.git",
+        "state": {
+          "branch": null,
+          "revision": "d029d9d39c87bed85b1c50adee7c41795261a192",
+          "version": "1.0.6"
         }
       },
       {

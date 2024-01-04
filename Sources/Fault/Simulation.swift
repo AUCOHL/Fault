@@ -184,9 +184,8 @@ enum Simulator {
                 _ = "rm -rf \(folderName)".sh()
             }
         }
-
         var faults = output.components(separatedBy: "\n").filter {
-            !$0.trimmingCharacters(in: .whitespaces).isEmpty
+            !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.contains("$finish")
         }
         var gmOutput = ""
         if goldenOutput {
@@ -194,7 +193,7 @@ enum Simulator {
             if let bin = BigUInt(last, radix: 2) {
                 gmOutput = String(bin, radix: 16)
             } else {
-                print("[Warning]: golden output contains x or z.")
+                print("[Warning]: Golden output was invalid: '\(last)'.")
             }
         }
 

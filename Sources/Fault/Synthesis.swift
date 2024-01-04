@@ -39,7 +39,7 @@ enum Synthesis {
     ) -> String {
         let opt = optimize ? "opt" : ""
         return """
-        read_verilog \(files.map { file in "'\(file)'" }.joined(separator: " "))
+        read_verilog -sv \(files.map { file in "'\(file)'" }.joined(separator: " "))
 
         # check design hierarchy
         hierarchy \(checkHierarchy ? "-check" : "") -top \(module)

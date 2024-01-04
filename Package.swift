@@ -11,7 +11,7 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/lukaskubanek/OrderedDictionary.git", from: "3.0.1"),
+        .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/pvieito/PythonKit", .branch("master")),
         .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
         .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
@@ -23,7 +23,7 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .executableTarget(
             name: "Fault",
-            dependencies: ["PythonKit", "CommandLineKit", "Defile", "OrderedDictionary", "BigInt", "Yams"],
+            dependencies: ["PythonKit", "CommandLineKit", "Defile", .product(name: "Collections", package: "swift-collections"), "BigInt", "Yams"],
             path: "Sources"
         ),
         .testTarget(

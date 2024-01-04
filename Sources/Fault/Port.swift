@@ -11,11 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+import Defile
 import Foundation
 import PythonKit
+import Collections
 
-class Port: Codable {
+struct Port: Codable {
     enum Polarity: String, Codable {
         case input
         case output
@@ -59,7 +60,7 @@ class Port: Codable {
                     paramaters["\(declaration.name)"] =
                         Port.evaluate(expr: declaration.value.var, params: paramaters)
                 } else if declType == "Input" || declType == "Output" {
-                    guard let port = ports["\(declaration.name)"] else {
+                    guard var port = ports["\(declaration.name)"] else {
                         throw "Unknown port \(declaration.name)"
                     }
                     if declaration.width != Python.None {
@@ -75,6 +76,7 @@ class Port: Codable {
                         port.polarity = .output
                         outputs.append(port)
                     }
+                    ports["\(declaration.name)"] = port
                 }
             }
         }
