@@ -448,7 +448,7 @@ func main(arguments: [String]) -> Int32 {
 
         let startTime = CFAbsoluteTimeGetCurrent()
 
-        var models = [cells] + Array(includeFiles)
+        let models = [cells] + Array(includeFiles)
 
         print("Performing simulations…")
         let result = try Simulator.simulate(

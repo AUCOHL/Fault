@@ -56,11 +56,18 @@ struct Port: Codable {
             var to = 0
             var name: String!
             if Bool(Python.hasattr(portDeclaration, "first"))! {
-                let type = "\(Python.type(portDeclaration[dynamicMember: "first"]).__name__)"
+                let declaration = portDeclaration[dynamicMember: "first"]
+                let type = "\(Python.type(declaration).__name__)"
                 if type == "Input" {
                     polarity = .input
                 } else {
                     polarity = .output
+                }
+                if declaration.width != Python.None {
+                    let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters)
+                    let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters)
+                    from = msb
+                    to = lsb
                 }
                 let firstChild = portDeclaration[dynamicMember: "first"]
                 name = "\(firstChild.name)"

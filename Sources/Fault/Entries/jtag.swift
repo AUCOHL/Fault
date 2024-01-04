@@ -603,6 +603,7 @@ func jtagCreate(arguments: [String]) -> Int32 {
                     if !resetActiveLow.value { // default is ignored inputs are held high
                         print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
                     }
+                    return EX_DATAERR
                 }
             }
         }
