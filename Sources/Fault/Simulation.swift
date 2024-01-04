@@ -793,7 +793,7 @@ enum Simulator {
                     for (i = 0; i< \(outputLength);i = i + 1) begin
                         \(tdi) = 0;
                         __scanInSerial__[i] = __tdo_pad_out__;
-                        if (__scanInSerial__[i] !== __goldenOutput__[i]) begin
+                        if (__scanInSerial__[i] !=? __goldenOutput__[i]) begin
                             $display("@%0d:\\t\\tExpected %0b, Got %0b", i, __goldenOutput__[i], __scanInSerial__[i]);
                             __error__ = __error__ + 1;
                         end
@@ -808,7 +808,7 @@ enum Simulator {
                     \(tms) = 0; // run-test-idle
                     #(`CLOCK_PERIOD) ;
 
-                    if(__scanInSerial__ !== __goldenOutput__) begin
+                    if(__scanInSerial__ !=? __goldenOutput__) begin
                         $display("Test vector simulation failed: %0d bits mismatched", __error__);
                         $display("Expected:\\t%0b", __goldenOutput__);
                         $display("Got:\\t\\t%0b", __scanInSerial__);
