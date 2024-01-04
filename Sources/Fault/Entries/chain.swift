@@ -34,7 +34,7 @@ func chainInternal(
     testName: String,
     tckName: String,
     invClockName: String?,
-    ignoredInputs: any Sequence<String>
+    ignoredInputs: Set<String>
 ) throws -> [ChainRegister] {
     // Modifies module definition in-place to create scan-chain.
     // Changes name to .original to differentate from new top level.
@@ -262,7 +262,7 @@ func chainTop(
     testName: String,
     tckName: String,
     invClockName _: String?,
-    ignoredInputs: any Sequence<String>,
+    ignoredInputs: Set<String>,
     internalOrder: [ChainRegister]
 ) throws -> (supermodel: PythonObject, order: [ChainRegister]) {
     var order: [ChainRegister] = []

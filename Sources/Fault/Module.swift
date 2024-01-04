@@ -180,7 +180,7 @@ struct Module {
         portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
     }
 
-    static func getModules(in files: [String], filter filterOpt: (any Sequence<String>)? = nil) throws -> OrderedDictionary<String, Module> {
+    static func getModules(in files: [String], filter filterOpt: Set<String>? = nil) throws -> OrderedDictionary<String, Module> {
         let parse = Python.import("pyverilog.vparser.parser").parse
         var result: OrderedDictionary<String, Module> = [:]
 
