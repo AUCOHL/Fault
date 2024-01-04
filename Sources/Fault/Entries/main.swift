@@ -20,7 +20,7 @@ import Defile
 import Foundation
 import PythonKit
 
-let VERSION = "0.6.0"
+let VERSION = "0.6.1"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
