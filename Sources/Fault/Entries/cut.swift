@@ -155,7 +155,7 @@ func cut(arguments: [String]) -> Int32 {
         let fnmatch = Python.import("fnmatch")
 
         for item in definition.items {
-            var include = true
+            var yank = false
 
             let type = Python.type(item).__name__
             // Process gates
@@ -164,13 +164,14 @@ func cut(arguments: [String]) -> Int32 {
                 let moduleName = "\(instance.module)"
                 let instanceName = "\(instance.name)"
                 if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
+                    yank = true
+                    
                     let moduleName = String(describing: instance.name)
                     let outputName = "\\" + moduleName + ".q"
 
                     let inputIdentifier = Node.Identifier(moduleName)
                     let outputIdentifier = Node.Identifier(outputName)
-
-                    include = false
+                    
                     var dArg: PythonObject?
                     var qArg: PythonObject?
 
@@ -209,73 +210,39 @@ func cut(arguments: [String]) -> Int32 {
                     items.append(outputAssignment)
 
                 } else if let blackboxModule = blackboxModules[moduleName] {
-                    include = false
-
-                    let bbInputNames = blackboxModule.inputs.map(\.name)
+                    yank = true
 
                     for hook in instance.portlist {
                         let portName = String(describing: hook.portname)
-                        let hookType = Python.type(hook.argname).__name__
-                        let input = bbInputNames.contains(portName)
-
-                        if hookType == "Concat" {
-                            let list = hook.argname.list
-                            for (i, element) in list.enumerated() {
-                                var name = ""
-                                var statement: PythonObject
-                                var assignStatement: PythonObject
-                                if input {
-                                    name = "\\\(instanceName).\(portName)[\(i)].q"
-                                    statement = Node.Output(name)
-                                    assignStatement = Node.Assign(
-                                        Node.Lvalue(Node.Identifier(name)),
-                                        Node.Rvalue(element)
-                                    )
-                                } else {
-                                    name = "\\\(instanceName).\(portName)[\(i)]"
-                                    statement = Node.Input(name)
-                                    assignStatement = Node.Assign(
-                                        Node.Lvalue(element),
-                                        Node.Rvalue(Node.Identifier(name))
-                                    )
-                                }
-                                items.append(assignStatement)
-                                declarations.append(statement)
-                                ports.append(Node.Port(name, Python.None, Python.None, Python.None))
-                            }
+                        let portInfo = blackboxModule.portsByName[portName]!
+                        
+                        let ioDeclaration: PythonObject
+                        let assignStatement: PythonObject
+                        var ioName: String = "\\\(instanceName).\(portName)"
+                        let width = Node.Width(Node.IntConst(portInfo.from), Node.IntConst(portInfo.to))
+                        if portInfo.polarity == .input {
+                            // Input to the blackbox module = Output from the circuit, and vice versa
+                            ioName += ".q"
+                            ioDeclaration = Node.Output(ioName, width)
+                            assignStatement = Node.Assign(
+                                Node.Lvalue(Node.Identifier(ioName)),
+                                Node.Rvalue(hook.argname)
+                            )
                         } else {
-                            let argName = String(describing: hook.argname)
-                            if ignoredInputs.contains(argName) {
-                                continue
-                            }
-
-                            var name = ""
-                            var statement: PythonObject
-                            var assignStatement: PythonObject
-                            if input {
-                                name = "\\\(instanceName).\(portName).q"
-                                statement = Node.Output(name)
-                                assignStatement = Node.Assign(
-                                    Node.Lvalue(Node.Identifier(name)),
-                                    Node.Rvalue(hook.argname)
-                                )
-                            } else {
-                                name = "\\\(instanceName).\(portName)"
-                                statement = Node.Input(name)
-                                assignStatement = Node.Assign(
-                                    Node.Lvalue(hook.argname),
-                                    Node.Rvalue(Node.Identifier(name))
-                                )
-                            }
-                            items.append(assignStatement)
-                            declarations.append(statement)
-                            ports.append(Node.Port(name, Python.None, Python.None, Python.None))
+                            ioDeclaration = Node.Input(ioName, width)
+                            assignStatement = Node.Assign(
+                                Node.Rvalue(hook.argname),
+                                Node.Lvalue(Node.Identifier(ioName))
+                            )
                         }
+                        items.append(assignStatement)
+                        declarations.append(ioDeclaration)
+                        ports.append(Node.Port(ioName, Python.None, Python.None, Python.None))
                     }
                 }
             }
 
-            if include {
+            if !yank {
                 items.append(item)
             }
         }
