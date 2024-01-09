@@ -214,6 +214,11 @@ func cut(arguments: [String]) -> Int32 {
 
                     for hook in instance.portlist {
                         let portName = String(describing: hook.portname)
+                        
+                        if ignoredInputs.contains(portName) {
+                            continue
+                        }
+                        
                         let portInfo = blackboxModule.portsByName[portName]!
                         
                         let ioDeclaration: PythonObject
