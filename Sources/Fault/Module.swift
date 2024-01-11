@@ -35,7 +35,7 @@ struct Port: Codable {
     }
 
     var bits: [Int] {
-        from < to ? [Int](from ... to) : [Int](to ... from).reversed()
+        from < to ? [Int](from ... to) : [Int](to ... from)
     }
 
     init(name: String, polarity: Polarity? = nil, from: Int = 0, to: Int = 0, at ordinal: Int) {
