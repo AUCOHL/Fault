@@ -1,4 +1,3 @@
-import Collections
 // Copyright (C) 2019 The American University in Cairo
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +11,11 @@ import Collections
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+import Collections
 import Defile
 import Foundation
 import PythonKit
-import Collections
 
 struct Port: Codable {
     enum Polarity: String, Codable {

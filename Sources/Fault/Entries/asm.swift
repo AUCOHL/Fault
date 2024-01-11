@@ -16,7 +16,6 @@ import BigInt
 import CommandLineKit
 import Defile
 import Foundation
-import PythonKit
 
 func assemble(arguments: [String]) -> Int32 {
     let cli = CommandLineKit.CommandLine(arguments: arguments)
@@ -75,16 +74,22 @@ func assemble(arguments: [String]) -> Int32 {
     let vectorOutput = filePath.value ?? "\(json).vec.bin"
     let goldenOutput = goldenFilePath.value ?? "\(json).out.bin"
 
-    guard let jsonString = File.read(json) else {
-        Stderr.print("Could not read file '\(json)'")
-        return EX_NOINPUT
+    print("Loading JSON data…")
+    let start = DispatchTime.now()
+    guard let data = try? Data(contentsOf: URL(fileURLWithPath: json)) else {
+        Stderr.print("Failed to open test vector JSON file.")
+        return EX_DATAERR
     }
 
     let decoder = JSONDecoder()
-    guard let tvinfo = try? decoder.decode(TVInfo.self, from: jsonString.data(using: .utf8)!) else {
+    guard let tvinfo = try? decoder.decode(TVInfo.self, from: data) else {
         Stderr.print("Test vector json file is invalid.")
         return EX_DATAERR
     }
+    let end = DispatchTime.now()
+    let nanoTime = end.uptimeNanoseconds - start.uptimeNanoseconds
+    let timeInterval = Double(nanoTime) / 1_000_000_000
+    print("Loaded JSON data in \(timeInterval)s.")
 
     let (chain, _, _) = ChainMetadata.extract(file: netlist)
 
@@ -193,7 +198,6 @@ func assemble(arguments: [String]) -> Int32 {
             } else {
                 if element.kind == .bypassOutput {
                     outputBinary += String(repeating: "x", count: element.width)
-                    print("Output is same as the loaded TV")
                 } else {
                     print("[Error]: Mismatch between output port \(element.name) and chained netlist.")
                     return EX_DATAERR

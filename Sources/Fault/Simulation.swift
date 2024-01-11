@@ -94,7 +94,7 @@ enum Simulator {
             outputComparison += " ( \(name) != \(name).gm ) || "
             if output.width > 1 {
                 for i in 0 ..< output.width {
-                    outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(output.name)[\(i)] ; \n"
+                    outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(output.name) [\(i)] ; \n"
                     outputCount += 1
                 }
             } else {
@@ -838,10 +838,10 @@ enum Simulator {
         try File.open(output, mode: .write) {
             try $0.print(bench)
         }
-        
+
         let outputLog = "\(output).log"
         print("Starting simulation steps (log: \(outputLog))…")
-        
+
         guard let outputFile = File.open(outputLog, mode: .write) else {
             throw RuntimeError("Failed to open log file.")
         }
@@ -852,23 +852,21 @@ enum Simulator {
                 let _ = "rm \(aoutName)".sh()
             }
         }
-        let iverilogCmd = "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1";
+        let iverilogCmd = "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
         try outputFile.write(string: "$ \(iverilogCmd)\n")
-        
+
         let iverilogResult =
             "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1".shOutput()
         try outputFile.write(string: iverilogResult.output)
 
-
         if iverilogResult.terminationStatus != EX_OK {
             throw RuntimeError("Failed to run iverilog.")
         }
-        
+
         let vvpCmd = "'\(vvpExecutable)' \(aoutName)"
         try outputFile.write(string: "$ \(vvpCmd)\n")
         let vvpResult = vvpCmd.shOutput()
         try outputFile.write(string: vvpResult.output)
-
 
         if iverilogResult.terminationStatus != EX_OK {
             throw RuntimeError("Failed to run vvp.")

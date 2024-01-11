@@ -415,7 +415,7 @@ func main(arguments: [String]) -> Int32 {
                 let minimum = min(port.from, port.to)
                 let maximum = max(port.from, port.to)
                 for i in minimum ... maximum {
-                    faultPoints.insert("\(port.name)[\(i)]")
+                    faultPoints.insert("\(port.name) [\(i)]")
                 }
             }
         }

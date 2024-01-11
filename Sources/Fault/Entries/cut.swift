@@ -165,13 +165,13 @@ func cut(arguments: [String]) -> Int32 {
                 let instanceName = "\(instance.name)"
                 if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
                     yank = true
-                    
+
                     let moduleName = String(describing: instance.name)
                     let outputName = "\\" + moduleName + ".q"
 
                     let inputIdentifier = Node.Identifier(moduleName)
                     let outputIdentifier = Node.Identifier(outputName)
-                    
+
                     var dArg: PythonObject?
                     var qArg: PythonObject?
 
@@ -214,13 +214,13 @@ func cut(arguments: [String]) -> Int32 {
 
                     for hook in instance.portlist {
                         let portName = String(describing: hook.portname)
-                        
+
                         if ignoredInputs.contains(portName) {
                             continue
                         }
-                        
+
                         let portInfo = blackboxModule.portsByName[portName]!
-                        
+
                         let ioDeclaration: PythonObject
                         let assignStatement: PythonObject
                         var ioName: String = "\\\(instanceName).\(portName)"
