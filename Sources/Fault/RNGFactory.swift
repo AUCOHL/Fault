@@ -16,7 +16,7 @@ import BigInt
 import Foundation
 
 protocol URNG {
-    init()
+    init(allBits: Int)
     func generate(bits: Int) -> BigUInt
 }
 
@@ -28,11 +28,11 @@ enum URNGFactory {
         return true
     }
 
-    static func get(name: String) -> URNG? {
+    static func get(name: String) -> URNG.Type? {
         guard let metaType = registry[name] else {
             return nil
         }
-        return metaType.init()
+        return metaType
     }
 
     static var validNames: [String] {

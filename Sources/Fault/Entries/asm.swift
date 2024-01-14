@@ -129,17 +129,6 @@ func assemble(arguments: [String]) -> Int32 {
         outputMap[name] = i
     }
 
-    func pad(_ number: BigUInt, digits: Int, radix: Int) -> String {
-        var padded = String(number, radix: radix)
-        let length = padded.count
-        if digits > length {
-            for _ in 0 ..< (digits - length) {
-                padded = "0" + padded
-            }
-        }
-        return padded
-    }
-
     var jsOutputLength = 0
     for output in jsOutputOrder {
         jsOutputLength += output.width
@@ -187,14 +176,14 @@ func assemble(arguments: [String]) -> Int32 {
                     return EX_DATAERR
                 }
             }
-            binaryString += pad(value, digits: element.width, radix: 2).reversed()
+            binaryString += value.pad(digits: element.width, radix: 2).reversed()
         }
         var outputBinary = ""
         for element in orderOutput {
             var value: BigUInt = 0
             if let locus = outputMap[element.name] {
                 value = outputDecimal[i][locus]
-                outputBinary += pad(value, digits: element.width, radix: 2)
+                outputBinary += value.pad(digits: element.width, radix: 2)
             } else {
                 if element.kind == .bypassOutput {
                     outputBinary += String(repeating: "x", count: element.width)

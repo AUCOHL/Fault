@@ -105,7 +105,7 @@ class PODEM: ExternalTestVectorGenerator {
 // MARK: Random Generators
 
 class SwiftRNG: URNG {
-    required init() {}
+    required init(allBits _: Int) {}
 
     func generate(bits: Int) -> BigUInt {
         BigUInt.randomInteger(withMaximumWidth: bits)
@@ -155,7 +155,7 @@ class LFSR: URNG {
     var polynomialHex: UInt
     let nbits: UInt
 
-    required init(nbits: UInt = 64) {
+    required init(allBits _: Int, nbits: UInt) {
         let max: UInt = (nbits == 64) ? UInt(pow(Double(2), Double(63)) - 1) : (1 << nbits) - 1
         let polynomial = LFSR.taps[nbits]!
 
@@ -168,8 +168,8 @@ class LFSR: URNG {
         }
     }
 
-    required convenience init() {
-        self.init(nbits: 64)
+    required convenience init(allBits: Int) {
+        self.init(allBits: allBits, nbits: 64)
     }
 
     static func parity(number: UInt) -> UInt {
@@ -205,4 +205,49 @@ class LFSR: URNG {
     }
 
     static let registered = URNGFactory.register(name: "LFSR", type: LFSR.self)
+}
+
+class PatternGenerator: URNG {
+    enum Pattern {
+        case allZero
+        case halfAndHalf
+        case alternating
+    }
+
+    let pattern: Pattern
+    let complement: Bool
+    var number: BigUInt
+
+    init(allBits: Int, pattern: Pattern, complement: Bool) {
+        self.pattern = pattern
+        self.complement = complement
+        number = BigUInt(0)
+        switch self.pattern {
+        case .halfAndHalf:
+            let halfBits = allBits / 2
+            number = (BigUInt(1) << halfBits) - 1
+        case .alternating:
+            for _ in 0 ..< allBits {
+                number = (number << 1) | ((number & 1) ^ 1)
+            }
+        default:
+            break
+        }
+    }
+
+    required convenience init(allBits: Int) {
+        self.init(allBits: allBits, pattern: .allZero, complement: false)
+    }
+
+    func generate(bits: Int) -> BigUInt {
+        let mask = (BigUInt(1) << bits) - 1
+        let result = number & mask
+        number >>= bits
+        // print("returning \(bits) bits: \(result.pad(digits: bits, radix: 2))")
+        if complement {
+            return result ^ mask
+        } else {
+            return result
+        }
+    }
 }

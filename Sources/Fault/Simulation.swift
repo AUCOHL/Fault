@@ -232,7 +232,8 @@ enum Simulator {
         minimumCoverage: Float,
         ceiling: Int,
         randomGenerator: String,
-        TVSet: [TestVector],
+        initialTVInfo: TVInfo? = nil,
+        externalTestVectors: [TestVector],
         sampleRun: Bool,
         clock: String?,
         defines: Set<String> = [],
@@ -240,20 +241,29 @@ enum Simulator {
         with vvpExecutable: String
     ) throws -> (coverageList: [TVCPair], coverageMeta: CoverageMeta) {
         var testVectorHash: Set<TestVector> = []
-
         var coverageList: [TVCPair] = []
-        var coverage: Float = 0.0
-
         var sa0Covered: Set<String> = []
         sa0Covered.reserveCapacity(faultPoints.count)
         var sa1Covered: Set<String> = []
         sa1Covered.reserveCapacity(faultPoints.count)
 
+        if let tvInfo = initialTVInfo {
+            coverageList = tvInfo.coverageList
+            for tvcPair in coverageList {
+                testVectorHash.insert(tvcPair.vector)
+                sa0Covered.formUnion(tvcPair.coverage.sa0)
+                sa0Covered.formUnion(tvcPair.coverage.sa1)
+            }
+        }
+
+        var coverage: Float = 0.0
+
         var totalTVAttempts = 0
         var tvAttempts = min(initialVectorCount, ceiling, sampleRun ? 1 : Int.max)
 
-        let simulateOnly = (TVSet.count != 0)
-        let rng: URNG = URNGFactory.get(name: randomGenerator)!
+        let simulateOnly = (externalTestVectors.count != 0)
+        let totalBitWidth = inputs.reduce(0) { $0 + $1.width }
+        let backupRng: URNG = URNGFactory.get(name: randomGenerator)!.init(allBits: totalBitWidth)
 
         while coverage < minimumCoverage, totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -266,12 +276,33 @@ enum Simulator {
             var futureList: [Future] = []
             var testVectors: [TestVector] = []
             for index in 0 ..< tvAttempts {
+                let overallIndex = totalTVAttempts + index
+                
+                var rng: URNG = backupRng
+                if overallIndex == 0 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .allZero, complement: false)
+                } else if overallIndex == 1 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .allZero, complement: true)
+                } else if overallIndex == 2 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .alternating, complement: false)
+                } else if overallIndex == 3 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .alternating, complement: true)
+                } else if overallIndex == 4 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .halfAndHalf, complement: false)
+                } else if overallIndex == 5 {
+                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .halfAndHalf, complement: true)
+                }
                 var testVector: TestVector = []
                 if simulateOnly {
-                    testVector = TVSet[totalTVAttempts + index]
+                    testVector = externalTestVectors[overallIndex]
                 } else {
+                    var assembled: BigUInt = 0
+                    var bitsSoFar = 0
                     for input in inputs {
-                        testVector.append(rng.generate(bits: input.width))
+                        let value = rng.generate(bits: input.width)
+                        assembled |= (value << bitsSoFar)
+                        bitsSoFar += input.width
+                        testVector.append(value)
                     }
                 }
                 if testVectorHash.contains(testVector) {

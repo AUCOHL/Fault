@@ -18,6 +18,19 @@ import Foundation
 
 typealias TestVector = [BigUInt]
 
+extension BigUInt {
+    func pad(digits: Int, radix: Int) -> String {
+        var padded = String(self, radix: radix)
+        let length = padded.count
+        if digits > length {
+            for _ in 0 ..< (digits - length) {
+                padded = "0" + padded
+            }
+        }
+        return padded
+    }
+}
+
 struct Coverage: Codable {
     var sa0: [String]
     var sa1: [String]
@@ -51,12 +64,16 @@ struct TVInfo: Codable {
         self.outputs = outputs
         self.coverageList = coverageList
     }
+
+    static func fromJSON(file: String) throws -> TVInfo {
+        let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
+        return try JSONDecoder().decode(TVInfo.self, from: data)
+    }
 }
 
 enum TVSet {
     static func readFromJson(file: String) throws -> ([TestVector], [Port]) {
-        let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
-        guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
+        guard let tvInfo = try? TVInfo.fromJSON(file: file) else {
             Stderr.print("File '\(file)' is invalid.")
             exit(EX_DATAERR)
         }
