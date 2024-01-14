@@ -73,12 +73,12 @@ func chainInternal(
     module.definition.portlist.ports = Python.tuple(ports)
 
     var counter = 0
-    let newShiftWire = {
+    let newShiftWire: () -> PythonObject = { // Type annotation required in Swift 5.4
         () in
-        let name = "__chain_\(counter)__"
-        counter += 1
-        statements.append(Node.Decl([Node.Wire(name)]))
-        return Node.Identifier(name)
+            let name = "__chain_\(counter)__"
+            counter += 1
+            statements.append(Node.Decl([Node.Wire(name)]))
+            return Node.Identifier(name)
     }
     var previousOutput = newShiftWire()
 
@@ -280,12 +280,12 @@ func chainTop(
     let portArguments = Python.list()
 
     var counter = 0
-    let newShiftWire = {
+    let newShiftWire: () -> PythonObject = { // Type annotation required in Swift 5.4
         () in
-        let name = "__chain_\(counter)__"
-        counter += 1
-        statements.append(Node.Decl([Node.Wire(name)]))
-        return Node.Identifier(name)
+            let name = "__chain_\(counter)__"
+            counter += 1
+            statements.append(Node.Decl([Node.Wire(name)]))
+            return Node.Identifier(name)
     }
     var previousOutput = newShiftWire()
 
