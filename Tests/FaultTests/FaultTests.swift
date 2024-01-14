@@ -114,6 +114,8 @@ final class FaultTests: XCTestCase {
         let fileSynth = base + ".nl.v"
         let fileCut = base + ".cut.v"
         let fileJson = base + ".tv.json"
+        let faultPointsYML = base + ".fault_points.yml"
+        let coverageYml = base + ".coverage_meta.yml"
         let fileChained = base + ".chained.v"
         let fileAsmVec = fileJson + ".vec.bin"
         let fileAsmOut = fileJson + ".out.bin"
@@ -125,7 +127,7 @@ final class FaultTests: XCTestCase {
         try run(steps: [
             ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", fileName],
             ["cut", "-o", fileCut, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", "--ignoring", "clk,rst,rstn", fileSynth],
-            ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, fileCut],
+            ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, "--output-fault-points", faultPointsYML, "--output-covered", coverageYml, fileCut],
             ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
             ["asm", fileJson, fileChained],
             ["compact", "-o", "/dev/null", fileJson],

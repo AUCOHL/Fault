@@ -17,6 +17,18 @@ import Defile
 import Foundation
 import PythonKit
 
+class CoverageMeta: Codable {
+    let ratio: Float
+    let sa0Covered: [String]
+    let sa1Covered: [String]
+
+    init(ratio: Float, sa0Covered: [String], sa1Covered: [String]) {
+        self.ratio = ratio
+        self.sa0Covered = sa0Covered
+        self.sa1Covered = sa1Covered
+    }
+}
+
 enum Simulator {
     enum Behavior: Int {
         case holdHigh = 1
@@ -226,7 +238,7 @@ enum Simulator {
         defines: Set<String> = [],
         using iverilogExecutable: String,
         with vvpExecutable: String
-    ) throws -> (coverageList: [TVCPair], coverage: Float) {
+    ) throws -> (coverageList: [TVCPair], coverageMeta: CoverageMeta) {
         var testVectorHash: Set<TestVector> = []
 
         var coverageList: [TVCPair] = []
@@ -362,7 +374,11 @@ enum Simulator {
 
         return (
             coverageList: coverageList,
-            coverage: coverage
+            coverageMeta: CoverageMeta(
+                ratio: coverage,
+                sa0Covered: sa0Covered.sorted(),
+                sa1Covered: sa1Covered.sorted()
+            )
         )
     }
 

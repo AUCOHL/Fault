@@ -19,6 +19,7 @@ import CoreFoundation // Not automatically imported on Linux
 import Defile
 import Foundation
 import PythonKit
+import Yams
 
 let VERSION = "0.6.1"
 
@@ -115,6 +116,18 @@ func main(arguments: [String]) -> Int32 {
         helpMessage: "Path to the output SVF file. (Default: input + .tv.svf)"
     )
     cli.addOptions(svfFilePath)
+
+    let faultPointFilePath = StringOption(
+        longFlag: "output-fault-points",
+        helpMessage: "Path to the output yml file listing all generated fault points. (Default: nil)"
+    )
+    cli.addOptions(faultPointFilePath)
+
+    let coverageMetaFilePath = StringOption(
+        longFlag: "output-covered",
+        helpMessage: "Path to the output yml file listing coverage metadata, i.e., ratio and fault points covered. (Default: nil)"
+    )
+    cli.addOptions(coverageMetaFilePath)
 
     let cellsOption = StringOption(
         shortFlag: "c",
@@ -477,7 +490,7 @@ func main(arguments: [String]) -> Int32 {
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         print("Time elapsed: \(String(format: "%.2f", timeElapsed))s.")
 
-        print("Simulations concluded: Coverage \(result.coverage * 100)%")
+        print("Simulations concluded: Coverage \(result.coverageMeta.ratio * 100)%")
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -502,6 +515,18 @@ func main(arguments: [String]) -> Int32 {
 
         try File.open(svfOutput, mode: .write) {
             try $0.print(svfString)
+        }
+
+        if let faultPointOutput = faultPointFilePath.value {
+            try File.open(faultPointOutput, mode: .write) {
+                try $0.write(string: YAMLEncoder().encode(faultPoints.sorted()))
+            }
+        }
+
+        if let coverageMetaFilePath = coverageMetaFilePath.value {
+            try File.open(coverageMetaFilePath, mode: .write) {
+                try $0.write(string: YAMLEncoder().encode(result.coverageMeta))
+            }
         }
 
     } catch {
