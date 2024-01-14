@@ -526,20 +526,24 @@ func main(arguments: [String]) -> Int32 {
             throw "Could not create utf8 string."
         }
         try File.open(jsonOutput, mode: .write) {
+            print("Writing generated test vectors in Fault JSON format to \(jsonOutput)…")
             try $0.print(string)
         }
 
         try File.open(svfOutput, mode: .write) {
+            print("Writing generated test vectors in SVF format to \(svfOutput)…")
             try $0.print(svfString)
         }
 
         if let faultPointOutput = faultPointFilePath.value {
+            print("Writing YAML file of fault points to \(faultPointOutput)…")
             try File.open(faultPointOutput, mode: .write) {
                 try $0.write(string: YAMLEncoder().encode(faultPoints.sorted()))
             }
         }
 
         if let coverageMetaFilePath = coverageMetaFilePath.value {
+            print("Writing YAML file of final coverage metadata to \(coverageMetaFilePath)…")
             try File.open(coverageMetaFilePath, mode: .write) {
                 try $0.write(string: YAMLEncoder().encode(result.coverageMeta))
             }
