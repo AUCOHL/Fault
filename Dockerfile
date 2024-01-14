@@ -60,6 +60,8 @@ WORKDIR /
 COPY requirements.txt /requirements.txt
 RUN python3 -m pip install --target /build/lib/pythonpath --upgrade -r ./requirements.txt
 
+ENV PYTHONPATH=/build/lib/pythonpath
+
 # Copy Libraries for AppImage
 RUN cp /lib64/libtinfo.so.5 /build/lib
 RUN cp /lib64/libffi.so.6 /build/lib

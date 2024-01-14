@@ -5,7 +5,7 @@ var env = ProcessInfo.processInfo.environment
 
 extension Process {
     func startAndBlock() throws {
-        log("$ \(executableURL!.path()) \((arguments ?? []).joined(separator: " "))")
+        log("$ \(executableURL!.path) \((arguments ?? []).joined(separator: " "))")
         launch()
         waitUntilExit()
         print("Exited with: \(terminationStatus)")
