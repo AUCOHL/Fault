@@ -73,6 +73,7 @@ COPY . .
 ENV CC=clang
 ENV CXX=clang++
 RUN swift build --static-swift-stdlib -c release
+RUN swift test
 RUN cp /fault/.build/x86_64-unknown-linux-gnu/release/Fault /build/bin/fault
 WORKDIR /
 # ---
@@ -80,8 +81,6 @@ WORKDIR /
 FROM centos:centos7 AS runner
 COPY --from=builder /build /build
 WORKDIR /test
-COPY ./Tests/smoke_test.py .
-COPY ./Tests/RTL/spm/spm.v .
 COPY ./Tech/osu035 ./osu035
 
 WORKDIR /

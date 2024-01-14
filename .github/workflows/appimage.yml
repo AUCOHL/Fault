@@ -22,9 +22,6 @@ jobs:
           cd appimage
           export FAULT_IMAGE_NAME=ghcr.io/aucohl/fault:${{ steps.get_version.outputs.value }}
           make
-      - name: Test AppImage
-        run: |
-          ./appimage/Fault-x86_64.AppImage smoke-test
       - name: Copy AppImage
         run: |
           cp ./appimage/Fault-x86_64.AppImage /tmp/Fault-${{ steps.get_version.outputs.value }}-x86_64.AppImage

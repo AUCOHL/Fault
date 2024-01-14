@@ -22,9 +22,7 @@ $(APPIMAGE): squashfs-root/build/bin/fault appimagetool $(RESOURCES)
 	mkdir -p ./squashfs-root/test
 	cp ../Tests/RTL/spm/spm.v ./squashfs-root/test/spm.v
 	cp -r ../Tech/osu035 ./squashfs-root/test/osu035
-	cp ../Tests/smoke_test.py ./squashfs-root/test/smoke_test.py
 	./appimagetool ./squashfs-root
-	@./$(APPIMAGE) smoke-test && echo "> Smoke test successful." || echo "> Smoke test failed."
 
 PREFIX ?= /usr/local
 install:
