@@ -252,11 +252,14 @@ enum Simulator {
             for tvcPair in coverageList {
                 testVectorHash.insert(tvcPair.vector)
                 sa0Covered.formUnion(tvcPair.coverage.sa0)
-                sa0Covered.formUnion(tvcPair.coverage.sa1)
+                sa1Covered.formUnion(tvcPair.coverage.sa1)
             }
         }
 
-        var coverage: Float = 0.0
+        var coverage: Float =
+            Float(sa0Covered.count + sa1Covered.count) /
+            Float(2 * faultPoints.count)
+        print("Initial coverage: \(coverage * 100)%")
 
         var totalTVAttempts = 0
         var tvAttempts = min(initialVectorCount, ceiling, sampleRun ? 1 : Int.max)
