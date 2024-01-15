@@ -32,6 +32,7 @@ let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 _ = [ // Register all RNGs
     SwiftRNG.registered,
     LFSR.registered,
+    PatternGenerator.registered,
 ]
 _ = [ // Register all TVGens
     Atalanta.registered,
@@ -88,7 +89,8 @@ func main(arguments: [String]) -> Int32 {
     let defaultTVIncrement = "50"
     let defaultMinimumCoverage = "80"
     let defaultCeiling = "1000"
-    let defaultRNG = "swift"
+    let defaultTVGen = "swift"
+    let defaultSeed: UInt = 0xDEADCAFEDEADF00D
 
     let version = BoolOption(
         shortFlag: "V",
@@ -163,18 +165,24 @@ func main(arguments: [String]) -> Int32 {
     )
     cli.addOptions(ceiling)
 
-    let rng = StringOption(
-        longFlag: "rng",
-        helpMessage: "Type of the RNG used in Internal TV Generation: LFSR or swift. (Default: swift.)"
-    )
-    cli.addOptions(rng)
-
     let tvGen = StringOption(
         shortFlag: "g",
         longFlag: "tvGen",
-        helpMessage: "Use an external TV Generator: Atalanta or PODEM. (Default: Internal.)"
+        helpMessage: "Type of the (pseudo-random) internal Test Vector generator: \(TVGeneratorFactory.validNames.joined(separator: "|")) (Default: \(defaultTVGen))"
     )
     cli.addOptions(tvGen)
+    
+    let rngSeed = StringOption(
+        longFlag: "rngSeed",
+        helpMessage: "A \(MemoryLayout<UInt>.size)-byte value to use as an RNG seed for test vector generators, provided as a hexadecimal string (without 0x). (Default: \(String(defaultSeed, radix: 16)))"
+    )
+    cli.addOptions(rngSeed)
+
+    let etvGen = StringOption(
+        longFlag: "etvGen",
+        helpMessage: "Use an external TV Generator: Atalanta or PODEM. (Default: Internal.)"
+    )
+    cli.addOptions(etvGen)
 
     let bench = StringOption(
         shortFlag: "b",
@@ -261,13 +269,13 @@ func main(arguments: [String]) -> Int32 {
         return EX_USAGE
     }
 
-    let randomGenerator = rng.value ?? defaultRNG
+    let tvGenName = tvGen.value ?? defaultTVGen
 
     guard
         let tvAttempts = Int(testVectorCount.value ?? defaultTVCount),
         let tvIncrement = Int(testVectorIncrement.value ?? defaultTVIncrement),
         let tvMinimumCoverageInt = Int(minimumCoverage.value ?? defaultMinimumCoverage),
-        Int(ceiling.value ?? defaultCeiling) != nil, URNGFactory.validNames.contains(randomGenerator), (tvGen.value == nil) == (bench.value == nil)
+        Int(ceiling.value ?? defaultCeiling) != nil, TVGeneratorFactory.validNames.contains(tvGenName), (etvGen.value == nil) == (bench.value == nil)
     else {
         cli.printUsage()
         return EX_USAGE
@@ -369,9 +377,9 @@ func main(arguments: [String]) -> Int32 {
         print("Read \(etvSetVectors.count) externally-generated vectors to verify.")
     }
 
-    if let tvGenerator = tvGen.value, ETVGFactory.validNames.contains(tvGenerator) {
+    if let tvGenerator = etvGen.value, ETVGFactory.validNames.contains(tvGenerator) {
         let etvgen = ETVGFactory.get(name: tvGenerator)!
-        let benchUnwrapped = bench.value! // Program exits if tvGen.value isn't nil and bench.value is or vice versa
+        let benchUnwrapped = bench.value! // Program exits if etvGen.value isn't nil and bench.value is or vice versa
 
         if !fileManager.fileExists(atPath: benchUnwrapped) {
             Stderr.print("Bench file '\(benchUnwrapped)' not found.")
@@ -395,6 +403,8 @@ func main(arguments: [String]) -> Int32 {
                 String(etvSetVectors.count)
         )
     )!
+    
+    let finalRNGSeed = rngSeed.value != nil ? UInt(rngSeed.value!, radix: 16)! : defaultSeed
 
     do {
         let (ports, inputs, outputs) = try Port.extract(from: definition)
@@ -493,7 +503,8 @@ func main(arguments: [String]) -> Int32 {
             incrementingBy: tvIncrement,
             minimumCoverage: tvMinimumCoverage,
             ceiling: finalTvCeiling,
-            randomGenerator: randomGenerator,
+            tvGenerator: TVGeneratorFactory.get(name: tvGenName)!,
+            rngSeed: finalRNGSeed,
             initialTVInfo: initialTVInfo,
             externalTestVectors: etvSetVectors,
             sampleRun: sampleRun.value,

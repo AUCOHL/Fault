@@ -127,7 +127,7 @@ final class FaultTests: XCTestCase {
         try run(steps: [
             ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", fileName],
             ["cut", "-o", fileCut, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", "--ignoring", "clk,rst,rstn", fileSynth],
-            ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, "--output-fault-points", faultPointsYML, "--output-covered", coverageYml, fileCut],
+            ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, "--output-faultPoints", faultPointsYML, "--output-covered", coverageYml, fileCut],
             ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
             ["asm", fileJson, fileChained],
             ["compact", "-o", "/dev/null", fileJson],

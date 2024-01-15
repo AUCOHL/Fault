@@ -231,7 +231,8 @@ enum Simulator {
         incrementingBy increment: Int,
         minimumCoverage: Float,
         ceiling: Int,
-        randomGenerator: String,
+        tvGenerator: TVGenerator.Type,
+        rngSeed: UInt,
         initialTVInfo: TVInfo? = nil,
         externalTestVectors: [TestVector],
         sampleRun: Bool,
@@ -266,7 +267,7 @@ enum Simulator {
 
         let simulateOnly = (externalTestVectors.count != 0)
         let totalBitWidth = inputs.reduce(0) { $0 + $1.width }
-        let backupRng: URNG = URNGFactory.get(name: randomGenerator)!.init(allBits: totalBitWidth)
+        var rng: TVGenerator = tvGenerator.init(allBits: totalBitWidth, seed: rngSeed)
 
         while coverage < minimumCoverage, totalTVAttempts < ceiling {
             if totalTVAttempts > 0 {
@@ -280,30 +281,15 @@ enum Simulator {
             var testVectors: [TestVector] = []
             for index in 0 ..< tvAttempts {
                 let overallIndex = totalTVAttempts + index
-                
-                var rng: URNG = backupRng
-                if overallIndex == 0 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .allZero, complement: false)
-                } else if overallIndex == 1 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .allZero, complement: true)
-                } else if overallIndex == 2 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .alternating, complement: false)
-                } else if overallIndex == 3 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .alternating, complement: true)
-                } else if overallIndex == 4 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .halfAndHalf, complement: false)
-                } else if overallIndex == 5 {
-                    rng = PatternGenerator(allBits: totalBitWidth, pattern: .halfAndHalf, complement: true)
-                }
+                rng.generate(count: overallIndex)
+                // print(rng.current.pad(digits: totalBitWidth, radix: 2))
                 var testVector: TestVector = []
                 if simulateOnly {
                     testVector = externalTestVectors[overallIndex]
                 } else {
-                    var assembled: BigUInt = 0
                     var bitsSoFar = 0
                     for input in inputs {
-                        let value = rng.generate(bits: input.width)
-                        assembled |= (value << bitsSoFar)
+                        let value = rng.get(bits: input.width)
                         bitsSoFar += input.width
                         testVector.append(value)
                     }
