@@ -13,33 +13,26 @@
 // limitations under the License.
 
 enum Synthesis {
-    enum Gate: String {
-        case and = "AND"
-        case nand = "NAND"
-        case or = "OR"
-        case nor = "NOR"
-        case xnor = "XNOR"
-        case andnot = "ANDNOT"
-        case ornot = "ORNOT"
-        case mux = "MUX"
-        case aoi3 = "AOI3"
-        case oai3 = "OAI3"
-        case aoi4 = "AOI4"
-        case oai4 = "OAI4"
-    }
-
     static func script(
         for module: String,
         in files: [String],
         cutting: Bool = false,
         checkHierarchy: Bool = true,
         liberty libertyFile: String,
+        blackboxing blackboxedModules: [String] = [],
         output: String,
         optimize: Bool = true
     ) -> String {
         let opt = optimize ? "opt" : ""
         return """
-        read_verilog -sv \(files.map { file in "'\(file)'" }.joined(separator: " "))
+        # read liberty
+        read_liberty -lib -ignore_miss_dir -setattr blackbox \(libertyFile)
+
+        # read black boxes
+        read_verilog -sv -lib \(blackboxedModules.map { "'\($0)'" }.joined(separator: " "))
+
+        # read design
+        read_verilog -sv \(files.map { "'\($0)'" }.joined(separator: " "))
 
         # check design hierarchy
         hierarchy \(checkHierarchy ? "-check" : "") -top \(module)
@@ -74,7 +67,10 @@ enum Synthesis {
         # cleanup
         opt_clean -purge
 
-        write_verilog -noexpr \(output).attrs.v
+        # names
+        # autoname
+
+        write_verilog -noexpr \(output)+attrs
         write_verilog -noexpr -noattr \(output)
         """
     }

@@ -12,30 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import BigInt
-import Foundation
+struct RuntimeError: Error {
+    let description: String
 
-protocol URNG {
-    init()
-    func generate(bits: Int) -> BigUInt
-}
-
-enum URNGFactory {
-    private static var registry: [String: URNG.Type] = [:]
-
-    static func register<T: URNG>(name: String, type: T.Type) -> Bool {
-        registry[name] = type
-        return true
+    init(_ description: String) {
+        self.description = description
     }
 
-    static func get(name: String) -> URNG? {
-        guard let metaType = registry[name] else {
-            return nil
-        }
-        return metaType.init()
-    }
-
-    static var validNames: [String] {
-        [String](registry.keys)
+    var errorDescription: String? {
+        description
     }
 }

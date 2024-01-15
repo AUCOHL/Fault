@@ -60,7 +60,6 @@ WORKDIR /
 COPY requirements.txt /requirements.txt
 RUN python3 -m pip install --target /build/lib/pythonpath --upgrade -r ./requirements.txt
 
-# Copy Libraries for AppImage
 RUN cp /lib64/libtinfo.so.5 /build/lib
 RUN cp /lib64/libffi.so.6 /build/lib
 RUN cp /lib64/libz.so.1 /build/lib
@@ -74,14 +73,23 @@ ENV CC=clang
 ENV CXX=clang++
 RUN swift build --static-swift-stdlib -c release
 RUN cp /fault/.build/x86_64-unknown-linux-gnu/release/Fault /build/bin/fault
+
+## Tests
+ENV PATH=/build/bin:$PATH\
+    PYTHON_LIBRARY=/build/lib/libpython3.6m.so\
+    PYTHONPATH=/build/lib/pythonpath\
+    LD_LIBRARY_PATH=/build/lib\
+    FAULT_IVL_BASE=/build/lib/ivl\
+    FAULT_IVERILOG=/build/bin/iverilog\
+    FAULT_VVP=/build/bin/vvp
+RUN swift test
+
 WORKDIR /
 # ---
 
 FROM centos:centos7 AS runner
 COPY --from=builder /build /build
 WORKDIR /test
-COPY ./Tests/smoke_test.py .
-COPY ./Tests/RTL/spm.v .
 COPY ./Tech/osu035 ./osu035
 
 WORKDIR /

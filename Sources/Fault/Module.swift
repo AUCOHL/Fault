@@ -11,10 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+import Collections
 import Defile
 import Foundation
 import PythonKit
-import Collections
 
 struct Port: Codable {
     enum Polarity: String, Codable {
@@ -33,21 +34,49 @@ struct Port: Codable {
         from < to ? to - from + 1 : from - to + 1
     }
 
-    init(name: String, at ordinal: Int) {
+    var bits: [Int] {
+        from < to ? [Int](from ... to) : [Int](to ... from)
+    }
+
+    init(name: String, polarity: Polarity? = nil, from: Int = 0, to: Int = 0, at ordinal: Int) {
         self.name = name
-        from = 0
-        to = 0
+        self.polarity = polarity
+        self.from = from
+        self.to = to
         self.ordinal = ordinal
     }
 
     static func extract(from definition: PythonObject) throws -> (ports: [String: Port], inputs: [Port], outputs: [Port]) {
         var ports: [String: Port] = [:]
-        var inputs: [Port] = []
-        var outputs: [Port] = []
+
         var paramaters: [String: Int] = [:]
         for (i, portDeclaration) in definition.portlist.ports.enumerated() {
-            let port = Port(name: "\(portDeclaration.name)", at: i)
-            ports["\(portDeclaration.name)"] = port
+            var polarity: Polarity? = nil
+            var from = 0
+            var to = 0
+            var name: String!
+            if Bool(Python.hasattr(portDeclaration, "first"))! {
+                let declaration = portDeclaration[dynamicMember: "first"]
+                let type = "\(Python.type(declaration).__name__)"
+                if type == "Input" {
+                    polarity = .input
+                } else {
+                    polarity = .output
+                }
+                if declaration.width != Python.None {
+                    let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters)
+                    let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters)
+                    from = msb
+                    to = lsb
+                }
+                let firstChild = portDeclaration[dynamicMember: "first"]
+                name = "\(firstChild.name)"
+            } else {
+                name = "\(portDeclaration.name)"
+            }
+
+            let port = Port(name: name, polarity: polarity, from: from, to: to, at: i)
+            ports[name] = port
         }
 
         for itemDeclaration in definition.items {
@@ -71,18 +100,19 @@ struct Port: Codable {
                     }
                     if declType == "Input" {
                         port.polarity = .input
-                        inputs.append(port)
                     } else {
                         port.polarity = .output
-                        outputs.append(port)
                     }
                     ports["\(declaration.name)"] = port
                 }
             }
         }
 
-        inputs.sort { $0.ordinal < $1.ordinal }
-        outputs.sort { $0.ordinal < $1.ordinal }
+        let inputs: [Port] = ports.values.filter { $0.polarity == .input }.sorted(by: { $0.ordinal < $1.ordinal })
+        let outputs: [Port] = ports.values.filter { $0.polarity == .output }.sorted(by: { $0.ordinal < $1.ordinal })
+        if ports.count != inputs.count + outputs.count {
+            throw RuntimeError("Some ports in \(definition.name) are not properly declared as an input or output.")
+        }
 
         return (ports: ports, inputs: inputs, outputs: outputs)
     }
@@ -102,7 +132,7 @@ struct Port: Codable {
         case "Identifier":
             value = params["\(expr.name)"]!
         default:
-            print("Got unknow expression type \(type)")
+            Stderr.print("Got unknown expression type \(type) while evaluating port expression \(expr)")
             exit(EX_DATAERR)
         }
         return value
@@ -131,4 +161,57 @@ func sub(left: Int, right: Int) -> Int {
 
 func sll(left: Int, right: Int) -> Int {
     left << right
+}
+
+struct Module {
+    var name: String
+    var inputs: [Port]
+    var outputs: [Port]
+    var definition: PythonObject
+    var ports: [Port]
+    var portsByName: [String: Port]
+
+    init(name: String, inputs: [Port], outputs: [Port], definition: PythonObject) {
+        self.name = name
+        self.inputs = inputs
+        self.outputs = outputs
+        self.definition = definition
+        ports = inputs + outputs
+        portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
+    }
+
+    static func getModules(in files: [String], filter filterOpt: Set<String>? = nil) throws -> OrderedDictionary<String, Module> {
+        let parse = Python.import("pyverilog.vparser.parser").parse
+        var result: OrderedDictionary<String, Module> = [:]
+
+        for file in files {
+            print("Processing file \(file)…")
+            let parseResult = parse([file])
+            let ast = parseResult[0]
+            let description = ast[dynamicMember: "description"]
+            for definition in description.definitions {
+                let type = Python.type(definition).__name__
+                if type != "ModuleDef" {
+                    continue
+                }
+                let name = String(describing: definition.name)
+                print("Processing module \(name)…")
+                if let filter = filterOpt {
+                    if !filter.contains(name) {
+                        continue
+                    }
+                }
+                let (_, inputs, outputs) = try Port.extract(from: definition)
+                result[name] = Module(name: name, inputs: inputs, outputs: outputs, definition: definition)
+            }
+        }
+
+        return result
+    }
+}
+
+extension Module: CustomStringConvertible {
+    var description: String {
+        "<Module " + (["\(name)"] + ports.map(\.description)).joined(separator: "\n\t") + "\n>"
+    }
 }

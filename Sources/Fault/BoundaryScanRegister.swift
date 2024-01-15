@@ -65,27 +65,21 @@ class BoundaryScanRegisterCreator {
     }
 
     func create(
-        ordinal: Int,
-        max: Int,
-        din: String,
-        dout: String,
+        group: String,
+        din: PythonObject,
+        dout: PythonObject,
         sin: String,
         sout: String,
         input: Bool
     ) -> PythonObject {
-        let dinIdentifier = Node.Identifier(din)
-        let doutIdentifier = Node.Identifier(dout)
         let sinIdentifier = Node.Identifier(sin)
         let soutIdentifier = Node.Identifier(sout)
-        let ordinalConstant = Node.Constant(ordinal)
 
         let name = input ? inputName : outputName
-        let dinArg = (max == 0) ? dinIdentifier : Node.Pointer(dinIdentifier, ordinalConstant)
-        let doutArg = (max == 0) ? doutIdentifier : Node.Pointer(doutIdentifier, ordinalConstant)
 
         let portArguments = [
-            Node.PortArg("din", dinArg),
-            Node.PortArg("dout", doutArg),
+            Node.PortArg("din", din),
+            Node.PortArg("dout", dout),
             Node.PortArg("sin", sinIdentifier),
             Node.PortArg("sout", soutIdentifier),
             Node.PortArg("clock", clockIdentifier),
@@ -94,9 +88,11 @@ class BoundaryScanRegisterCreator {
             Node.PortArg("shift", shiftIdentifier),
         ]
 
+        let instanceName = "__\(name)_\(group)_\(counter)__"
+
         let submoduleInstance = Node.Instance(
             name,
-            "__" + name + "_" + String(describing: counter) + "__",
+            instanceName,
             Python.tuple(portArguments),
             Python.tuple()
         )
