@@ -57,7 +57,7 @@ enum TVGeneratorFactory {
 class SwiftRNG: TVGenerator {
     var current: BigUInt
     var bits: Int
-    var rng: RandomNumberGenerator
+    var rng: ARC4RandomNumberGenerator
     
     required init(allBits bits: Int, seed: UInt) {
         self.current = 0
