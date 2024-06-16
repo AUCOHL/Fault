@@ -20,6 +20,7 @@ Netlists
 /*.log
 
 *.json
+!/nix/workspace-state.json 
 *.bench
 *.test
 *.log

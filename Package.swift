@@ -12,7 +12,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/pvieito/PythonKit", .branch("master")),
-        .package(url: "https://github.com/pvieito/CommandLineKit", .branch("master")),
+        .package(url: "https://github.com/basvankuijck/CommandLine.git", from: "4.1.2"),
         .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.2.1"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6"),
@@ -22,7 +22,7 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .executableTarget(
             name: "Fault",
-            dependencies: ["PythonKit", "CommandLineKit", "Defile", .product(name: "Collections", package: "swift-collections"), "BigInt", "Yams"],
+            dependencies: ["PythonKit", .product(name: "CommandLineKit", package: "CommandLine"), "Defile", .product(name: "Collections", package: "swift-collections"), "BigInt", "Yams"],
             path: "Sources"
         ),
         .testTarget(

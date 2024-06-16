@@ -12,11 +12,11 @@
       },
       {
         "package": "CommandLineKit",
-        "repositoryURL": "https://github.com/pvieito/CommandLineKit",
+        "repositoryURL": "https://github.com/basvankuijck/CommandLine.git",
         "state": {
-          "branch": "master",
-          "revision": "a4ca3c200b87490d070c930d5033ade2fd26ef71",
-          "version": null
+          "branch": null,
+          "revision": "b83f09a25224c29b820f9e8d1311569736021820",
+          "version": "4.1.2"
         }
       },
       {
