@@ -1,0 +1,110 @@
+{
+  "object": {
+    "artifacts": [],
+    "dependencies": [
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "bigint",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/attaswift/BigInt.git",
+          "name": "BigInt"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "889a1ecacd73ccc189c5cb29288048f186c44ed9",
+            "version": "5.2.1"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "BigInt"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "commandline",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/basvankuijck/CommandLine.git",
+          "name": "CommandLineKit"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "b83f09a25224c29b820f9e8d1311569736021820",
+            "version": "4.1.2"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "CommandLine"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "defile",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/donn/Defile.git",
+          "name": "Defile"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "9021d9c0fb28b1df48a6fd0db065fd3adb9e718a",
+            "version": "5.2.1"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "Defile"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "pythonkit",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/pvieito/PythonKit",
+          "name": "PythonKit"
+        },
+        "state": {
+          "checkoutState": {
+            "branch": "master",
+            "revision": "c77231820148515a77e9bba5016a57e5a88ef007"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "PythonKit"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "swift-collections",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/apple/swift-collections.git",
+          "name": "swift-collections"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "d029d9d39c87bed85b1c50adee7c41795261a192",
+            "version": "1.0.6"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "swift-collections"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "yams",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/jpsim/Yams.git",
+          "name": "Yams"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3",
+            "version": "5.0.6"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "Yams"
+      }
+    ]
+  },
+  "version": 6
+}

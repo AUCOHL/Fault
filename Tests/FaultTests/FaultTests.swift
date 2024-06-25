@@ -43,16 +43,19 @@ func log(_ string: String) {
 }
 
 final class FaultTests: XCTestCase {
-    func run(steps: [[String]]) throws {
+    func run(scl: String, steps: [[String]]) throws {
         let binary = productsDirectory.appendingPathComponent("Fault")
         for (i, step) in steps.enumerated() {
-            log("\(i)/6")
+            log("\(scl): \(i)/6")
             let process = Process()
             process.executableURL = binary
             process.arguments = step
             try process.startAndBlock()
 
             XCTAssertEqual(process.terminationStatus, 0)
+            if process.terminationStatus != 0 {
+                return
+            }
         }
     }
 
@@ -63,36 +66,39 @@ final class FaultTests: XCTestCase {
          */
 
         // Fault Tests
-        let liberty = "Tech/osu035/osu035_stdcells.lib"
-        let models = "Tech/osu035/osu035_stdcells.v"
+        for (scl, liberty, models, config) in [
+            ("osu035", "Tech/osu035/osu035_stdcells.lib", "Tech/osu035/osu035_stdcells.v", "Tech/osu035/config.yml"),
+            // ("sky130_fd_sc_hd", "Tech/sky130_fd_sc_hd/sky130_fd_sc_hd__trimmed.lib", "Tech/sky130_fd_sc_hd/sky130_fd_sc_hd.v", "Tech/sky130_fd_sc_hd/config.yml"),
+        ] {
+            let fileName = "Tests/RTL/spm/spm.v"
+            let topModule = "spm"
+            let clock = "clk"
+            let reset = "rst"
+            let ignoredInputs = "\(reset)"
 
-        let fileName = "Tests/RTL/spm/spm.v"
-        let topModule = "spm"
-        let clock = "clk"
-        let reset = "rst"
-        let ignoredInputs = "\(reset)"
+            let base = "Netlists/" + NSString(string: fileName).deletingPathExtension
+            let fileSynth = base + ".nl.v"
+            let fileCut = base + ".cut.v"
+            let fileJson = base + ".tv.json"
+            let fileChained = base + ".chained.v"
+            let fileAsmVec = fileJson + ".vec.bin"
+            let fileAsmOut = fileJson + ".out.bin"
 
-        let base = "Netlists/" + NSString(string: fileName).deletingPathExtension
-        let fileSynth = base + ".nl.v"
-        let fileCut = base + ".cut.v"
-        let fileJson = base + ".tv.json"
-        let fileChained = base + ".chained.v"
-        let fileAsmVec = fileJson + ".vec.bin"
-        let fileAsmOut = fileJson + ".out.bin"
+            for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
+                let _ = "rm -f \(file)".shOutput()
+            }
 
-        for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
-            let _ = "rm -f \(file)".shOutput()
+            try run(scl: scl, steps: [
+                ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName],
+                ["cut", "-o", fileCut, "--sclConfig", config, fileSynth],
+                ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut],
+                ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, "--sclConfig", config, fileSynth],
+                ["asm", fileJson, fileChained],
+                ["compact", "-o", "/dev/null", fileJson],
+                ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs],
+            ])
+            
         }
-
-        try run(steps: [
-            ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName],
-            ["cut", "-o", fileCut, fileSynth],
-            ["-c", models, "-i", ignoredInputs, "--clock", clock, "-o", fileJson, fileCut],
-            ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth],
-            ["asm", fileJson, fileChained],
-            ["compact", "-o", "/dev/null", fileJson],
-            ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "-i", ignoredInputs],
-        ])
     }
 
     func testIntegration() throws {
@@ -124,7 +130,7 @@ final class FaultTests: XCTestCase {
             let _ = "rm -f \(file)".shOutput()
         }
 
-        try run(steps: [
+        try run(scl: "osu035", steps: [
             ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", fileName],
             ["cut", "-o", fileCut, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v", "--ignoring", "clk,rst,rstn", fileSynth],
             ["-c", models, "-i", reset, "--clock", clock, "-o", fileJson, "--output-faultPoints", faultPointsYML, "--output-covered", coverageYml, fileCut],
