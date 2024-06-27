@@ -1,4 +1,4 @@
-// Copyright (C) 2019 The American University in Cairo
+// Copyright (C) 2019-2024 The American University in Cairo
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import Collections
-import CommandLineKit
+import ArgumentParser
 import Defile
 import Foundation
 import PythonKit
@@ -477,435 +477,317 @@ func chainTop(
     return (supermodel, order)
 }
 
-func scanChainCreate(arguments: [String]) -> Int32 {
-    let cli = CommandLineKit.CommandLine(arguments: arguments)
 
-    let help = BoolOption(
-        shortFlag: "h",
-        longFlag: "help",
-        helpMessage: "Prints this message and exits."
-    )
-    cli.addOptions(help)
-
-    let filePath = StringOption(
-        shortFlag: "o",
-        longFlag: "output",
-        helpMessage: "Path to the output file. (Default: input + .chained.v)"
-    )
-    cli.addOptions(filePath)
-
-    let ignored = StringOption(
-        shortFlag: "i",
-        longFlag: "ignoring",
-        helpMessage: "Inputs to ignore on both the top level design and all black-boxed macros. Comma-delimited."
-    )
-    cli.addOptions(ignored)
-
-    let verifyOpt = StringOption(
-        shortFlag: "c",
-        longFlag: "cellModel",
-        helpMessage: "Verify scan chain using given cell model."
-    )
-    cli.addOptions(verifyOpt)
-
-    let clockOpt = StringOption(
-        longFlag: "clock",
-        helpMessage: "Clock signal to add to --ignoring and use in simulation. (Required.)."
-    )
-    cli.addOptions(clockOpt)
-
-    let invClock = StringOption(
-        longFlag: "invClock",
-        helpMessage: "Inverted clk tree source cell name. (Default: none)"
-    )
-    cli.addOptions(invClock)
-
-    let resetOpt = StringOption(
-        longFlag: "reset",
-        helpMessage: "Reset signal to add to --ignoring and use in simulation. (Required.)"
-    )
-    cli.addOptions(resetOpt)
-
-    let resetActiveLow = BoolOption(
-        longFlag: "activeLow",
-        helpMessage: "Reset signal is active low instead of active high."
-    )
-    cli.addOptions(resetActiveLow)
-
-    let liberty = StringOption(
-        shortFlag: "l",
-        longFlag: "liberty",
-        helpMessage: "Liberty file. (Required.)"
-    )
-    cli.addOptions(liberty)
-
-    let sclConfigOpt = StringOption(
-        shortFlag: "s",
-        longFlag: "sclConfig",
-        helpMessage: "Path for the YAML SCL config file. Recommended."
-    )
-    cli.addOptions(sclConfigOpt)
-
-    let dffOpt = StringOption(
-        shortFlag: "d",
-        longFlag: "dff",
-        helpMessage: "Optional override for the DFF names from the PDK config. Comma-delimited. "
-    )
-    cli.addOptions(dffOpt)
-
-    let blackboxOpt = StringOption(
-        longFlag: "blackbox",
-        helpMessage: "Blackbox module names. Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(blackboxOpt)
-
-    let blackboxModelOpt = StringOption(
-        longFlag: "blackboxModel",
-        helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(blackboxModelOpt)
-
-    let defs = StringOption(
-        longFlag: "define",
-        helpMessage: "define statements to include during simulations.  Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(defs)
-
-    let include = StringOption(
-        longFlag: "inc",
-        helpMessage: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(include)
-
-    let skipSynth = BoolOption(
-        longFlag: "skipSynth",
-        helpMessage: "Skip Re-synthesizing the chained netlist. (Default: none)"
-    )
-    cli.addOptions(skipSynth)
-
-    var names: [String: (default: String, option: StringOption)] = [:]
-
-    for (name, value) in [
-        ("sin", "Scan-chain serial data in"),
-        ("sout", "Scan-chain serial data out"),
-        ("mode", "Input/Output scan-cell mode"),
-        ("shift", "Input/Output scan-cell shift"),
-        ("clockDR", "Input/Output scan-cell clock DR"),
-        ("update", "Input/Output scan-cell update"),
-        ("test", "test mode enable"),
-        ("tck", "test clock"),
-    ] {
-        let option = StringOption(
-            longFlag: name,
-            helpMessage: "Name for \(value) signal. (Default: \(name).)"
+extension Fault {
+    struct Chain: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Manipulate a netlist to create a scan chain, and resynthesize."
         )
-        cli.addOptions(option)
-        names[name] = (default: name, option: option)
-    }
+        
+        @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
+        var output: String?
+        
+        @Option(name: [.short, .long], help: "Inputs to ignore on both the top level design and all black-boxed macros. Comma-delimited.")
+        var ignoring: String?
+        
+        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify scan chain using given cell model.")
+        var cellModel: String?
+        
+        @Option(name: [.long], help: "Clock signal to add to --ignoring and use in simulation. (Required.)")
+        var clock: String
+        
+        @Option(name: [.long], help: "Inverted clk tree source cell name. (Default: none)")
+        var invClock: String?
+        
+        @Option(name: [.long], help: "Reset signal to add to --ignoring and use in simulation. (Required.)")
+        var reset: String
+        
+        @Flag(name: [.long, .customLong("activeLow")], help: "Reset signal is active low instead of active high.")
+        var activeLow: Bool = false
+        
+        @Option(name: [.short, .long], help: "Liberty file. (Required.)")
+        var liberty: String
+        
+        @Option(name: [.short, .long, .customLong("sclConfig")], help: "Path for the YAML SCL config file. Recommended.")
+        var sclConfig: String?
+        
+        @Option(name: [.short, .long], help: "Optional override for the DFF names from the PDK config. Comma-delimited.")
+        var dff: String?
+        
+        @Option(name: [.customShort("b"), .customLong("blackbox")], help: "Blackbox module names. Comma-delimited. (Default: none)")
+        var blackbox: [String] = []
+        
+        @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+        var blackboxModels: [String] = []
+        
+        @Option(name: .long, help: "define statements to include during simulations. Comma-delimited. (Default: none)")
+        var define: String?
+        
+        @Option(name: .long, help: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)")
+        var inc: String?
+        
+        @Flag(name: .long, help: "Skip Re-synthesizing the chained netlist. (Default: none)")
+        var skipSynth: Bool = false
+        
+        @Option(name: .long, help: "Name for scan-chain serial data in signal.")
+        var sin: String = "sin"
 
-    do {
-        try cli.parse()
-    } catch {
-        Stderr.print(error)
-        Stderr.print("Invoke fault chain --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: .long, help: "Name for scan-chain serial data out signal.")
+        var sout: String = "sout"
 
-    if help.value {
-        cli.printUsage()
-        return EX_OK
-    }
+        @Option(name: .long, help: "Name for scan-chain shift enable signal.")
+        var shift: String = "shift"
 
-    let args = cli.unparsedArguments
-    if args.count != 1 {
-        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
-        Stderr.print("Invoke fault chain --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: .long, help: "Name for scan-chain test enable signal.")
+        var test: String = "test"
 
-    let fileManager = FileManager()
-    let file = args[0]
-    if !fileManager.fileExists(atPath: file) {
-        Stderr.print("File '\(file)' not found.")
-        return EX_NOINPUT
-    }
+        @Option(name: .long, help: "Name for JTAG test clock signal.")
+        var tck: String = "tck"
+        
+        @Argument
+        var file: String
+        
+        func run() throws {
+            let fileManager = FileManager()
 
-    guard let clockName = clockOpt.value else {
-        Stderr.print("Option --clock is required.")
-        Stderr.print("Invoke fault chain --help for more info.")
-        return EX_USAGE
-    }
+            // Check if input file exists
+            guard fileManager.fileExists(atPath: file) else {
+                throw ValidationError("File '\(file)' not found.")
+            }
 
-    guard let resetName = resetOpt.value else {
-        Stderr.print("Option --reset is required.")
-        Stderr.print("Invoke fault chain --help for more info.")
-        return EX_USAGE
-    }
+            // Required options validation
+            guard !clock.isEmpty else {
+                throw ValidationError("Option --clock is required.")
+            }
 
-    guard let libertyFile = liberty.value else {
-        Stderr.print("Option --liberty is required.")
-        Stderr.print("Invoke fault chain --help for more info.")
-        return EX_USAGE
-    }
+            guard !reset.isEmpty else {
+                throw ValidationError("Option --reset is required.")
+            }
 
-    var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
-    if let sclConfigPath = sclConfigOpt.value {
-        guard let sclConfigYML = File.read(sclConfigPath) else {
-            Stderr.print("File not found: \(sclConfigPath)")
-            return EX_NOINPUT
-        }
-        let decoder = YAMLDecoder()
-        do {
-            sclConfig = try decoder.decode(SCLConfiguration.self, from: sclConfigYML)
-        } catch {
-            Stderr.print("Invalid YAML file \(sclConfigPath):  \(error).")
-            return EX_DATAERR
-        }
-    }
-    if let dffOverride = dffOpt.value {
-        sclConfig.dffMatches.last!.name = dffOverride
-    }
+            guard !liberty.isEmpty else {
+                throw ValidationError("Option --liberty is required.")
+            }
 
-    if !fileManager.fileExists(atPath: libertyFile) {
-        Stderr.print("Liberty file '\(libertyFile)' not found.")
-        return EX_NOINPUT
-    }
+            var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
+            if let sclConfigPath = self.sclConfig {
+                guard let sclConfigYML = File.read(sclConfigPath) else {
+                    throw ValidationError("File not found: \(sclConfigPath)")
+                }
+                let decoder = YAMLDecoder()
+                sclConfig = try decoder.decode(SCLConfiguration.self, from: sclConfigYML)
+            }
 
-    if !libertyFile.hasSuffix(".lib") {
-        Stderr.print(
-            "Warning: Liberty file provided does not end with .lib."
-        )
-    }
+            if let dffOverride = dff {
+                sclConfig.dffMatches.last!.name = dffOverride
+            }
 
-    if let modelTest = verifyOpt.value {
-        if !fileManager.fileExists(atPath: modelTest) {
-            Stderr.print("Cell model file '\(modelTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
-            Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv.\n"
+            if !fileManager.fileExists(atPath: liberty) {
+                throw ValidationError("Liberty file '\(liberty)' not found.")
+            }
+
+            if !liberty.hasSuffix(".lib") {
+                print("Warning: Liberty file provided does not end with .lib.")
+            }
+
+            let output = output ?? "\(file).chained.v"
+            let intermediate = output + ".intermediate.v"
+
+            var ignoredInputs = Set<String>(ignoring?.components(separatedBy: ",") ?? [])
+            let defines = Set<String>(define?.components(separatedBy: ",") ?? [])
+
+            ignoredInputs.insert(clock)
+            ignoredInputs.insert(reset)
+
+            let includeFiles = Set<String>(inc?.components(separatedBy: ",").filter { !$0.isEmpty } ?? [])
+
+            // MARK: Importing Python and Pyverilog
+
+            let parse = Python.import("pyverilog.vparser.parser").parse
+            let Node = Python.import("pyverilog.vparser.ast")
+            let Generator = Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
+
+            // MARK: Parse
+
+            let modules = try! Module.getModules(in: [file])
+            guard let module = modules.values.first else {
+                throw ValidationError("No modules found in file.")
+            }
+
+            let blackboxModules = try! Module.getModules(in: blackboxModels, filter: Set(blackbox))
+
+            let bsrCreator = BoundaryScanRegisterCreator(
+                name: "BoundaryScanRegister",
+                clock: tck,
+                reset: reset,
+                resetActive: activeLow ? .low : .high,
+                testing: test,
+                shift: shift,
+                using: Node
             )
-        }
-    }
 
-    let output = filePath.value ?? "\(file).chained.v"
-    let intermediate = output + ".intermediate.v"
+            let internalOrder = try chainInternal(
+                Node: Node,
+                sclConfig: sclConfig,
+                module: module,
+                blackboxModules: blackboxModules,
+                bsrCreator: bsrCreator,
+                clockName: clock,
+                resetName: reset,
+                resetActive: activeLow ? .low : .high,
+                shiftName: shift,
+                inputName: sin,
+                outputName: sout,
+                testName: test,
+                tckName: tck,
+                invClockName: invClock,
+                ignoredInputs: ignoredInputs
+            )
 
-    var ignoredInputs
-        = Set<String>(ignored.value?.components(separatedBy: ",") ?? [])
-    let defines
-        = Set<String>(defs.value?.components(separatedBy: ",") ?? [])
+            let internalCount = internalOrder.reduce(0) { $0 + $1.width }
+            if internalCount == 0 {
+                print("Warning: No internal scan elements found. Are your DFFs configured properly?")
+            } else {
+                print("Internal scan chain successfully constructed. Length: \(internalCount)")
+            }
 
-    ignoredInputs.insert(clockName)
-    ignoredInputs.insert(resetName)
+            let (supermodel, finalOrder) = try chainTop(
+                Node: Node,
+                sclConfig: sclConfig,
+                module: module,
+                blackboxModules: blackboxModules,
+                bsrCreator: bsrCreator,
+                clockName: clock,
+                resetName: reset,
+                resetActive: activeLow ? .low : .high,
+                shiftName: shift,
+                inputName: sin,
+                outputName: sout,
+                testName: test,
+                tckName: tck,
+                invClockName: invClock,
+                ignoredInputs: ignoredInputs,
+                internalOrder: internalOrder
+            )
+            let finalCount = finalOrder.reduce(0) { $0 + $1.width }
 
-    let includeFiles
-        = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+            let finalAst = parse([bsrCreator.inputDefinition + bsrCreator.outputDefinition])[0]
+            let finalDefinitions = [PythonObject](finalAst[dynamicMember: "description"].definitions)! + [module.definition, supermodel]
+            finalAst[dynamicMember: "description"].definitions = Python.tuple(finalDefinitions)
 
-    // MARK: Importing Python and Pyverilog
+            try File.open(intermediate, mode: .write) {
+                try $0.print(Generator.visit(finalAst))
+            }
 
-    let parse = Python.import("pyverilog.vparser.parser").parse
+            print("Total scan-chain length: ", finalCount)
 
-    let Node = Python.import("pyverilog.vparser.ast")
+            let metadata = ChainMetadata(
+                boundaryCount: finalCount - internalCount,
+                internalCount: internalCount,
+                order: finalOrder,
+                shift: shift,
+                sin: sin,
+                sout: sout
+            )
+            guard let metadataString = metadata.toJSON() else {
+                Stderr.print("Could not generate metadata string.")
+                Foundation.exit(EX_SOFTWARE)
+            }
 
-    let Generator =
-        Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
+            let netlist: String = {
+                if !skipSynth {
+                    let script = Synthesis.script(
+                        for: module.name,
+                        in: [intermediate],
+                        liberty: liberty,
+                        blackboxing: blackboxModels,
+                        output: output
+                    )
 
-    // MARK: Parse
+                    // MARK: Yosys
 
-    let modules = try! Module.getModules(in: [file])
-    guard let module = modules.values.first else {
-        Stderr.print("No modules found in file.")
-        return EX_DATAERR
-    }
+                    print("Resynthesizing with yosys…")
+                    let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
 
-    let blackboxModuleNames = Set<String>((blackboxOpt.value?.components(separatedBy: ",")) ?? [])
-    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
-    let blackboxModules = try! Module.getModules(in: blackboxModels, filter: blackboxModuleNames)
+                    if result != EX_OK {
+                        Stderr.print("A yosys error has occurred.")
+                        Foundation.exit(EX_DATAERR)
+                    }
+                    return output
+                } else {
+                    return intermediate
+                }
+            }()
 
-    do {
-        let shiftName = names["shift"]!.option.value ?? names["shift"]!.default
-        let inputName = names["sin"]!.option.value ?? names["sin"]!.default
-        let outputName = names["sout"]!.option.value ?? names["sout"]!.default
-        let testName = names["test"]!.option.value ?? names["test"]!.default
-        let tckName = names["tck"]!.option.value ?? names["tck"]!.default
+            guard let content = File.read(netlist) else {
+                throw "Could not re-read created file."
+            }
 
-        let bsrCreator = BoundaryScanRegisterCreator(
-            name: "BoundaryScanRegister",
-            clock: tckName,
-            reset: resetName,
-            resetActive: resetActiveLow.value ? .low : .high,
-            testing: testName,
-            shift: shiftName,
-            using: Node
-        )
+            try File.open(netlist, mode: .write) {
+                try $0.print(String.boilerplate)
+                try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
+                try $0.print(content)
+            }
 
-        let internalOrder = try chainInternal(
-            Node: Node,
-            sclConfig: sclConfig,
-            module: module,
-            blackboxModules: blackboxModules,
-            bsrCreator: bsrCreator,
-            clockName: clockName,
-            resetName: resetName,
-            resetActive: resetActiveLow.value ? .low : .high,
-            shiftName: shiftName,
-            inputName: inputName,
-            outputName: outputName,
-            testName: testName,
-            tckName: tckName,
-            invClockName: invClock.value,
-            ignoredInputs: ignoredInputs
-        )
-        let internalCount = internalOrder.reduce(0) { $0 + $1.width }
-        if internalCount == 0 {
-            print("Warning: No internal scan elements found. Are your DFFs configured properly?")
-        } else {
-            print("Internal scan chain successfuly constructed. Length: ", internalCount)
-        }
+            // MARK: Verification
 
-        let (supermodel, finalOrder) = try chainTop(
-            Node: Node,
-            sclConfig: sclConfig,
-            module: module,
-            blackboxModules: blackboxModules,
-            bsrCreator: bsrCreator,
-            clockName: clockName,
-            resetName: resetName,
-            resetActive: resetActiveLow.value ? .low : .high,
-            shiftName: shiftName,
-            inputName: inputName,
-            outputName: outputName,
-            testName: testName,
-            tckName: tckName,
-            invClockName: invClock.value,
-            ignoredInputs: ignoredInputs,
-            internalOrder: internalOrder
-        )
-        let finalCount = finalOrder.reduce(0) { $0 + $1.width }
+            if let model = cellModel {
+                let models = [model] + Array(includeFiles) + Array(blackboxModels)
 
-        let finalAst = parse([bsrCreator.inputDefinition + bsrCreator.outputDefinition])[0]
-        let finalDefinitions = [PythonObject](finalAst[dynamicMember: "description"].definitions)! + [module.definition, supermodel]
-        finalAst[dynamicMember: "description"].definitions = Python.tuple(finalDefinitions)
+                print("Verifying scan chain integrity…")
+                let ast = parse([netlist])[0]
+                let description = ast[dynamicMember: "description"]
+                var definitionOptional: PythonObject?
+                for definition in description.definitions {
+                    let type = Python.type(definition).__name__
+                    if type == "ModuleDef" {
+                        definitionOptional = definition
+                        break
+                    }
+                }
+                guard let definition = definitionOptional else {
+                    Stderr.print("No module found.")
+                    Foundation.exit(EX_DATAERR)
+                }
+                let (ports, inputs, outputs) = try Port.extract(from: definition)
 
-        try File.open(intermediate, mode: .write) {
-            try $0.print(Generator.visit(finalAst))
-        }
-
-        print("Total scan-chain length: ", finalCount)
-
-        let metadata = ChainMetadata(
-            boundaryCount: finalCount - internalCount,
-            internalCount: internalCount,
-            order: finalOrder,
-            shift: shiftName,
-            sin: inputName,
-            sout: outputName
-        )
-        guard let metadataString = metadata.toJSON() else {
-            Stderr.print("Could not generate metadata string.")
-            return EX_SOFTWARE
-        }
-
-        let netlist: String = {
-            if !skipSynth.value {
-                let script = Synthesis.script(
-                    for: module.name,
-                    in: [intermediate],
-                    liberty: libertyFile,
-                    blackboxing: blackboxModels,
-                    output: output
+                let verified = try Simulator.simulate(
+                    verifying: module.name,
+                    in: netlist,
+                    with: models,
+                    ports: ports,
+                    inputs: inputs,
+                    outputs: outputs,
+                    chainLength: finalOrder.reduce(0) { $0 + $1.width },
+                    clock: clock,
+                    tck: tck,
+                    reset: reset,
+                    sin: sin,
+                    sout: sout,
+                    resetActive: activeLow ? .low : .high,
+                    shift: shift,
+                    test: test,
+                    output: netlist + ".tb.sv",
+                    defines: defines,
+                    using: iverilogExecutable,
+                    with: vvpExecutable
                 )
-
-                // MARK: Yosys
-
-                print("Resynthesizing with yosys…")
-                let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
-
-                if result != EX_OK {
-                    Stderr.print("A yosys error has occurred.")
-                    exit(EX_DATAERR)
+                if verified {
+                    print("Scan chain verified successfully.")
+                } else {
+                    print("Scan chain verification failed.")
+                    print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
+                    if activeLow {
+                        print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
+                    }
+                    if internalOrder.count == 0 {
+                        print("・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides.")
+                    }
+                    print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
+                    Foundation.exit(EX_DATAERR)
                 }
-                return output
-            } else {
-                return intermediate
             }
-        }()
+            print("Done.")
 
-        guard let content = File.read(netlist) else {
-            throw "Could not re-read created file."
         }
-
-        try File.open(netlist, mode: .write) {
-            try $0.print(String.boilerplate)
-            try $0.print("/* FAULT METADATA: '\(metadataString)' END FAULT METADATA */")
-            try $0.print(content)
-        }
-
-        // MARK: Verification
-
-        if let model = verifyOpt.value {
-            let models = [model] + Array(includeFiles) + Array(blackboxModels)
-
-            print("Verifying scan chain integrity…")
-            let ast = parse([netlist])[0]
-            let description = ast[dynamicMember: "description"]
-            var definitionOptional: PythonObject?
-            for definition in description.definitions {
-                let type = Python.type(definition).__name__
-                if type == "ModuleDef" {
-                    definitionOptional = definition
-                    break
-                }
-            }
-            guard let definition = definitionOptional else {
-                Stderr.print("No module found.")
-                return EX_DATAERR
-            }
-            let (ports, inputs, outputs) = try Port.extract(from: definition)
-
-            let verified = try Simulator.simulate(
-                verifying: module.name,
-                in: netlist,
-                with: models,
-                ports: ports,
-                inputs: inputs,
-                outputs: outputs,
-                chainLength: finalOrder.reduce(0) { $0 + $1.width },
-                clock: clockName,
-                tck: tckName,
-                reset: resetName,
-                sin: inputName,
-                sout: outputName,
-                resetActive: resetActiveLow.value ? .low : .high,
-                shift: shiftName,
-                test: testName,
-                output: netlist + ".tb.sv",
-                defines: defines,
-                using: iverilogExecutable,
-                with: vvpExecutable
-            )
-            if verified {
-                print("Scan chain verified successfully.")
-            } else {
-                print("Scan chain verification failed.")
-                print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
-                if !resetActiveLow.value {
-                    print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
-                }
-                if internalOrder.count == 0 {
-                    print("・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides.")
-                }
-                print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
-                return EX_DATAERR
-            }
-        }
-        print("Done.")
-
-    } catch {
-        Stderr.print("Internal software error: \(error)")
-        return EX_SOFTWARE
     }
-    return EX_OK
 }

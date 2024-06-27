@@ -12,94 +12,68 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import CommandLineKit
+import BigInt
+import Collections
+import ArgumentParser
+import CoreFoundation // Not automatically imported on Linux
 import Defile
 import Foundation
+import PythonKit
+import Yams
 
-func synth(arguments: [String]) -> Int32 {
-    let cli = CommandLineKit.CommandLine(arguments: arguments)
-
-    let help = BoolOption(shortFlag: "h", longFlag: "help", helpMessage: "Prints this message and exits.")
-    cli.addOptions(help)
-
-    let filePath = StringOption(shortFlag: "o", longFlag: "output", helpMessage: "Path to the output netlist. (Default: Netlists/ + input + .netlist.v)")
-    cli.addOptions(filePath)
-
-    let liberty = StringOption(shortFlag: "l", longFlag: "liberty", helpMessage: "Liberty file. (Required.)")
-    cli.addOptions(liberty)
-
-    let topModule = StringOption(shortFlag: "t", longFlag: "top", helpMessage: "Top module. (Required.)")
-    cli.addOptions(topModule)
-
-    let blackboxModelOpt = StringOption(longFlag: "blackboxModel", helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
-    cli.addOptions(blackboxModelOpt)
-
-    do {
-        try cli.parse()
-    } catch {
-        Stderr.print(error)
-        Stderr.print("Invoke fault synth --help for more info.")
-        return EX_USAGE
-    }
-
-    if help.value {
-        cli.printUsage()
-        return EX_OK
-    }
-
-    let args = cli.unparsedArguments
-    if args.count < 1 {
-        Stderr.print("At least one Verilog file is required.")
-        Stderr.print("Invoke fault synth --help for more info.")
-        return EX_USAGE
-    }
-
-    let fileManager = FileManager()
-    let files = args
-
-    for file in files {
-        if !fileManager.fileExists(atPath: file) {
-            Stderr.print("File '\(file)' not found.")
-            return EX_NOINPUT
+extension Fault {
+    struct Synth: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Synthesize Verilog designs using Yosys."
+        )
+        
+        @Option(name: [.customShort("o"), .long], help: "Path to the output netlist. (Default: Netlists/ + input + .netlist.v)")
+        var output: String?
+        
+        @Option(name: [.customShort("l"), .long], help: "Liberty file. (Required.)")
+        var liberty: String
+        
+        @Option(name: [.customShort("t"), .long], help: "Top module. (Required.)")
+        var top: String
+        
+        @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+        var blackboxModels: [String] = []
+        
+        @Argument(help: "Verilog files to synthesize.")
+        var files: [String]
+        
+        mutating func run() throws {
+            let fileManager = FileManager.default
+        
+            
+            for file in files {
+                guard fileManager.fileExists(atPath: file) else {
+                    throw ValidationError("File '\(file)' not found.")
+                }
+            }
+            
+            if !fileManager.fileExists(atPath: liberty) {
+                print("Liberty file '\(liberty)' not found.")
+                return
+            }
+            
+            if !liberty.hasSuffix(".lib") {
+                print("Warning: Liberty file provided does not end with .lib.")
+            }
+            
+            let output = self.output ?? "Netlists/\(top).nl.v"
+            
+            let script = Synthesis.script(for: top, in: files, cutting: false, liberty: liberty, blackboxing: blackboxModels, output: output)
+            
+            let outputDirectory = URL(fileURLWithPath: output).deletingLastPathComponent().path
+            try fileManager.createDirectory(atPath: outputDirectory, withIntermediateDirectories: true, attributes: nil)
+            
+            let result = "echo '\(script)' | '\(yosysExecutable)'".sh()
+            
+            if result != EX_OK {
+                print("A yosys error has occurred.")
+                throw ValidationError("Yosys error occurred.")
+            }
         }
     }
-
-    guard let module = topModule.value else {
-        Stderr.print("Option --top is required.")
-        Stderr.print("Invoke fault synth --help for more info.")
-        return EX_USAGE
-    }
-
-    guard let libertyFile = liberty.value else {
-        Stderr.print("Option --liberty is required.")
-        Stderr.print("Invoke fault synth --help for more info.")
-        return EX_USAGE
-    }
-
-    if !fileManager.fileExists(atPath: libertyFile) {
-        Stderr.print("Liberty file '\(libertyFile)' not found.")
-        return EX_NOINPUT
-    }
-
-    if !libertyFile.hasSuffix(".lib") {
-        Stderr.print(
-            "Warning: Liberty file provided does not end with .lib."
-        )
-    }
-
-    let output = filePath.value ?? "Netlists/\(module).nl.v"
-
-    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
-
-    let script = Synthesis.script(for: module, in: args, cutting: false, liberty: libertyFile, blackboxing: blackboxModels, output: output)
-
-    let _ = "mkdir -p \(NSString(string: output).deletingLastPathComponent)".sh()
-    let result = "echo '\(script)' | '\(yosysExecutable)'".sh()
-
-    if result != EX_OK {
-        Stderr.print("A yosys error has occurred.")
-        return Int32(result)
-    }
-
-    return EX_OK
 }

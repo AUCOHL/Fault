@@ -22,23 +22,6 @@
       {
         "basedOn": null,
         "packageRef": {
-          "identity": "commandline",
-          "kind": "remoteSourceControl",
-          "location": "https://github.com/basvankuijck/CommandLine.git",
-          "name": "CommandLineKit"
-        },
-        "state": {
-          "checkoutState": {
-            "revision": "b83f09a25224c29b820f9e8d1311569736021820",
-            "version": "4.1.2"
-          },
-          "name": "sourceControlCheckout"
-        },
-        "subpath": "CommandLine"
-      },
-      {
-        "basedOn": null,
-        "packageRef": {
           "identity": "defile",
           "kind": "remoteSourceControl",
           "location": "https://github.com/donn/Defile.git",
@@ -63,12 +46,29 @@
         },
         "state": {
           "checkoutState": {
-            "branch": "master",
-            "revision": "c77231820148515a77e9bba5016a57e5a88ef007"
+            "revision": "43647b36cacb99558e57ef98e97ef598f91d1164",
+            "version": "0.5.0"
           },
           "name": "sourceControlCheckout"
         },
         "subpath": "PythonKit"
+      },
+      {
+        "basedOn": null,
+        "packageRef": {
+          "identity": "swift-argument-parser",
+          "kind": "remoteSourceControl",
+          "location": "https://github.com/apple/swift-argument-parser",
+          "name": "swift-argument-parser"
+        },
+        "state": {
+          "checkoutState": {
+            "revision": "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
+            "version": "1.4.0"
+          },
+          "name": "sourceControlCheckout"
+        },
+        "subpath": "swift-argument-parser"
       },
       {
         "basedOn": null,

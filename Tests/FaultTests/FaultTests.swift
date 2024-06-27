@@ -84,8 +84,9 @@ final class FaultTests: XCTestCase {
             let fileAsmVec = fileJson + ".vec.bin"
             let fileAsmOut = fileJson + ".out.bin"
 
+            let fileManager = FileManager()
             for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
-                let _ = "rm -f \(file)".shOutput()
+                try? fileManager.removeItem(atPath: file)
             }
 
             try run(scl: scl, steps: [
@@ -126,8 +127,9 @@ final class FaultTests: XCTestCase {
         let fileAsmVec = fileJson + ".vec.bin"
         let fileAsmOut = fileJson + ".out.bin"
 
+        let fileManager = FileManager()
         for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut] {
-            let _ = "rm -f \(file)".shOutput()
+            try? fileManager.removeItem(atPath: file)
         }
 
         try run(scl: "osu035", steps: [
@@ -137,7 +139,7 @@ final class FaultTests: XCTestCase {
             ["chain", "-c", models, "-l", liberty, "-o", fileChained, "--clock", clock, "--reset", reset, "--activeLow", "-i", ignoredInputs, fileSynth, "--blackbox", "BufferedInverter", "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
             ["asm", fileJson, fileChained],
             ["compact", "-o", "/dev/null", fileJson],
-            ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--activeLow", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
+            ["tap", fileChained, "-c", models, "--clock", clock, "--reset", reset, "--active-low", "-l", liberty, "-t", fileAsmVec, "-g", fileAsmOut, "--blackboxModel", "Tests/RTL/integration/buffered_inverter.v"],
         ])
     }
 

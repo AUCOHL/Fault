@@ -12,146 +12,98 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import CommandLineKit
 import Defile
 import Foundation
 import PythonKit
+import ArgumentParser
+import Foundation
 
-func compactTestVectors(arguments: [String]) -> Int32 {
-    let cli = CommandLineKit.CommandLine(arguments: arguments)
-
-    let help = BoolOption(
-        shortFlag: "h",
-        longFlag: "help",
-        helpMessage: "Prints this message and exits."
-    )
-    cli.addOptions(help)
-
-    let filePath = StringOption(
-        shortFlag: "o",
-        longFlag: "output",
-        helpMessage: "Path to the output file. (Default: input + .compacted.json)"
-    )
-    cli.addOptions(filePath)
-
-    let verifyOpt = StringOption(
-        shortFlag: "c",
-        longFlag: "cellModel",
-        helpMessage: "Verify compaction using given cell model."
-    )
-    cli.addOptions(verifyOpt)
-
-    let netlistOpt = StringOption(
-        shortFlag: "n",
-        longFlag: "netlist",
-        helpMessage: "Verify compaction for the given netlist. "
-    )
-    cli.addOptions(netlistOpt)
-
-    do {
-        try cli.parse()
-    } catch {
-        Stderr.print(error)
-        Stderr.print("Invoke fault compact --help for more info.")
-        return EX_USAGE
-    }
-
-    if help.value {
-        cli.printUsage()
-        return EX_OK
-    }
-    let args = cli.unparsedArguments
-
-    if args.count != 1 {
-        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
-        Stderr.print("Invoke fault compact --help for more info.")
-        return EX_USAGE
-    }
-
-    let fileManager = FileManager()
-    let file = args[0]
-
-    if !fileManager.fileExists(atPath: file) {
-        Stderr.print("File '\(file)' not found.")
-        return EX_NOINPUT
-    }
-
-    if let modelTest = verifyOpt.value {
-        if !fileManager.fileExists(atPath: modelTest) {
-            Stderr.print("Cell model file '\(modelTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
-            Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv.\n"
-            )
-        }
-        guard let _ = netlistOpt.value else {
-            Stderr.print("Error: The netlist must be provided to verify compaciton ")
-            return EX_NOINPUT
-        }
-    }
-
-    if let netlistTest = netlistOpt.value {
-        if !fileManager.fileExists(atPath: netlistTest) {
-            Stderr.print("Netlist file '\(netlistTest)' not found.")
-            return EX_NOINPUT
-        }
-        guard let _ = verifyOpt.value else {
-            Stderr.print("Error: The cell models file  must be provided to verify compaciton ")
-            return EX_NOINPUT
-        }
-    }
-
-    let output = filePath.value ?? "\(file).compacted.json"
-    // Parse JSON File
-    do {
-        let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
-        guard let tvInfo = try? JSONDecoder().decode(TVInfo.self, from: data) else {
-            Stderr.print("File '\(file)' is invalid.")
-            return EX_DATAERR
-        }
-
-        let compactedTV = Compactor.compact(coverageList: tvInfo.coverageList)
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-
-        let jsonData = try encoder.encode(
-            TVInfo(
-                inputs: tvInfo.inputs,
-                outputs: tvInfo.outputs,
-                coverageList: compactedTV
-            )
+extension Fault {
+    struct Compact: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Compact test vectors and optionally verify using given cell models and netlists."
         )
 
-        guard let string = String(data: jsonData, encoding: .utf8) else {
-            throw "Could not create utf8 string."
-        }
+        @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .compacted.json)")
+        var output: String?
 
-        try File.open(output, mode: .write) {
-            try $0.print(string)
-        }
+        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify compaction using given cell model.")
+        var cellModel: String?
 
-        if let modelTest = verifyOpt.value {
-            print("Running simulations using the compacted set…")
-            let verifiedOutput = "\(output).verified.json"
-            let mainArguments: [String] = [
-                arguments[0].components(separatedBy: " ")[0],
-                "-c", modelTest,
-                "-r", "10",
-                "-v", "10",
-                "-m", "100",
-                "--tvSet", output,
-                "-o", verifiedOutput,
-                netlistOpt.value!,
-            ]
-            exit(main(arguments: mainArguments))
+        @Option(name: [.short, .long], help: "Verify compaction for the given netlist.")
+        var netlist: String?
+
+        @Argument(help: "The file to process.")
+        var file: String
+
+        func run() throws {
+            let fileManager = FileManager()
+            // Validate input file existence
+            guard fileManager.fileExists(atPath: file) else {
+                throw ValidationError("File '\(file)' not found.")
+            }
+
+            // Validate cell model and netlist options
+            if let cellModel = cellModel {
+                guard fileManager.fileExists(atPath: cellModel) else {
+                    throw ValidationError("Cell model file '\(cellModel)' not found.")
+                }
+                if !(cellModel.hasSuffix(".v") || cellModel.hasSuffix(".sv")) {
+                    print("Warning: Cell model file provided does not end with .v or .sv.")
+                }
+                guard let _ = netlist else {
+                    throw ValidationError("Error: The netlist must be provided to verify compaction.")
+                }
+            }
+
+            if let netlist = netlist {
+                guard fileManager.fileExists(atPath: netlist) else {
+                    throw ValidationError("Netlist file '\(netlist)' not found.")
+                }
+                guard let _ = cellModel else {
+                    throw ValidationError("Error: The cell model must be provided to verify compaction.")
+                }
+            }
+
+            let output = self.output ?? "\(file).compacted.json"
+
+            // Parse JSON File
+            let data = try Data(contentsOf: URL(fileURLWithPath: file))
+            let tvInfo = try JSONDecoder().decode(TVInfo.self, from: data)
+
+            let compactedTV = Compactor.compact(coverageList: tvInfo.coverageList)
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+
+            let jsonData = try encoder.encode(
+                TVInfo(
+                    inputs: tvInfo.inputs,
+                    outputs: tvInfo.outputs,
+                    coverageList: compactedTV
+                )
+            )
+
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+            try File.open(output, mode: .write) {
+                try $0.print(jsonString)
+            }
+
+        //     // Verify compaction if cellModel is provided
+        //     if let cellModel = cellModel {
+        //         print("Running simulations using the compacted set…")
+        //         let verifiedOutput = "\(output).verified.json"
+        //         let mainArguments = [
+        //             CommandLine.arguments[0],
+        //             "-c", cellModel,
+        //             "-r", "10",
+        //             "-v", "10",
+        //             "-m", "100",
+        //             "--tvSet", output,
+        //             "-o", verifiedOutput,
+        //             netlist
+        //         ]
+        //     }
         }
-    } catch {
-        Stderr.print(error.localizedDescription)
-        return EX_NOINPUT
     }
-
-    return EX_OK
 }

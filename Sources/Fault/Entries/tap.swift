@@ -12,605 +12,499 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import CommandLineKit
+import ArgumentParser
+import CoreFoundation
 import Defile
 import Foundation
 import PythonKit
+import BigInt
 
-func jtagCreate(arguments: [String]) -> Int32 {
-    let cli = CommandLineKit.CommandLine(arguments: arguments)
 
-    let help = BoolOption(
-        shortFlag: "h",
-        longFlag: "help",
-        helpMessage: "Prints this message and exits."
-    )
-    cli.addOptions(help)
-
-    let filePath = StringOption(
-        shortFlag: "o",
-        longFlag: "output",
-        helpMessage: "Path to the output file. (Default: input + .jtag.v)"
-    )
-    cli.addOptions(filePath)
-
-    let verifyOpt = StringOption(
-        shortFlag: "c",
-        longFlag: "cellModel",
-        helpMessage: "Verify JTAG port using given cell model."
-    )
-    cli.addOptions(verifyOpt)
-
-    let clockOpt = StringOption(
-        longFlag: "clock",
-        helpMessage: "Clock signal of core logic to use in simulation. (Required)"
-    )
-    cli.addOptions(clockOpt)
-
-    let resetOpt = StringOption(
-        longFlag: "reset",
-        helpMessage: "Reset signal of core logic to use in simulation. (Required)"
-    )
-    cli.addOptions(resetOpt)
-
-    let resetActiveLow = BoolOption(
-        longFlag: "activeLow",
-        helpMessage: "Reset signal of core logic is active low instead of active high."
-    )
-    cli.addOptions(resetActiveLow)
-
-    let liberty = StringOption(
-        shortFlag: "l",
-        longFlag: "liberty",
-        helpMessage: "Liberty file. (Required.)"
-    )
-    cli.addOptions(liberty)
-
-    let testvectors = StringOption(
-        shortFlag: "t",
-        longFlag: "testVectors",
-        helpMessage: ".bin file for test vectors."
-    )
-    cli.addOptions(testvectors)
-
-    let goldenOutput = StringOption(
-        shortFlag: "g",
-        longFlag: "goldenOutput",
-        helpMessage:
-        " .bin file for golden output."
-    )
-    cli.addOptions(goldenOutput)
-
-    let ignored = StringOption(
-        shortFlag: "i",
-        longFlag: "ignoring",
-        helpMessage: "Inputs,to,ignore,separated,by,commas. (Default: none)"
-    )
-    cli.addOptions(ignored)
-
-    let blackboxModelOpt = StringOption(
-        longFlag: "blackboxModel",
-        helpMessage: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(blackboxModelOpt)
-
-    let defs = StringOption(
-        longFlag: "define",
-        helpMessage: "define statements to include during simulations. (Default: none)"
-    )
-    cli.addOptions(defs)
-
-    let include = StringOption(
-        longFlag: "inc",
-        helpMessage: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)"
-    )
-    cli.addOptions(include)
-
-    let skipSynth = BoolOption(
-        longFlag: "skipSynth",
-        helpMessage: "Skip Re-synthesizing the chained netlist. (Default: none)"
-    )
-    cli.addOptions(skipSynth)
-
-    var names: [String: (default: String, option: StringOption)] = [:]
-
-    for (name, value) in [
-        ("sin", "scan-chain serial data in"),
-        ("sout", "scan-chain serial data out"),
-        ("shift", "scan-chain shift enable"),
-        ("test", "scan-chain test enable"),
-        ("tms", "JTAG test mode select"),
-        ("tck", "JTAG test clock"),
-        ("tdi", "JTAG test data input"),
-        ("tdo", "JTAG test data output"),
-        ("tdo_paden_o", "TDO Enable pad (active low) "),
-        ("trst", "JTAG test reset (active low)"),
-    ] {
-        let option = StringOption(
-            longFlag: name,
-            helpMessage: "Name for \(value) signal. (Default: \(name).)"
+extension Fault {
+    struct Tap: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Add a JTAG TAP port and controller to a netlist with a scan-chain."
         )
-        cli.addOptions(option)
-        names[name] = (default: name, option: option)
-    }
+        
+        @Option(name: [.short, .long], help: "Path to the output file.")
+        var output: String?
 
-    do {
-        try cli.parse()
-    } catch {
-        Stderr.print(error)
-        Stderr.print("Invoke fault tap --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify JTAG port using given cell model.")
+        var cellModel: String?
 
-    if help.value {
-        cli.printUsage()
-        return EX_OK
-    }
+        @Option(name: [.long], help: "Clock signal of core logic to use in simulation. (Required)")
+        var clock: String
 
-    let args = cli.unparsedArguments
-    if args.count != 1 {
-        Stderr.print("Invalid argument count: (\(args.count)/\(1))")
-        Stderr.print("Invoke fault tap --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: [.long], help: "Reset signal of core logic to use in simulation. (Required)")
+        var reset: String
 
-    let fileManager = FileManager()
-    let file = args[0]
-    if !fileManager.fileExists(atPath: file) {
-        Stderr.print("File '\(file)' not found.")
-        return EX_NOINPUT
-    }
+        @Flag(name: [.long, .customLong("activeLow")], help: "Reset signal of core logic is active low instead of active high.")
+        var activeLow: Bool = false
 
-    let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)
+        @Option(name: [.short, .long], help: "Liberty file. (Required.)")
+        var liberty: String
 
-    guard let clockName = clockOpt.value else {
-        Stderr.print("Option --clock is required.")
-        Stderr.print("Invoke fault jtag --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: [.short, .long], help: ".bin file for test vectors.")
+        var testVectors: String?
 
-    guard let resetName = resetOpt.value else {
-        Stderr.print("Option --reset is required.")
-        Stderr.print("Invoke fault jtag --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: [.short, .long], help: ".bin file for golden output. Required iff testVectors is provided.")
+        var goldenOutput: String?
+        
+        @Option(name: [.short, .long], help: "Inputs to ignore. May be specified multiple times.")
+        var ignoring: [String] = []
+        
+        @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+        var blackboxModels: [String] = []
 
-    var ignoredInputs
-        = Set<String>(ignored.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+        @Option(name: [.customShort("D"), .customLong("define")], help: "Define statements to include during simulations.")
+        var defines: [String] = []
+        
+        @Option(name: [.customShort("I"), .customLong("include")], help: "Extra verilog models to include during simulations.")
+        var includes: [String] = []
 
-    let defines
-        = Set<String>(defs.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+        @Flag(name: [.long], help: "Skip re-synthesizing the chained netlist.")
+        var skipSynth: Bool = false
 
-    ignoredInputs.insert(clockName)
-    ignoredInputs.insert(resetName)
+        // Scan chain signals with default names
+        @Option(name: .long, help: "Name for scan-chain serial data in signal.")
+        var sin: String = "sin"
 
-    guard let libertyFile = liberty.value else {
-        Stderr.print("Option --liberty is required.")
-        Stderr.print("Invoke fault jtag --help for more info.")
-        return EX_USAGE
-    }
+        @Option(name: .long, help: "Name for scan-chain serial data out signal.")
+        var sout: String = "sout"
 
-    if !fileManager.fileExists(atPath: libertyFile) {
-        Stderr.print("Liberty file '\(libertyFile)' not found.")
-        return EX_NOINPUT
-    }
+        @Option(name: .long, help: "Name for scan-chain shift enable signal.")
+        var shift: String = "shift"
 
-    if !libertyFile.hasSuffix(".lib") {
-        Stderr.print(
-            "Warning: Liberty file provided does not end with .lib."
-        )
-    }
+        @Option(name: .long, help: "Name for scan-chain test enable signal.")
+        var test: String = "test"
 
-    if let modelTest = verifyOpt.value {
-        if !fileManager.fileExists(atPath: modelTest) {
-            Stderr.print("Cell model file '\(modelTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
-            Stderr.print(
-                "Warning: Cell model file provided does not end with .v or .sv."
-            )
-        }
-    }
+        @Option(name: .long, help: "Name for JTAG test mode select signal.")
+        var tms: String = "tms"
 
-    if let tvTest = testvectors.value {
-        if !fileManager.fileExists(atPath: tvTest) {
-            Stderr.print("Test vectors file '\(tvTest)' not found.")
-            return EX_NOINPUT
-        }
-        if !tvTest.hasSuffix(".bin") {
-            Stderr.print(
-                "Warning: Test vectors file provided does not end with .bin."
-            )
-        }
-        guard let _ = goldenOutput.value else {
-            Stderr.print("Using goldenOutput (-g) option is required '\(tvTest)'.")
-            return EX_NOINPUT
-        }
-    }
+        @Option(name: .long, help: "Name for JTAG test clock signal.")
+        var tck: String = "tck"
 
-    let includeFiles
-        = Set<String>(include.value?.components(separatedBy: ",").filter { $0 != "" } ?? [])
+        @Option(name: .long, help: "Name for JTAG test data input signal.")
+        var tdi: String = "tdi"
 
-    let output = filePath.value ?? "\(file).jtag.v"
-    let intermediate = output + ".intermediate.v"
+        @Option(name: .long, help: "Name for JTAG test data output signal.")
+        var tdo: String = "tdo"
 
-    // MARK: Importing Python and Pyverilog
+        @Option(name: .long, help: "Name for TDO Enable pad (active low) signal.")
+        var tdoEnable: String = "tdo_paden_o"
 
-    let parse = Python.import("pyverilog.vparser.parser").parse
-
-    let Node = Python.import("pyverilog.vparser.ast")
-
-    let Generator =
-        Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
-
-    // MARK: Parse
-
-    let ast = parse([args[0]])[0]
-    let description = ast[dynamicMember: "description"]
-    var definitionOptional: PythonObject?
-    for definition in description.definitions {
-        let type = Python.type(definition).__name__
-        if type == "ModuleDef" {
-            definitionOptional = definition
-            break
-        }
-    }
-
-    guard let definition = definitionOptional else {
-        Stderr.print("No module found.")
-        return EX_DATAERR
-    }
-
-    let sinName = names["sin"]!.option.value
-        ?? names["sin"]!.default
-    let soutName = names["sout"]!.option.value
-        ?? names["sout"]!.default
-    let shiftName = names["shift"]!.option.value
-        ?? names["shift"]!.default
-    let testName = names["test"]!.option.value
-        ?? names["test"]!.default
-    let tmsName = names["tms"]!.option.value
-        ?? names["tms"]!.default
-    let tdiName = names["tdi"]!.option.value
-        ?? names["tdi"]!.default
-    let tdoName = names["tdo"]!.option.value
-        ?? names["tdo"]!.default
-    let tdoenableName = names["tdo_paden_o"]!.option.value
-        ?? names["tdo_paden_o"]!.default
-    let tckName = names["tck"]!.option.value
-        ?? names["tck"]!.default
-    let trstName = names["trst"]!.option.value
-        ?? names["trst"]!.default
-
-    let blackboxModels = blackboxModelOpt.value?.components(separatedBy: ",") ?? []
-
-    // MARK: Internal signals
-
-    print("Creating top module…")
-    let definitionName = String(describing: definition.name)
-    let alteredName = "__DESIGN__UNDER__TEST__"
-
-    do {
-        let (_, inputs, outputs) = try Port.extract(from: definition)
-        definition.name = Python.str(alteredName)
-        let ports = Python.list(definition.portlist.ports)
-
-        let chainPorts: [String] = [
-            sinName,
-            soutName,
-            shiftName,
-            tckName,
-            testName,
-        ]
-        let topModulePorts = Python.list(ports.filter {
-            !chainPorts.contains(String($0.name)!)
-        })
-
-        topModulePorts.append(Node.Port(
-            tmsName, Python.None, Python.None, Python.None
-        ))
-        topModulePorts.append(Node.Port(
-            tckName, Python.None, Python.None, Python.None
-        ))
-        topModulePorts.append(Node.Port(
-            tdiName, Python.None, Python.None, Python.None
-        ))
-        topModulePorts.append(Node.Port(
-            tdoName, Python.None, Python.None, Python.None
-        ))
-        topModulePorts.append(Node.Port(
-            trstName, Python.None, Python.None, Python.None
-        ))
-        topModulePorts.append(Node.Port(
-            tdoenableName, Python.None, Python.None, Python.None
-        ))
-
-        let statements = Python.list()
-        statements.append(Node.Input(tmsName))
-        statements.append(Node.Input(tckName))
-        statements.append(Node.Input(tdiName))
-        statements.append(Node.Output(tdoName))
-        statements.append(Node.Output(tdoenableName))
-        statements.append(Node.Input(trstName))
-
-        let portArguments = Python.list()
-        for input in inputs {
-            if !chainPorts.contains(input.name) {
-                let inputStatement = Node.Input(input.name)
-                portArguments.append(Node.PortArg(
-                    input.name,
-                    Node.Identifier(input.name)
-                ))
-                if input.width > 1 {
-                    let width = Node.Width(
-                        Node.Constant(input.from),
-                        Node.Constant(input.to)
-                    )
-                    inputStatement.width = width
-                }
-                statements.append(inputStatement)
-            } else {
-                let portIdentifier = input.name
-                portArguments.append(Node.PortArg(
-                    input.name,
-                    Node.Identifier(portIdentifier)
-                ))
-            }
-        }
-
-        for output in outputs {
-            if !chainPorts.contains(output.name) {
-                let outputStatement = Node.Output(output.name)
-                if output.width > 1 {
-                    let width = Node.Width(
-                        Node.Constant(output.from),
-                        Node.Constant(output.to)
-                    )
-                    outputStatement.width = width
-                }
-                statements.append(outputStatement)
-            }
-            portArguments.append(Node.PortArg(
-                output.name,
-                Node.Identifier(output.name)
-            ))
-        }
-
-        // MARK: tap module
-
-        print("Stitching tap port…")
-        let tapInfo = TapInfo.default
-
-        let tapCreator = TapCreator(
-            name: "tap_wrapper",
-            using: Node
-        )
-        let tapModule = tapCreator.create(
-            tapInfo: tapInfo,
-            tms: tmsName,
-            tck: tckName,
-            tdi: tdiName,
-            tdo: tdoName,
-            tdoEnable_n: tdoenableName,
-            trst: trstName,
-            sin: sinName,
-            sout: soutName,
-            shift: shiftName,
-            test: testName
-        )
-
-        statements.extend(tapModule.wires)
-        statements.append(tapModule.tapModule)
-
-        let submoduleInstance = Node.Instance(
-            alteredName,
-            "__dut__",
-            Python.tuple(portArguments),
-            Python.tuple()
-        )
-
-        statements.append(Node.InstanceList(
-            alteredName,
-            Python.tuple(),
-            Python.tuple([submoduleInstance])
-        ))
-
-        let supermodel = Node.ModuleDef(
-            definitionName,
-            Python.None,
-            Node.Portlist(Python.tuple(topModulePorts)),
-            Python.tuple(statements)
-        )
-
-        let tempDir = "\(NSTemporaryDirectory())"
-
-        let tapLocation = "\(tempDir)/top.v"
-        let wrapperLocation = "\(tempDir)/wrapper.v"
-
-        do {
-            try File.open(tapLocation, mode: .write) {
-                try $0.print(TapCreator.top)
-            }
-            try File.open(wrapperLocation, mode: .write) {
-                try $0.print(TapCreator.wrapper)
+        @Option(name: .long, help: "Name for JTAG test reset (active low) signal.")
+        var trst: String = "trst"
+        
+        @Argument
+        var file: String
+    
+        mutating func run() throws {
+            let fileManager = FileManager()
+            if !fileManager.fileExists(atPath: file) {
+                throw ValidationError("File '\(file)' not found.")
             }
 
-        } catch {}
+            let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)
+            
+            var ignoredInputs
+                = Set<String>(ignoring)
 
-        let tapDefinition =
-            parse([tapLocation])[0][dynamicMember: "description"].definitions
+            let defines
+                = Set<String>(defines)
 
-        let wrapperDefinition =
-            parse([wrapperLocation])[0][dynamicMember: "description"].definitions
+            ignoredInputs.insert(clock)
+            ignoredInputs.insert(reset)
 
-        try? File.delete(tapLocation)
-        try? File.delete(wrapperLocation)
+            if !fileManager.fileExists(atPath: liberty) {
+                throw ValidationError("Liberty file '\(liberty)' not found.")
+            }
 
-        let definitions = Python.list(description.definitions)
-        definitions.extend(tapDefinition)
-        definitions.extend(wrapperDefinition)
-        definitions.append(supermodel)
-        description.definitions = Python.tuple(definitions)
-
-        try File.open(intermediate, mode: .write) {
-            try $0.print(Generator.visit(ast))
-        }
-
-        let _ = Synthesis.script(
-            for: definitionName,
-            in: [intermediate],
-            liberty: libertyFile,
-            blackboxing: blackboxModels,
-            output: output
-        )
-
-        let netlist: String = {
-            if !skipSynth.value {
-                let script = Synthesis.script(
-                    for: definitionName,
-                    in: [intermediate],
-                    liberty: libertyFile,
-                    blackboxing: blackboxModels,
-                    output: output
+            if !liberty.hasSuffix(".lib") {
+                Stderr.print(
+                    "Warning: Liberty file provided does not end with .lib."
                 )
-
-                // MARK: Yosys
-
-                print("Resynthesizing with yosys…")
-                let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
-
-                if result != EX_OK {
-                    Stderr.print("A yosys error has occurred.")
-                    exit(EX_DATAERR)
-                }
-                return output
-            } else {
-                return intermediate
             }
-        }()
 
-        if verifyOpt.value == nil {
-            print("Done.")
-        }
+            if let modelTest = cellModel {
+                if !fileManager.fileExists(atPath: modelTest) {
+                    throw ValidationError("Cell model file '\(modelTest)' not found.")
+                }
+                if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
+                    Stderr.print(
+                        "Warning: Cell model file provided does not end with .v or .sv."
+                    )
+                }
+            }
 
-        guard let content = File.read(netlist) else {
-            throw "Could not re-read created file."
-        }
+            if let tvTest = testVectors {
+                if !fileManager.fileExists(atPath: tvTest) {
+                    throw ValidationError("Test vectors file '\(tvTest)' not found.")
+                }
+                if !tvTest.hasSuffix(".bin") {
+                    Stderr.print(
+                        "Warning: Test vectors file provided does not end with .bin."
+                    )
+                }
+                guard let _ = goldenOutput else {
+                    throw ValidationError("Using goldenOutput (-g) option is required '\(tvTest)'.")
+                }
+            }
 
-        try File.open(netlist, mode: .write) {
-            try $0.print(String.boilerplate)
-            try $0.print(content)
-        }
+            let output = output ?? "\(file).jtag.v"
+            let intermediate = output + ".intermediate.v"
 
-        // MARK: Verification
+            // MARK: Importing Python and Pyverilog
 
-        if let model = verifyOpt.value {
-            let models = [model] + Array(includeFiles) + blackboxModels
+            let parse = Python.import("pyverilog.vparser.parser").parse
 
-            print("Verifying tap port integrity…")
-            let ast = parse([netlist])[0]
+            let Node = Python.import("pyverilog.vparser.ast")
+
+            let Generator =
+                Python.import("pyverilog.ast_code_generator.codegen").ASTCodeGenerator()
+
+            // MARK: Parse
+
+            let ast = parse([file])[0]
             let description = ast[dynamicMember: "description"]
             var definitionOptional: PythonObject?
             for definition in description.definitions {
                 let type = Python.type(definition).__name__
                 if type == "ModuleDef" {
                     definitionOptional = definition
+                    break
                 }
             }
+
             guard let definition = definitionOptional else {
                 Stderr.print("No module found.")
-                return EX_DATAERR
+                Foundation.exit(EX_DATAERR)
             }
-            let (ports, inputs, outputs) = try Port.extract(from: definition)
-            let verified = try Simulator.simulate(
-                verifying: definitionName,
-                in: netlist, // DEBUG
-                with: models,
-                ports: ports,
-                inputs: inputs,
-                outputs: outputs,
-                chainLength: boundaryCount + internalCount,
-                clock: clockName,
-                reset: resetName,
-                resetActive: resetActiveLow.value ? .low : .high,
-                tms: tmsName,
-                tdi: tdiName,
-                tck: tckName,
-                tdo: tdoName,
-                trst: trstName,
-                output: netlist + ".tb.sv",
-                defines: defines,
-                using: iverilogExecutable,
-                with: vvpExecutable
-            )
-            print("Done.")
-            if verified {
-                print("Tap port verified successfully.")
-            } else {
-                print("Tap port verification failed.")
-                print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
-                if !resetActiveLow.value {
-                    print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
+
+            // MARK: Internal signals
+
+            print("Creating top module…")
+            let definitionName = String(describing: definition.name)
+            let alteredName = "__DESIGN__UNDER__TEST__"
+
+            do {
+                let (_, inputs, outputs) = try Port.extract(from: definition)
+                definition.name = Python.str(alteredName)
+                let ports = Python.list(definition.portlist.ports)
+
+                let chainPorts: [String] = [
+                    sin,
+                    sout,
+                    shift,
+                    tck,
+                    test,
+                ]
+                let topModulePorts = Python.list(ports.filter {
+                    !chainPorts.contains(String($0.name)!)
+                })
+
+                topModulePorts.append(Node.Port(
+                    tms, Python.None, Python.None, Python.None
+                ))
+                topModulePorts.append(Node.Port(
+                    tck, Python.None, Python.None, Python.None
+                ))
+                topModulePorts.append(Node.Port(
+                    tdi, Python.None, Python.None, Python.None
+                ))
+                topModulePorts.append(Node.Port(
+                    tdo, Python.None, Python.None, Python.None
+                ))
+                topModulePorts.append(Node.Port(
+                    trst, Python.None, Python.None, Python.None
+                ))
+                topModulePorts.append(Node.Port(
+                    tdoEnable, Python.None, Python.None, Python.None
+                ))
+
+                let statements = Python.list()
+                statements.append(Node.Input(tms))
+                statements.append(Node.Input(tck))
+                statements.append(Node.Input(tdi))
+                statements.append(Node.Output(tdo))
+                statements.append(Node.Output(tdoEnable))
+                statements.append(Node.Input(trst))
+
+                let portArguments = Python.list()
+                for input in inputs {
+                    if !chainPorts.contains(input.name) {
+                        let inputStatement = Node.Input(input.name)
+                        portArguments.append(Node.PortArg(
+                            input.name,
+                            Node.Identifier(input.name)
+                        ))
+                        if input.width > 1 {
+                            let width = Node.Width(
+                                Node.Constant(input.from),
+                                Node.Constant(input.to)
+                            )
+                            inputStatement.width = width
+                        }
+                        statements.append(inputStatement)
+                    } else {
+                        let portIdentifier = input.name
+                        portArguments.append(Node.PortArg(
+                            input.name,
+                            Node.Identifier(portIdentifier)
+                        ))
+                    }
                 }
-                print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
-            }
 
-            // MARK: Test bench
+                for output in outputs {
+                    if !chainPorts.contains(output.name) {
+                        let outputStatement = Node.Output(output.name)
+                        if output.width > 1 {
+                            let width = Node.Width(
+                                Node.Constant(output.from),
+                                Node.Constant(output.to)
+                            )
+                            outputStatement.width = width
+                        }
+                        statements.append(outputStatement)
+                    }
+                    portArguments.append(Node.PortArg(
+                        output.name,
+                        Node.Identifier(output.name)
+                    ))
+                }
 
-            if let tvFile = testvectors.value {
-                print("Generating testbench for test vectors…")
-                let behavior
-                    = [Simulator.Behavior](
-                        repeating: .holdHigh,
-                        count: ignoredInputs.count
-                    )
-                let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
-                let (_, outputLength) = binMetadata.extract(file: goldenOutput.value!)
-                let testbecnh = netlist + ".tv" + ".tb.sv"
+                // MARK: tap module
+
+                print("Stitching tap port…")
+                let tapInfo = TapInfo.default
+
+                let tapCreator = TapCreator(
+                    name: "tap_wrapper",
+                    using: Node
+                )
+                let tapModule = tapCreator.create(
+                    tapInfo: tapInfo,
+                    tms: tms,
+                    tck: tck,
+                    tdi: tdi,
+                    tdo: tdo,
+                    tdoEnable_n: tdoEnable,
+                    trst: trst,
+                    sin: sin,
+                    sout: sout,
+                    shift: shift,
+                    test: test
+                )
+
+                statements.extend(tapModule.wires)
+                statements.append(tapModule.tapModule)
+
+                let submoduleInstance = Node.Instance(
+                    alteredName,
+                    "__dut__",
+                    Python.tuple(portArguments),
+                    Python.tuple()
+                )
+
+                statements.append(Node.InstanceList(
+                    alteredName,
+                    Python.tuple(),
+                    Python.tuple([submoduleInstance])
+                ))
+
+                let supermodel = Node.ModuleDef(
+                    definitionName,
+                    Python.None,
+                    Node.Portlist(Python.tuple(topModulePorts)),
+                    Python.tuple(statements)
+                )
+
+                let tempDir = "\(NSTemporaryDirectory())"
+
+                let tapLocation = "\(tempDir)/top.v"
+                let wrapperLocation = "\(tempDir)/wrapper.v"
+
+                do {
+                    try File.open(tapLocation, mode: .write) {
+                        try $0.print(TapCreator.top)
+                    }
+                    try File.open(wrapperLocation, mode: .write) {
+                        try $0.print(TapCreator.wrapper)
+                    }
+
+                } catch {}
+
+                let tapDefinition =
+                    parse([tapLocation])[0][dynamicMember: "description"].definitions
+
+                let wrapperDefinition =
+                    parse([wrapperLocation])[0][dynamicMember: "description"].definitions
+
+                try? File.delete(tapLocation)
+                try? File.delete(wrapperLocation)
+
+                let definitions = Python.list(description.definitions)
+                definitions.extend(tapDefinition)
+                definitions.extend(wrapperDefinition)
+                definitions.append(supermodel)
+                description.definitions = Python.tuple(definitions)
+
+                try File.open(intermediate, mode: .write) {
+                    try $0.print(Generator.visit(ast))
+                }
+
+                let _ = Synthesis.script(
+                    for: definitionName,
+                    in: [intermediate],
+                    liberty: liberty,
+                    blackboxing: blackboxModels,
+                    output: output
+                )
+
+                let netlist: String = {
+                    if !skipSynth {
+                        let script = Synthesis.script(
+                            for: definitionName,
+                            in: [intermediate],
+                            liberty: liberty,
+                            blackboxing: blackboxModels,
+                            output: output
+                        )
+
+                        // MARK: Yosys
+
+                        print("Resynthesizing with yosys…")
+                        let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
+
+                        if result != EX_OK {
+                            Stderr.print("A yosys error has occurred.")
+                            Foundation.exit(EX_DATAERR)
+                        }
+                        return output
+                    } else {
+                        return intermediate
+                    }
+                }()
+
+                guard let model = cellModel else {
+                    print("Done.")
+                    return
+                }
+
+                guard let content = File.read(netlist) else {
+                    throw "Could not re-read created file."
+                }
+
+                try File.open(netlist, mode: .write) {
+                    try $0.print(String.boilerplate)
+                    try $0.print(content)
+                }
+
+                // MARK: Verification
+                let models = [model] + includes + blackboxModels
+
+                print("Verifying tap port integrity…")
+                let ast = parse([netlist])[0]
+                let description = ast[dynamicMember: "description"]
+                var definitionOptional: PythonObject?
+                for definition in description.definitions {
+                    let type = Python.type(definition).__name__
+                    if type == "ModuleDef" {
+                        definitionOptional = definition
+                    }
+                }
+                guard let definition = definitionOptional else {
+                    Stderr.print("No module found.")
+                    Foundation.exit(EX_DATAERR)
+                }
+                let (myPorts, myInputs, myOutputs) = try Port.extract(from: definition)
                 let verified = try Simulator.simulate(
                     verifying: definitionName,
-                    in: netlist,
+                    in: netlist, // DEBUG
                     with: models,
-                    ports: ports,
-                    inputs: inputs,
-                    ignoring: ignoredInputs,
-                    behavior: behavior,
-                    outputs: outputs,
-                    clock: clockName,
-                    reset: resetName,
-                    resetActive: resetActiveLow.value ? .low : .high,
-                    tms: tmsName,
-                    tdi: tdiName,
-                    tck: tckName,
-                    tdo: tdoName,
-                    trst: trstName,
-                    output: testbecnh,
-                    chainLength: internalCount + boundaryCount,
-                    vecbinFile: testvectors.value!,
-                    outbinFile: goldenOutput.value!,
-                    vectorCount: vectorCount,
-                    vectorLength: vectorLength,
-                    outputLength: outputLength,
+                    ports: myPorts,
+                    inputs: myInputs,
+                    outputs: myOutputs,
+                    chainLength: boundaryCount + internalCount,
+                    clock: clock,
+                    reset: reset,
+                    resetActive: activeLow ? .low : .high,
+                    tms: tms,
+                    tdi: tdi,
+                    tck: tck,
+                    tdo: tdo,
+                    trst: trst,
+                    output: netlist + ".tb.sv",
                     defines: defines,
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )
+                print("Done.")
                 if verified {
-                    print("Test vectors verified successfully.")
+                    print("Tap port verified successfully.")
                 } else {
-                    print("Test vector simulation failed.")
-                    if !resetActiveLow.value { // default is ignored inputs are held high
-                        print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
+                    print("Tap port verification failed.")
+                    print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
+                    if !activeLow {
+                        print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
-                    return EX_DATAERR
+                    print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
                 }
+
+                // MARK: Test bench
+
+                if let tvFile = testVectors {
+                    print("Generating testbench for test vectors…")
+                    let behavior
+                        = [Simulator.Behavior](
+                            repeating: .holdHigh,
+                            count: ignoredInputs.count
+                        )
+                    let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
+                    let (_, outputLength) = binMetadata.extract(file: goldenOutput!)
+                    let testbecnh = netlist + ".tv" + ".tb.sv"
+                    let verified = try Simulator.simulate(
+                        verifying: definitionName,
+                        in: netlist,
+                        with: models,
+                        ports: myPorts,
+                        inputs: myInputs,
+                        ignoring: ignoredInputs,
+                        behavior: behavior,
+                        outputs: myOutputs,
+                        clock: clock,
+                        reset: reset,
+                        resetActive: activeLow ? .low : .high,
+                        tms: tms,
+                        tdi: tdi,
+                        tck: tck,
+                        tdo: tdo,
+                        trst: trst,
+                        output: testbecnh,
+                        chainLength: internalCount + boundaryCount,
+                        vecbinFile: testVectors!,
+                        outbinFile: goldenOutput!,
+                        vectorCount: vectorCount,
+                        vectorLength: vectorLength,
+                        outputLength: outputLength,
+                        defines: defines,
+                        using: iverilogExecutable,
+                        with: vvpExecutable
+                    )
+                    if verified {
+                        print("Test vectors verified successfully.")
+                    } else {
+                        print("Test vector simulation failed.")
+                        if !activeLow { // default is ignored inputs are held high
+                            print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
+                        }
+                        Foundation.exit(EX_DATAERR)
+                    }
+                }
+            } catch {
+                Stderr.print("Internal software error: \(error)")
+                Foundation.exit(EX_SOFTWARE)
             }
         }
-    } catch {
-        Stderr.print("Internal software error: \(error)")
-        return EX_SOFTWARE
     }
-
-    return EX_OK
 }

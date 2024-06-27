@@ -18,8 +18,8 @@ import Foundation
 extension String {
     func shOutput() -> (terminationStatus: Int32, output: String) {
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["sh", "-c", self]
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", self]
 
         let pipe = Pipe()
         task.standardOutput = pipe
@@ -42,8 +42,8 @@ extension String {
 
     func sh(silent: Bool = false) -> Int32 {
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["sh", "-c", self]
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", self]
 
         if silent {
             task.standardOutput = FileHandle.nullDevice
