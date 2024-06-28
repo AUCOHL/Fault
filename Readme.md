@@ -1,13 +1,11 @@
 # 🧪 Fault
-![Swift 5.4+](https://img.shields.io/badge/Swift-5.4-orange?logo=swift) ![Docker Image Available for x86-64](https://img.shields.io/static/v1?logo=docker&label=docker&message=x86_64)
+![Swift 5.8+](https://img.shields.io/badge/Swift-5.8-orange?logo=swift) [![ReadTheDocs](https://readthedocs.org/projects/Fault/badge)](https://fault.readthedocs.io) [![Built with Nix](https://img.shields.io/static/v1?logo=nixos&logoColor=white&label=&message=Built%20with%20Nix&color=41439a)](https://nixos.org)
 
 Fault is a complete open source design for testing (DFT) Solution that includes automatic test pattern generation for netlists, scan chain stitching, synthesis scripts and a number of other convenience features.
 
-# Quick Setup/Walkthrough
-You may refer to the [wiki](https://github.com/Cloud-V/Fault/wiki) for quick setup instructions (and a small walkthrough!) if you're into that.
+# Installation and Usage
 
-## Detailed installation instructions
-If you don't feel like using (or can't use) Docker, you can try [Installing.md](./Installing.md) for full installation instructions.
+See the documentation at https://fault.readthedocs.io.
 
 # Running
 ## Subcommands
@@ -75,7 +73,7 @@ For more information on the supported instructions, check the example [testbench
 For more options, you can invoke `fault tap --help`.
 
 # Copyright & Licensing
-All rights reserved ©2018-2022 The American University in Cairo and other contributors. Fault is available under the Apache 2.0 License: See `License`.
+All rights reserved ©2018-2024 The American University in Cairo and other contributors. Fault is available under the Apache 2.0 License: See `License`.
 
 SOFTWARE INCLUDED WITH FAULT DISTRIBUTIONS, I.E. ATALANTA AND PODEM, WHILE FREE TO DISTRIBUTE, ARE PROPRIETARY, AND MAY NOT BE USED FOR COMMERCIAL PURPOSES.
 
