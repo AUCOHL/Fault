@@ -77,7 +77,7 @@ is increased if sufficient coverage isn't met. This is done by the following
 options:
 
 ```bash
-fault -v <initial TV count> -r <increment> -m <minCoverage> --ceiling <TV count ceiling> -c <cell models> <netlist> 
+fault -v <initial TV count> -r <increment> -m <minCoverage> --ceiling <TV count ceiling> -c <cell models> --clock <clock port> --reset <reset port> [--ignoring <ignored port 1> [--ignoring <ignored port 2> ] ] [ --activeLow] <netlist> 
 ```
 
 - `-v`: Number of the initially generated test vectors.
@@ -96,6 +96,14 @@ fault -v <initial TV count> -r <increment> -m <minCoverage> --ceiling <TV count 
 
 - `-c`: The cell models to use for simulations.
 
+- `--clock`: The name of the clock port.
+
+- `--ignoring`: The name of any other ports to ignore during ATPG, which will
+  be held high.
+
+- `--activeLow`: If set, all ports specified by `--ignoring` will be held low
+  instead.
+
 In this example, we will use a minimum coverage of `95%`, an increment of `50`,
 an initial test vector set size of `100` , and a ceiling of `1000` test vectors.
 
@@ -105,7 +113,7 @@ generator will be used for pseudo-random number generation.
 To run the simulations, invoke the following:
 
 ```bash
- fault -c Tech/osu035/osu035_stdcells.v -v 100 -r 50 -m 95 --ceiling 1000 Netlists/s27.nl.v.cut.v
+fault -c Tech/osu035/osu035_stdcells.v -v 100 -r 50 -m 95 --ceiling 1000 --clock CK --ignoring reset Netlists/s27.nl.v.cut.v
 ```
 
 This will generate the coverage at the default path:
@@ -143,12 +151,12 @@ The bench netlist will be generated at ` Netlists/s27.nl.v.cut.v.bench`
 After the bench netlist is created, we can generate test vectors using atalanta
 and run fault simulations by setting the following options:
 
-- `-g`: Type of the test vector generator. Set to `atalanta`
+- `-g`: Type of the test vector generator. Set to `Atalanta`
 - `-c`: Cell models file path.
 - `-b`: Path to the bench netlist.
 
 ```bash
-    fault -g atalanta -c Tech/osu035/osu035_stdcells.v -b Netlists/s27.nl.v.cut.v.bench Netlists/s27.nl.v.cut.v
+    fault -g Atalanta -c Tech/osu035/osu035_stdcells.v -b Netlists/s27.nl.v.cut.v.bench Netlists/s27.nl.v.cut.v
 ```
 
 This will run the simulations with the default options for the initial TV count,
@@ -179,7 +187,7 @@ path at: `fault compact Netlists/s27.nl.v.cut.v.tv.json.compacted.json`
 It has the following options:
 
 ```bash
- fault chain -i <inputs-to-ingnore> --clock <clk-signal> --reset <rst-signal> -l <liberty-file> -c <cell-models-file> -o <path-to-chained-netlist> <flattened-netlist-path>
+ fault chain -i <inputs-to-ignore> --clock <clk-signal> --reset <rst-signal> -l <liberty-file> -c <cell-models-file> -o <path-to-chained-netlist> <flattened-netlist-path>
 ```
 
 - `-i`: Specifies the inputs to ignore (if any)
@@ -209,8 +217,9 @@ set the following options:
 - `-o`: Path to the output file. (Default: input + .jtag.v)
 - `--clock`: Clock signal of core logic to use in simulation
 - `--reset`: Reset signal of core logic to use in simulation.
-- `--activeLow`: Reset signal of core logic is active low instead of active
-  high.
+- `--ignoring`: Other signals to ignore
+- `--activeLow`: Ignored signals (including reset) signal of core logic are held
+  low instead of high.
 - `-c`: Cell models file to verify JTAG port using given cell model.
 - `-l`: Path to the liberty file for resynthesis.
 

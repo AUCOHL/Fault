@@ -67,7 +67,7 @@ enum Simulator {
         }
 
         let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        _ = "mkdir -p \(folderName)".sh()
+        try FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
 
         var inputAssignment = ""
         var fmtString = ""
@@ -196,7 +196,7 @@ enum Simulator {
         let output = File.read(intermediate)!
         defer {
             if cleanUp {
-                _ = "rm -rf \(folderName)".sh()
+                try? FileManager.default.removeItem(atPath: folderName)
             } else {
                 print("Find testbenches at : \(folderName)")
             }

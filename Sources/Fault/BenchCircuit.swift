@@ -21,6 +21,12 @@ struct BenchCircuit: Codable {
     init(cells: [BenchCell]) {
         self.cells = cells
     }
+    
+    static func represent(_ item: PythonObject) -> String {
+        return Python.type(item).__name__ == "Pointer" ?
+            "\(item.var)[\(item.ptr)]" :
+            "\(item)"
+    }
 
     static func extract(definitions: PythonObject) throws -> [BenchCell] {
         var cells: [BenchCell] = []
@@ -49,13 +55,12 @@ struct BenchCircuit: Codable {
                     if type == "InstanceList" {
                         let instance = item.instances[0]
 
-                        let outArgname = String(describing: instance.portlist[0].argname)
+                        let outArgname = represent(instance.portlist[0].argname)
                         let output = (outArgname == cellOutput) ? outArgname : "__\(outArgname)___"
 
                         var benchStatement = "("
                         for hook in instance.portlist[1...] {
-                            let argname = String(describing: hook.argname)
-
+                            let argname = represent(hook.argname)
                             if cellInputs.contains(argname) {
                                 benchStatement += "\(hook.argname), "
                             } else {
@@ -65,7 +70,6 @@ struct BenchCircuit: Codable {
 
                         benchStatement = String(benchStatement.dropLast(2))
                         benchStatement += ")"
-
                         switch instance.module {
                         case "and":
                             cellStatements.append("\(output) = AND" + benchStatement)

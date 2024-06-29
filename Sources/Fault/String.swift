@@ -44,7 +44,7 @@ extension String {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", self]
-
+        //print("$ \(self)")
         if silent {
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice

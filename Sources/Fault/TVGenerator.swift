@@ -248,13 +248,13 @@ class Atalanta: ExternalTestVectorGenerator {
         let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p '\(folderName)'".sh()
+        try? FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
         defer {
-            let _ = "rm -rf '\(folderName)'".sh()
+            try? FileManager.default.removeItem(atPath: folderName)
         }
 
         let output = "\(folderName)/\(module).test"
-        let atalanta = "atalanta -t \(output) \(file) > /dev/null 2>&1".sh()
+        let atalanta = "atalanta -t \(output) \(file)".sh()
 
         if atalanta != EX_OK {
             exit(atalanta)
@@ -279,9 +279,9 @@ class PODEM: ExternalTestVectorGenerator {
         let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        let _ = "mkdir -p '\(folderName)'".sh()
+        try? FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
         defer {
-            let _ = "rm -rf '\(folderName)'".sh()
+            try? FileManager.default.removeItem(atPath: folderName)
         }
 
         let output = "\(folderName)/\(module).out"

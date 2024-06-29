@@ -72,11 +72,11 @@ extension Fault {
                     cellDefinitions = matches.joined(separator: "\n")
                     
                     let folderName = "\(NSTemporaryDirectory())/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-                    let _ = "mkdir -p \(folderName)".sh()
-                    
+                    try? FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
                     defer {
-                        let _ = "rm -rf \(folderName)".sh()
+                        try? FileManager.default.removeItem(atPath: folderName)
                     }
+                    
                     let cellFile = "\(folderName)/cells.v"
                     
                     try File.open(cellFile, mode: .write) {
@@ -170,7 +170,7 @@ extension Fault {
                     
                     for hook in instance.portlist {
                         let portname = String(describing: hook.portname)
-                        let argname = String(describing: hook.argname)
+                        let argname = BenchCircuit.represent(hook.argname)
                         
                         if portname == cell.output {
                             outputs.append(argname)
@@ -185,13 +185,8 @@ extension Fault {
                     usedInputs.append(contentsOf: Array(inputs.values))
                     
                 } else if type == "Assign" {
-                    let right = Python.type(item.right.var).__name__ == "Pointer" ?
-                        "\(item.right.var.var)[\(item.right.var.ptr)]" :
-                        "\(item.right.var)"
-                    
-                    let left = Python.type(item.left.var).__name__ == "Pointer" ?
-                        "\(item.left.var.var)[\(item.left.var.ptr)]" :
-                        "\(item.left.var)"
+                    let right = BenchCircuit.represent(item.right.var)
+                    let left = BenchCircuit.represent(item.left.var)
                     
                     if right == "1'b0" || right == "1'h0" {
                         print("[Warning]: Constants are not recognized by atalanta. Removing \(left) associated gates and nets..")

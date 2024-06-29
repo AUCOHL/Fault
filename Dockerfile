@@ -1,7 +1,7 @@
 FROM efabless/openlane-tools:yosys-cfe940a98b08f1a5d08fb44427db155ba1f18b62-centos-7 AS yosys
 # ---
 
-FROM swift:5.6-centos7 AS builder
+FROM swift:5.8-centos7 AS builder
 
 # Setup Build Environment
 RUN yum install -y --setopt=skip_missing_names_on_install=False https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm centos-release-scl

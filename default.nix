@@ -8,6 +8,7 @@
   python3,
   yosys,
   verilog,
+  quaigh,
   ncurses,
   makeBinaryWrapper,
 }:
@@ -42,6 +43,7 @@ stdenv.mkDerivation (finalAttrs: {
     pyenv
     yosys
     verilog
+    quaigh
   ];
   
   buildInputs = with swiftPackages; [
@@ -86,6 +88,13 @@ stdenv.mkDerivation (finalAttrs: {
       --set PYTHON_LIBRARY ${pyenv}/lib/lib${pyenv.libPrefix}${swiftPackages.stdenv.hostPlatform.extensions.sharedLibrary}\
       --set FAULT_IVL_BASE ${verilog}/lib/ivl
   '';
+  
+  meta = with lib; {
+    description = "Open-source EDA's missing DFT toolchain";
+    homepage = "https://github.com/AUCOHL/Fault";
+    license = licenses.asl20;
+    platforms = platforms.linux ++ platforms.darwin;
+  };
   
   shellHook = finalAttrs.preCheck + finalAttrs.preBuild;
 })

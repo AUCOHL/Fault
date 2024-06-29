@@ -2,12 +2,12 @@
   pkgs? import <nixpkgs> {}
 }:
 with pkgs; stdenvNoCC.mkDerivation {
-  # Use the host's Clang and Swift, they're hopelessly broken in Nix
+  # Use the host's Clang and Swift
   name = "shell";
   buildInputs = [
     yosys
     verilog
-    (python3.withPackages(ps: with ps; [pyverilog]))
+    (python3.withPackages(ps: with ps; [pyverilog pyyaml]))
     gtkwave
   ];
   

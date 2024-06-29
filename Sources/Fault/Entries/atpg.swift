@@ -61,7 +61,7 @@ extension Fault {
         @Option(help: "A \(MemoryLayout<UInt>.size)-byte value to use as an RNG seed for test vector generators, provided as a hexadecimal string (without 0x).")
         var rngSeed: String = "DEADCAFEDEADF00D"
         
-        @Option(help: "Use an external TV Generator: Atalanta or PODEM.")
+        @Option(name: [.customShort("g"), .long], help: "Use an external TV Generator: Atalanta or PODEM.")
         var etvGen: String?
         
         @Option(name: [.short, .long], help: "Netlist in bench format. (Required iff generator is set to Atalanta or PODEM.)")
