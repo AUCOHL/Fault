@@ -40,8 +40,8 @@ extension Fault {
         @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
         var blackboxModels: [String] = []
         
-        @Option(name: [.short, .long], help: "Inputs to ignore on black-boxed macros. Comma-delimited.")
-        var ignoring: String?
+        @OptionGroup
+        var bypass: BypassOptions
         
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
         var output: String?
@@ -56,12 +56,7 @@ extension Fault {
                 throw ValidationError("File '\(file)' not found.")
             }
             
-            let output = self.output ?? "\(file).cut.v"
-            
-            var ignoredInputs: Set<String> = []
-            if let ignoring = ignoring {
-                ignoredInputs = Set(ignoring.components(separatedBy: ","))
-            }
+            let output = self.output ?? file.replacingExtension(".nl.v", with: ".cut.v")
             
             // MARK: Importing Python and Pyverilog
             
@@ -124,7 +119,7 @@ extension Fault {
                     if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
                         yank = true
                         
-                        let outputName = "\\" + instanceName + ".q"
+                        let outputName = "\\" + instanceName + ".d"
                         let inputIdentifier = Node.Identifier(instanceName)
                         let outputIdentifier = Node.Identifier(outputName)
                         var dArg: PythonObject?
@@ -161,12 +156,12 @@ extension Fault {
                         for hook in instance.portlist {
                             let portName = String(describing: hook.portname)
                             
-                            if ignoredInputs.contains(portName) {
+                            if bypass.simulationValues[portName] != nil {
                                 continue
                             }
                             
                             let portInfo = blackboxModule.portsByName[portName]!
-                            let ioName = "\\\(instanceName).\(portName)" + (portInfo.polarity == .input ? ".q" : "")
+                            let ioName = "\\\(instanceName).\(portName)" + (portInfo.polarity == .input ? ".d" : "")
                             let width = Node.Width(Node.IntConst(portInfo.from), Node.IntConst(portInfo.to))
                             let ioDeclaration = portInfo.polarity == .input ?
                                 Node.Output(ioName, width) :

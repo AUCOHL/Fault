@@ -31,11 +31,15 @@ will use the `synth` command with the following options:
 To generate the synthesized netlist, run :
 
 ```bash
- fault synth -t s27 -l Tech/osu035/osu035_stdcells.lib Benchmarks/ISCAS_89/s27.v
+fault synth\
+  -t s27 \
+  -l Tech/osu035/osu035_stdcells.lib \
+  -o Netlists/s27.nl.v \
+  Benchmarks/ISCAS_89/s27.v
 ```
 
 This will run a yosys-based synthesis script and it will generate a flattened
-netlist in the default path at `Netlists/s27.nl.v`.
+netlist at `Netlists/s27.nl.v`.
 
 - For combinational circuits, add dummy clock and reset ports to the design. The
   clock port doesn't have to be connected to anything, necessarily, but will be
@@ -54,13 +58,13 @@ combinational designs.)
 To generate the cut netlist, run:
 
 ```bash
- fault cut Netlists/s27.nl.v
+fault cut Netlists/s27.nl.v
 ```
 
 This will remove all the netlist flip flops converting it into a pure
 combinational netlist. The removed flip-flops will be exposed as input and
 output ports. The generated comb-only (only combinational logic) netlist default
-path is: `Netlists/s27.nl.v.cut.v `
+path is: `Netlists/s27.cut.v `
 
 The comb-only netlist is then used for performing fault simulations in the next
 step.
@@ -113,73 +117,70 @@ generator will be used for pseudo-random number generation.
 To run the simulations, invoke the following:
 
 ```bash
-fault -c Tech/osu035/osu035_stdcells.v -v 100 -r 50 -m 95 --ceiling 1000 --clock CK --ignoring reset Netlists/s27.nl.v.cut.v
+fault -c Tech/osu035/osu035_stdcells.v -v 100 -r 50 -m 95 --ceiling 1000 --clock CK --ignoring reset Netlists/s27.cut.v
 ```
 
 This will generate the coverage at the default path:
-`Netlists/s27.nl.v.cut.v.tv.json`.
+`Netlists/s27.tv.json`.
 
-### B) Using Atalanta
+### B) Using Quaigh or Atalanta
 
-In this part, we will set the test vector generator to Atalanta. But, before
+In this part, we will use an external test vector generation. But, before
 running the simulations we have to convert the comb-only netlist (.cut netlist)
-to bench format because atalanta is compatible only with bench format.
+to the .bench format accepted by Quaigh or Atalanta.
 
-The bench conversion is supported by `bench` option:
+```{note}
+Quaigh is bundled with Fault, but Atalanta is not as it is proprietary software.
+```
+
+<!--
+First of all, convert the cut netlist to Verilog as follows:
 
 ```bash
- fault bench -c <cell-models-file> -o <bench-netlist-output-path> <comb-only-netlist-path>
+yosys-abc -F /dev/stdin <<HD
+read Tech/osu035/osu035_stdcells.lib
+read -m Netlists/s27.cut.v
+write_bench -l Netlists/s27.bench
+HD
+```
+-->
+```bash
+fault bench -c <cell-models-file> -o <bench-netlist-output-path> <comb-only-netlist-path>
 ```
 
 - `-c`: Path of the cell models library. Fault converts the cell library to json
   representation for easier cell extraction. So, if .json file is available from
   previous runs, the file could be passed directly.
 - `-o`: Path of the output bench netlist. Default is
-  `<comb-only-netlist-path> + .bench`
+  `<comb-only-netlist-path> + .bench
 
-To generate bench netlist, invoke the following:
+To generate a .bench netlist, invoke the following:
 
+```bash
+fault bench -c Tech/osu035/osu035_stdcells.v Netlists/s27.cut.v
 ```
- fault bench -c Tech/osu035/osu035_stdcells.v  Netlists/s27.nl.v.cut.v
-```
 
-This will generate the json representation for the osu035 cell library at:
-`Tech/osu035/osu035_stdcells.v.json` which could be used for subsequent runs.
+```{note}
+This will also generate a JSON representation for the osu035 cell library at:
+`Tech/osu035/osu035_stdcells.v.json` which will be re-used for subsequent runs.
+```
 
 The bench netlist will be generated at ` Netlists/s27.nl.v.cut.v.bench`
 
-After the bench netlist is created, we can generate test vectors using atalanta
+After the bench netlist is created, we can generate test vectors 
 and run fault simulations by setting the following options:
 
-- `-g`: Type of the test vector generator. Set to `Atalanta`
+- `-g`: Type of the test vector generator.
 - `-c`: Cell models file path.
 - `-b`: Path to the bench netlist.
 
 ```bash
-    fault -g Atalanta -c Tech/osu035/osu035_stdcells.v -b Netlists/s27.nl.v.cut.v.bench Netlists/s27.nl.v.cut.v
+fault atpg -g [Atalanta|Quaigh] -c Tech/osu035/osu035_stdcells.v -b Netlists/s27.bench Netlists/s27.cut.v --clock CK -i reset -i VDD -i GND
 ```
 
 This will run the simulations with the default options for the initial TV count,
 increment, and ceiling. TV coverage will be generated at the default path
-`Netlists/s27.nl.v.cut.v.tv.json`
-
-## Compaction
-
-`Compact` option is used to reduce the size of the test vector generated in the
-previous step while maintaining the same coverage.
-
-```bash
- fault compact -o <output-compacted-json> <coverage-json>
-```
-
-To run compact, invoke:
-
-```bash
- fault compact Netlists/s27.nl.v.cut.v.tv.json
-```
-
-This will generate the compacted test vector set which is output in the default
-path at: `fault compact Netlists/s27.nl.v.cut.v.tv.json.compacted.json`
+`Netlists/s27.tv.json`
 
 ## Scan Chain Insertion
 
@@ -203,7 +204,11 @@ It has the following options:
 The chained netlist could be generated by running:
 
 ```bash
- fault chain -l Tech/osu035/osu035_stdcells.lib -c Tech/osu035/osu035_stdcells.v --clock CK --reset reset Netlists/s27.nl.v
+fault chain\
+  -l Tech/osu035/osu035_stdcells.lib\
+  -c Tech/osu035/osu035_stdcells.v\
+  --clock CK --reset reset -i VDD -i GND\
+  Netlists/s27.nl.v
 ```
 
 This will generate the chained netlist at the default path:
@@ -226,5 +231,9 @@ set the following options:
 To run tap option, invoke the following
 
 ```bash
- fault tap -l Tech/osu035/osu035_stdcells.lib -c Tech/osu035/osu035_stdcells.v -l Tech/osu035/osu035_stdcells.lib -c Tech/osu035/osu035_stdcells.v --clock CK --reset reset Netlists/s27.nl.v.chained.v
+fault tap\
+  -l Tech/osu035/osu035_stdcells.lib\
+  -c Tech/osu035/osu035_stdcells.v\
+  --clock CK --reset reset -i VDD -i GND\
+  Netlists/s27.nl.v.chained.v
 ```

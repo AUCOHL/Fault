@@ -26,10 +26,10 @@ extension Fault {
             abstract: "Assemble test vectors and golden outputs from JSON and Verilog files."
         )
         
-        @Option(name: [.customShort("o"), .long], help: "Path to the output vector file. (Default: <json input> + .vec.bin)")
+        @Option(name: [.customShort("o"), .long], help: "Path to the output vector file.")
         var output: String?
         
-        @Option(name: [.customShort("O"), .long], help: "Path to the golden output file. (Default: <json input> + .out.bin)")
+        @Option(name: [.customShort("O"), .long], help: "Path to the golden output file.")
         var goldenOutput: String?
         
         @Argument(help: "JSON file (.json).")
@@ -47,8 +47,8 @@ extension Fault {
                 throw ValidationError("JSON file '\(json)' not found.")
             }
             
-            let vectorOutput = output ?? "\(json).vec.bin"
-            let goldenOutput = goldenOutput ?? "\(json).out.bin"
+            let vectorOutput = output ?? json.replacingExtension(".json", with: ".bin")
+            let goldenOutput = goldenOutput ?? json.replacingExtension(".tv.json", with: ".au.bin")
             
             print("Loading JSON data…")
             let start = DispatchTime.now()
@@ -93,7 +93,7 @@ extension Fault {
             
             for (i, output) in jsOutputOrder.enumerated() {
                 var name = output.name.hasPrefix("\\") ? String(output.name.dropFirst()) : output.name
-                name = name.hasSuffix(".q") ? String(name.dropLast(2)) : name
+                name = name.hasSuffix(".d") ? String(name.dropLast(2)) : name
                 outputMap[name] = i
             }
             

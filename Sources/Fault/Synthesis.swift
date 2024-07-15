@@ -72,6 +72,7 @@ enum Synthesis {
 
         write_verilog -noexpr \(output)+attrs
         write_verilog -noexpr -noattr \(output)
+        # write_blif -gates -unbuf DFFSR D Q \(output).blif
         """
     }
 }

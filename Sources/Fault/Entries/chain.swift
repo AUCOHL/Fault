@@ -25,16 +25,13 @@ func chainInternal(
     module: Module,
     blackboxModules: OrderedDictionary<String, Module>,
     bsrCreator: BoundaryScanRegisterCreator,
-    clockName: String,
-    resetName _: String,
-    resetActive _: Simulator.Active,
+    bypass: inout BypassOptions,
     shiftName: String,
     inputName: String,
     outputName: String,
     testName: String,
     tckName: String,
-    invClockName: String?,
-    ignoredInputs: Set<String>
+    invClockName: String?
 ) throws -> [ChainRegister] {
     // Modifies module definition in-place to create scan-chain.
     // Changes name to .original to differentate from new top level.
@@ -102,7 +99,7 @@ func chainInternal(
                 for hook in instance.portlist {
                     let portnameStr = String(describing: hook.portname)
                     if portnameStr == dffinfo.clk {
-                        if String(describing: hook.argname) == clockName {
+                        if String(describing: hook.argname) == bypass.clock {
                             hook.argname = clkSourceId
                         } else {
                             warn = true
@@ -145,7 +142,7 @@ func chainInternal(
                     // Note that `hook.argname` is actually an expression
                     let portInfo = blackboxModule.portsByName["\(hook.portname)"]!
 
-                    if ignoredInputs.contains(portInfo.name) {
+                    if bypass.bypassedInputs.contains(portInfo.name) {
                         // Leave it alone
                         continue
                     }
@@ -195,7 +192,7 @@ func chainInternal(
 
             if let invClock = invClockName, moduleName == invClock {
                 for hook in instance.portlist {
-                    if String(describing: hook.argname) == clockName {
+                    if String(describing: hook.argname) == bypass.clock {
                         invClkSourceId = Node.Identifier(invClkSourceName)
                         hook.argname = invClkSourceId!
                     }
@@ -207,7 +204,7 @@ func chainInternal(
     }
 
     if warn {
-        print("[Warning]: Detected flip-flops with clock different from \(clockName).")
+        print("[Warning]: Detected flip-flops with clock different from \(bypass.clock).")
     }
 
     let finalAssignment = Node.Assign(
@@ -219,7 +216,7 @@ func chainInternal(
     let clockCond = Node.Cond(
         Node.Identifier(testName),
         Node.Identifier(tckName),
-        Node.Identifier(clockName)
+        Node.Identifier(bypass.clock)
     )
     let clkSourceAssignment = Node.Assign(
         Node.Lvalue(clkSourceId),
@@ -231,7 +228,7 @@ func chainInternal(
         let invClockCond = Node.Cond(
             Node.Identifier(testName),
             Node.Unot(Node.Identifier(tckName)),
-            Node.Identifier(clockName)
+            Node.Identifier(bypass.clock)
         )
 
         let invClockAssignment = Node.Assign(
@@ -253,16 +250,13 @@ func chainTop(
     module: Module,
     blackboxModules _: OrderedDictionary<String, Module>,
     bsrCreator: BoundaryScanRegisterCreator,
-    clockName: String,
-    resetName: String,
-    resetActive _: Simulator.Active,
+    bypass: inout BypassOptions,
     shiftName: String,
     inputName: String,
     outputName: String,
     testName: String,
     tckName: String,
     invClockName _: String?,
-    ignoredInputs: Set<String>,
     internalOrder: [ChainRegister]
 ) throws -> (supermodel: PythonObject, order: [ChainRegister]) {
     var order: [ChainRegister] = []
@@ -271,11 +265,11 @@ func chainTop(
     var statements: [PythonObject] = []
     statements.append(Node.Input(inputName))
     statements.append(Node.Output(outputName))
-    statements.append(Node.Input(resetName))
+    statements.append(Node.Input(bypass.reset.name))
     statements.append(Node.Input(shiftName))
     statements.append(Node.Input(tckName))
     statements.append(Node.Input(testName))
-    statements.append(Node.Input(clockName))
+    statements.append(Node.Input(bypass.clock))
 
     let portArguments = Python.list()
 
@@ -298,10 +292,10 @@ func chainTop(
     for input in module.inputs {
         let inputStatement = Node.Input(input.name)
 
-        if input.name != clockName, input.name != resetName {
+        if input.name != bypass.clock, input.name != bypass.reset.name {
             statements.append(inputStatement)
         }
-        if ignoredInputs.contains(input.name) {
+        if bypass.bypassedInputs.contains(input.name) {
             portArguments.append(Node.PortArg(
                 input.name,
                 Node.Identifier(input.name)
@@ -487,26 +481,17 @@ extension Fault {
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
         var output: String?
         
-        @Option(name: [.short, .long], help: "Inputs to ignore on both the top level design and all black-boxed macros. Comma-delimited.")
-        var ignoring: String?
-        
         @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify scan chain using given cell model.")
         var cellModel: String?
-        
-        @Option(name: [.long], help: "Clock signal to add to --ignoring and use in simulation. (Required.)")
-        var clock: String
         
         @Option(name: [.long], help: "Inverted clk tree source cell name. (Default: none)")
         var invClock: String?
         
-        @Option(name: [.long], help: "Reset signal to add to --ignoring and use in simulation. (Required.)")
-        var reset: String
-        
-        @Flag(name: [.long, .customLong("activeLow")], help: "Reset signal is active low instead of active high.")
-        var activeLow: Bool = false
-        
         @Option(name: [.short, .long], help: "Liberty file. (Required.)")
         var liberty: String
+        
+        @OptionGroup
+        var bypass: BypassOptions
         
         @Option(name: [.short, .long, .customLong("sclConfig")], help: "Path for the YAML SCL config file. Recommended.")
         var sclConfig: String?
@@ -520,8 +505,8 @@ extension Fault {
         @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
         var blackboxModels: [String] = []
         
-        @Option(name: .long, help: "define statements to include during simulations. Comma-delimited. (Default: none)")
-        var define: String?
+        @Option(name: [.customShort("D"), .customLong("define")], help: "define statements to include during simulations. Comma-delimited. (Default: none)")
+        var defines: [String] = []
         
         @Option(name: .long, help: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)")
         var inc: String?
@@ -547,7 +532,7 @@ extension Fault {
         @Argument
         var file: String
         
-        func run() throws {
+        mutating func run() throws {
             let fileManager = FileManager()
 
             // Check if input file exists
@@ -556,18 +541,6 @@ extension Fault {
             }
 
             // Required options validation
-            guard !clock.isEmpty else {
-                throw ValidationError("Option --clock is required.")
-            }
-
-            guard !reset.isEmpty else {
-                throw ValidationError("Option --reset is required.")
-            }
-
-            guard !liberty.isEmpty else {
-                throw ValidationError("Option --liberty is required.")
-            }
-
             var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
             if let sclConfigPath = self.sclConfig {
                 guard let sclConfigYML = File.read(sclConfigPath) else {
@@ -589,14 +562,8 @@ extension Fault {
                 print("Warning: Liberty file provided does not end with .lib.")
             }
 
-            let output = output ?? "\(file).chained.v"
-            let intermediate = output + ".intermediate.v"
-
-            var ignoredInputs = Set<String>(ignoring?.components(separatedBy: ",") ?? [])
-            let defines = Set<String>(define?.components(separatedBy: ",") ?? [])
-
-            ignoredInputs.insert(clock)
-            ignoredInputs.insert(reset)
+            let output = output ?? file.replacingExtension(".nl.v", with: ".chained.v")
+            let intermediate = output.replacingExtension(".chained.v", with: ".chain-intermediate.v")
 
             let includeFiles = Set<String>(inc?.components(separatedBy: ",").filter { !$0.isEmpty } ?? [])
 
@@ -618,8 +585,8 @@ extension Fault {
             let bsrCreator = BoundaryScanRegisterCreator(
                 name: "BoundaryScanRegister",
                 clock: tck,
-                reset: reset,
-                resetActive: activeLow ? .low : .high,
+                reset: bypass.reset.name,
+                resetActive: bypass.reset.active,
                 testing: test,
                 shift: shift,
                 using: Node
@@ -631,16 +598,13 @@ extension Fault {
                 module: module,
                 blackboxModules: blackboxModules,
                 bsrCreator: bsrCreator,
-                clockName: clock,
-                resetName: reset,
-                resetActive: activeLow ? .low : .high,
+                bypass: &bypass,
                 shiftName: shift,
                 inputName: sin,
                 outputName: sout,
                 testName: test,
                 tckName: tck,
-                invClockName: invClock,
-                ignoredInputs: ignoredInputs
+                invClockName: invClock
             )
 
             let internalCount = internalOrder.reduce(0) { $0 + $1.width }
@@ -656,16 +620,13 @@ extension Fault {
                 module: module,
                 blackboxModules: blackboxModules,
                 bsrCreator: bsrCreator,
-                clockName: clock,
-                resetName: reset,
-                resetActive: activeLow ? .low : .high,
+                bypass: &bypass,
                 shiftName: shift,
                 inputName: sin,
                 outputName: sout,
                 testName: test,
                 tckName: tck,
                 invClockName: invClock,
-                ignoredInputs: ignoredInputs,
                 internalOrder: internalOrder
             )
             let finalCount = finalOrder.reduce(0) { $0 + $1.width }
@@ -758,16 +719,16 @@ extension Fault {
                     inputs: inputs,
                     outputs: outputs,
                     chainLength: finalOrder.reduce(0) { $0 + $1.width },
-                    clock: clock,
+                    clock: bypass.clock,
                     tck: tck,
-                    reset: reset,
+                    reset: bypass.reset.name,
                     sin: sin,
                     sout: sout,
-                    resetActive: activeLow ? .low : .high,
+                    resetActive: bypass.reset.active,
                     shift: shift,
                     test: test,
                     output: netlist + ".tb.sv",
-                    defines: defines,
+                    defines: Set(defines),
                     using: iverilogExecutable,
                     with: vvpExecutable
                 )
@@ -776,7 +737,7 @@ extension Fault {
                 } else {
                     print("Scan chain verification failed.")
                     print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
-                    if activeLow {
+                    if !bypass.resetActiveLow {
                         print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
                     if internalOrder.count == 0 {

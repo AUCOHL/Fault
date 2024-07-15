@@ -56,7 +56,7 @@ stdenv.mkDerivation (finalAttrs: {
   installPhase = ''
     binPath="$(swiftpmBinPath)"
     mkdir -p $out/bin
-    cp $binPath/Fault $out/bin/fault
+    cp $binPath/fault $out/bin/fault
   '';
   
   # This doesn't work on Linux otherwise and I don't know why.

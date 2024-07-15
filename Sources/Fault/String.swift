@@ -61,6 +61,17 @@ extension String {
 
         return task.terminationStatus
     }
+    
+    func replacingExtension(_ before: String, with after: String) -> String {
+        var result = self
+        if result.hasSuffix(before) {
+            result = result.replacingOccurrences(of: before, with: after)
+        }
+        if !result.hasSuffix(after) {
+            result += after
+        }
+        return result
+    }
 }
 
 extension String: Error {}

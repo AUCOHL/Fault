@@ -32,14 +32,8 @@ extension Fault {
         @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify JTAG port using given cell model.")
         var cellModel: String?
 
-        @Option(name: [.long], help: "Clock signal of core logic to use in simulation. (Required)")
-        var clock: String
-
-        @Option(name: [.long], help: "Reset signal of core logic to use in simulation. (Required)")
-        var reset: String
-
-        @Flag(name: [.long, .customLong("activeLow")], help: "Reset signal of core logic is active low instead of active high.")
-        var activeLow: Bool = false
+        @OptionGroup
+        var bypass: BypassOptions
 
         @Option(name: [.short, .long], help: "Liberty file. (Required.)")
         var liberty: String
@@ -106,16 +100,10 @@ extension Fault {
             }
 
             let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)
-            
-            var ignoredInputs
-                = Set<String>(ignoring)
 
             let defines
                 = Set<String>(defines)
-
-            ignoredInputs.insert(clock)
-            ignoredInputs.insert(reset)
-
+                
             if !fileManager.fileExists(atPath: liberty) {
                 throw ValidationError("Liberty file '\(liberty)' not found.")
             }
@@ -151,8 +139,8 @@ extension Fault {
                 }
             }
 
-            let output = output ?? "\(file).jtag.v"
-            let intermediate = output + ".intermediate.v"
+            let output = output ?? file.replacingExtension(".chained.v", with: ".jtag.v") // "\(file).jtag.v"
+            let intermediate = output.replacingExtension(".jtag.v", with: ".jtag_intermediate.v")
 
             // MARK: Importing Python and Pyverilog
 
@@ -426,9 +414,9 @@ extension Fault {
                     inputs: myInputs,
                     outputs: myOutputs,
                     chainLength: boundaryCount + internalCount,
-                    clock: clock,
-                    reset: reset,
-                    resetActive: activeLow ? .low : .high,
+                    clock: bypass.clock,
+                    reset: bypass.reset.name,
+                    resetActive: bypass.reset.active,
                     tms: tms,
                     tdi: tdi,
                     tck: tck,
@@ -445,7 +433,7 @@ extension Fault {
                 } else {
                     print("Tap port verification failed.")
                     print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
-                    if !activeLow {
+                    if bypass.reset.active == .high {
                         print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
                     print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
@@ -455,11 +443,6 @@ extension Fault {
 
                 if let tvFile = testVectors {
                     print("Generating testbench for test vectors…")
-                    let behavior
-                        = [Simulator.Behavior](
-                            repeating: .holdHigh,
-                            count: ignoredInputs.count
-                        )
                     let (vectorCount, vectorLength) = binMetadata.extract(file: tvFile)
                     let (_, outputLength) = binMetadata.extract(file: goldenOutput!)
                     let testbecnh = netlist + ".tv" + ".tb.sv"
@@ -469,12 +452,11 @@ extension Fault {
                         with: models,
                         ports: myPorts,
                         inputs: myInputs,
-                        ignoring: ignoredInputs,
-                        behavior: behavior,
+                        bypassingWithBehavior: bypass.simulationValues,
                         outputs: myOutputs,
-                        clock: clock,
-                        reset: reset,
-                        resetActive: activeLow ? .low : .high,
+                        clock: bypass.clock,
+                        reset: bypass.reset.name,
+                        resetActive: bypass.reset.active,
                         tms: tms,
                         tdi: tdi,
                         tck: tck,
@@ -495,8 +477,8 @@ extension Fault {
                         print("Test vectors verified successfully.")
                     } else {
                         print("Test vector simulation failed.")
-                        if !activeLow { // default is ignored inputs are held high
-                            print("・Ensure that ignored inputs in the simulation are held low. Pass --holdLow if reset is active high.")
+                        if bypass.reset.active == .high {// default is ignored inputs are held high
+                            print("・The reset is assumed active-high and thus held low. Pass --activeLow if reset is active low.")
                         }
                         Foundation.exit(EX_DATAERR)
                     }

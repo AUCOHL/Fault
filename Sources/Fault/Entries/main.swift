@@ -36,6 +36,7 @@ _ = [ // Register all RNGs
 ]
 _ = [ // Register all TVGens
     Atalanta.registered,
+    Quaigh.registered,
     PODEM.registered,
 ]
 
@@ -73,7 +74,7 @@ let pythonVersions = {
 struct Fault: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Open-source EDA's missing DFT Toolchain",
-        subcommands: [ATPG.self, Cut.self, Synth.self, Assemble.self, Compact.self, Tap.self, Bench.self, Chain.self],
+        subcommands: [ATPG.self, Cut.self, Synth.self, Assemble.self, Tap.self, Bench.self, Chain.self],
         defaultSubcommand: ATPG.self
     )
 }

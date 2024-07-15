@@ -22,7 +22,7 @@ import BigInt
 extension Fault {
     struct Bench: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Generate a benchmark file from Verilog or JSON cell models."
+            abstract: "Generate a .bench file from Verilog models."
         )
         
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .bench)")
@@ -45,7 +45,7 @@ extension Fault {
                 throw ValidationError("Cell model file '\(cellModel)' not found.")
             }
             
-            let output = self.output ?? "\(file).bench"
+            let output = self.output ?? file.replacingExtension(".cut.v", with: ".bench")
             
             var cellModelsFile = cellModel
             
@@ -135,23 +135,21 @@ extension Fault {
             }
             
             let (_, inputs, outputs) = try Port.extract(from: definition)
-            
-            var inputNames: [String] = []
-            var usedInputs: [String] = []
-            var floatingOutputs: [String] = []
+        
+            var allWires: Set<String> = []
+            var usedWires: Set<String> = []
             var benchStatements = ""
             
             for input in inputs {
                 if input.width > 1 {
-                    let range = (input.from > input.to) ? input.to ... input.from : input.from ... input.to
-                    for index in range {
+                    for index in input.bits {
                         let name = "\(input.name)[\(index)]"
-                        inputNames.append(name)
+                        allWires.insert(name)
                         benchStatements += "INPUT(\(name)) \n"
                     }
                 } else {
                     let name = input.name
-                    inputNames.append(name)
+                    allWires.insert(name)
                     benchStatements += "INPUT(\(name)) \n"
                 }
             }
@@ -170,55 +168,65 @@ extension Fault {
                     
                     for hook in instance.portlist {
                         let portname = String(describing: hook.portname)
-                        let argname = BenchCircuit.represent(hook.argname)
-                        
+                        let type = Python.type(hook.argname).__name__
+
                         if portname == cell.output {
-                            outputs.append(argname)
+                            if type == "Pointer" {
+                                outputs.append("\(hook.argname.var)[\(hook.argname.ptr)]")
+                            } else {
+                                outputs.append(String(describing: hook.argname))
+                            }
                         } else {
-                            inputs[portname] = argname
+                            if type == "Pointer" {
+                                inputs[portname] = "\(hook.argname.var)[\(hook.argname.ptr)]"
+                            } else {
+                                inputs[portname] = String(describing: hook.argname)
+                            }
                         }
                     }
                     
                     let statements = try cell.extract(name: instanceName, inputs: inputs, output: outputs)
                     benchStatements += "\(statements) \n"
                     
-                    usedInputs.append(contentsOf: Array(inputs.values))
+                    for used in inputs.values {
+                        usedWires.insert(used)
+                    }
+                    for new: String in outputs {
+                        allWires.insert(new)
+                    }                                        
                     
                 } else if type == "Assign" {
                     let right = BenchCircuit.represent(item.right.var)
                     let left = BenchCircuit.represent(item.left.var)
                     
                     if right == "1'b0" || right == "1'h0" {
-                        print("[Warning]: Constants are not recognized by atalanta. Removing \(left) associated gates and nets..")
-                        floatingOutputs.append(left)
+                        print("[Warning]: Constants are not supported in the bench format.")
                     } else {
                         let statement = "\(left) = BUFF(\(right)) \n"
                         benchStatements += statement
                         
-                        usedInputs.append(right)
+                        usedWires.insert(right)
                     }
                 }
             }
             
-            let ignoredInputs = inputNames.filter { !usedInputs.contains($0) }
-            print("Found \(ignoredInputs.count) floating inputs.")
-            
-            let filteredOutputs = outputs.filter { !floatingOutputs.contains($0.name) }
-            for output in filteredOutputs {
+            for output in outputs {
                 if output.width > 1 {
-                    let range = (output.from > output.to) ? output.to ... output.from : output.from ... output.to
-                    for index in range {
-                        benchStatements += "OUTPUT(\(output.name)[\(index)]) \n"
+                    for index in output.bits {
+                        let name = "\(output.name)[\(index)]"
+                        usedWires.insert(name)
+                        benchStatements += "OUTPUT(\(name)) \n"
                     }
                 } else {
-                    benchStatements += "OUTPUT(\(output.name)) \n"
+                    let name = output.name
+                    usedWires.insert(name)
+                    benchStatements += "OUTPUT(\(name)) \n"
                 }
             }
             
-            var floatingStatements = ""
-            for input in ignoredInputs {
-                floatingStatements += "OUTPUT(\(input)) \n"
-            }
+            // for unused in allWires.subtracting(usedWires) {
+            //     benchStatements += "OUTPUT(\(unused))\n"
+            // }
             
             let boilerplate = """
             #    Bench for \(definition.name)
@@ -228,7 +236,6 @@ extension Fault {
             
             try File.open(output, mode: .write) {
                 try $0.print(boilerplate)
-                try $0.print(floatingStatements.dropLast())
                 try $0.print(benchStatements)
             }
             

@@ -15,18 +15,16 @@
 import BigInt
 import Defile
 import Foundation
+import Collections
 import PythonKit
 
-class CoverageMeta: Codable {
+struct CoverageMeta: Codable {
     let ratio: Float
+    let faultPoints: [String]
     let sa0Covered: [String]
     let sa1Covered: [String]
-
-    init(ratio: Float, sa0Covered: [String], sa1Covered: [String]) {
-        self.ratio = ratio
-        self.sa0Covered = sa0Covered
-        self.sa1Covered = sa1Covered
-    }
+    let sa0Uncovered: [String]
+    let sa1Uncovered: [String]
 }
 
 enum Simulator {
@@ -43,8 +41,7 @@ enum Simulator {
         with models: [String],
         ports: [String: Port],
         inputs: [Port],
-        ignoring ignoredInputs: Set<String>,
-        behavior: [Behavior],
+        bypassingWithBehavior: OrderedDictionary<String, Behavior>,
         outputs: [Port],
         stuckAt: Int,
         cleanUp: Bool,
@@ -83,11 +80,16 @@ enum Simulator {
             inputList += "\(name) , "
         }
 
-        for (i, rawName) in ignoredInputs.enumerated() {
+
+        for (rawName, behavior) in bypassingWithBehavior {
+            guard ports[rawName] != nil else {
+                continue // black-box module ignore probably
+            }
+            
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
 
-            inputAssignment += "        \(name) = \(behavior[i].rawValue) ;\n"
-            inputAssignment += "        \(name).gm = \(behavior[i].rawValue) ;\n"
+            inputAssignment += "        \(name) = \(behavior.rawValue) ;\n"
+            inputAssignment += "        \(name).gm = \(behavior.rawValue) ;\n"
         }
 
         fmtString = String(fmtString.dropLast(1))
@@ -224,8 +226,7 @@ enum Simulator {
         with models: [String],
         ports: [String: Port],
         inputs: [Port],
-        ignoring ignoredInputs: Set<String> = [],
-        behavior: [Behavior] = [],
+        bypassingWithBehavior: OrderedDictionary<String, Behavior>,
         outputs: [Port],
         initialVectorCount: Int,
         incrementingBy increment: Int,
@@ -318,8 +319,7 @@ enum Simulator {
                                 with: models,
                                 ports: ports,
                                 inputs: inputs,
-                                ignoring: ignoredInputs,
-                                behavior: behavior,
+                                bypassingWithBehavior: bypassingWithBehavior,
                                 outputs: outputs,
                                 stuckAt: 0,
                                 cleanUp: !sampleRun,
@@ -340,8 +340,7 @@ enum Simulator {
                                 with: models,
                                 ports: ports,
                                 inputs: inputs,
-                                ignoring: ignoredInputs,
-                                behavior: behavior,
+                                bypassingWithBehavior: bypassingWithBehavior,
                                 outputs: outputs,
                                 stuckAt: 1,
                                 cleanUp: !sampleRun,
@@ -396,8 +395,11 @@ enum Simulator {
             coverageList: coverageList,
             coverageMeta: CoverageMeta(
                 ratio: coverage,
+                faultPoints: [String](faultPoints), 
                 sa0Covered: sa0Covered.sorted(),
-                sa1Covered: sa1Covered.sorted()
+                sa1Covered: sa1Covered.sorted(),
+                sa0Uncovered: faultPoints.filter { !sa0Covered.contains($0) },
+                sa1Uncovered: faultPoints.filter { !sa0Covered.contains($0) }
             )
         )
     }
@@ -672,8 +674,7 @@ enum Simulator {
         with models: [String],
         ports: [String: Port],
         inputs: [Port],
-        ignoring ignoredInputs: Set<String>,
-        behavior: [Behavior],
+        bypassingWithBehavior: OrderedDictionary<String, Behavior>,
         outputs _: [Port],
         clock: String,
         reset: String,
@@ -703,9 +704,12 @@ enum Simulator {
         }
 
         var inputAssignment = ""
-        for (i, rawName) in ignoredInputs.enumerated() {
+        for (rawName, behavior) in bypassingWithBehavior {
+            guard ports[rawName] != nil else {
+                continue // black-box module ignore probably
+            }
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            inputAssignment += "        \(name) = \(behavior[i].rawValue) ;\n"
+            inputAssignment += "        \(name) = \(behavior.rawValue) ;\n"
         }
 
         let tapPorts = [tck, trst, tdi]

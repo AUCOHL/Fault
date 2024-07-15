@@ -66,18 +66,12 @@ extension Fault {
         
         @Option(name: [.short, .long], help: "Netlist in bench format. (Required iff generator is set to Atalanta or PODEM.)")
         var bench: String?
-        
-        @Option(name: [.short, .long], help: "Inputs to ignore. May be specified multiple times.")
-        var ignoring: [String] = []
-        
-        @Flag(help: "Hold ignored inputs in the simulation to low instead of high.")
-        var holdLow: Bool = false
-        
+    
         @Flag(help: "Generate only one testbench for inspection, and do not delete it.")
         var sampleRun: Bool = false
         
-        @Option(help: "Clock name to add to --ignoring")
-        var clock: String
+        @OptionGroup
+        var bypass: BypassOptions
         
         @Option(help: "If provided, this JSON file's test vectors are simulated and no generation is attempted.")
         var externalTVSet: String?
@@ -115,17 +109,9 @@ extension Fault {
                 )
             }
 
-            let jsonOutput = output ?? "\(file).tv.json"
-            let svfOutput = outputSvf ?? "\(file).tv.svf"
+            let jsonOutput = output ?? file.replacingExtension(".cut.v", with: ".tv.json")
+            let svfOutput = outputSvf ?? file.replacingExtension(".cut.v", with: ".tv.svf")
             
-            ignoring.append(clock)
-
-            let behavior
-                = [Simulator.Behavior](
-                    repeating: holdLow ? .holdLow : .holdHigh,
-                    count: ignoring.count
-                )
-
             // MARK: Importing Python and Pyverilog
 
             let parse = Python.import("pyverilog.vparser.parser").parse
@@ -214,17 +200,17 @@ extension Fault {
                 var inputsMinusIgnored: [Port] = []
                 if etvSetVectors.count == 0 {
                     inputsMinusIgnored = inputs.filter {
-                        !ignoring.contains($0.name)
+                        !bypass.bypassedInputs.contains($0.name)
                     }
                 } else {
                     etvSetInputs.sort { $0.ordinal < $1.ordinal }
                     inputsMinusIgnored = etvSetInputs.filter {
-                        !ignoring.contains($0.name)
+                        !bypass.bypassedInputs.contains($0.name)
                     }
                 }
 
                 for (_, port) in ports {
-                    if ignoring.contains(port.name) {
+                    if bypass.bypassedInputs.contains(port.name) {
                         continue
                     }
                     if port.width == 1 {
@@ -285,8 +271,7 @@ extension Fault {
                     with: models,
                     ports: ports,
                     inputs: inputsMinusIgnored,
-                    ignoring: Set(ignoring),
-                    behavior: behavior,
+                    bypassingWithBehavior: bypass.simulationValues,
                     outputs: outputs,
                     initialVectorCount: tvCount,
                     incrementingBy: increment,
@@ -297,7 +282,7 @@ extension Fault {
                     initialTVInfo: initialTVInfo,
                     externalTestVectors: etvSetVectors,
                     sampleRun: sampleRun,
-                    clock: clock,
+                    clock: bypass.clock,
                     defines: Set(defines),
                     using: iverilogExecutable,
                     with: vvpExecutable
@@ -311,36 +296,28 @@ extension Fault {
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = .prettyPrinted
 
-                let tvInfo = TVInfo(
+                let rawTVInfo = TVInfo(
                     inputs: inputsMinusIgnored,
                     outputs: outputs,
                     coverageList: result.coverageList
                 )
+                let jsonRawOutput = jsonOutput.replacingExtension(".tv.json", with: ".raw_tv.json")
+                
+                print("Writing raw generated test vectors in Fault JSON format to \(jsonOutput)…")
+                try encoder.encode(rawTVInfo).write(to: URL(fileURLWithPath: jsonRawOutput))
+                
+                let tvInfo = TVInfo(
+                    inputs: inputsMinusIgnored,
+                    outputs: outputs,
+                    coverageList: Compactor.compact(coverageList: result.coverageList)
+                )
+                print("Writing compacted generated test vectors in Fault JSON format to \(jsonOutput)…")
+                try encoder.encode(tvInfo).write(to: URL(fileURLWithPath: jsonOutput))
 
-                let data = try encoder.encode(tvInfo)
-
-                let svfString = try SerialVectorCreator.create(tvInfo: tvInfo)
-
-                guard let string = String(data: data, encoding: .utf8)
-                else {
-                    throw "Could not create utf8 string."
-                }
-                try File.open(jsonOutput, mode: .write) {
-                    print("Writing generated test vectors in Fault JSON format to \(jsonOutput)…")
-                    try $0.print(string)
-                }
-
-                try File.open(svfOutput, mode: .write) {
-                    print("Writing generated test vectors in SVF format to \(svfOutput)…")
-                    try $0.print(svfString)
-                }
-
-                if let faultPointOutput = outputFaultPoints {
-                    print("Writing YAML file of fault points to \(faultPointOutput)…")
-                    try File.open(faultPointOutput, mode: .write) {
-                        try $0.write(string: YAMLEncoder().encode(faultPoints.sorted()))
-                    }
-                }
+                // try File.open(svfOutput, mode: .write) {
+                //     print("Writing generated test vectors in SVF format to \(svfOutput)…")
+                //     try $0.print(try SerialVectorCreator.create(tvInfo: tvInfo))
+                // }
 
                 if let coverageMetaFilePath = outputCoverageMetadata {
                     print("Writing YAML file of final coverage metadata to \(coverageMetaFilePath)…")
