@@ -300,7 +300,7 @@ class PODEM: ExternalTestVectorGenerator {
         }
 
         let output = "\(folderName)/\(module).out"
-        let podem = "atpg -output \(output) \(file) > /dev/null 2>&1".sh()
+        let podem = "atpg-podem -output \(output) \(file) > /dev/null 2>&1".sh()
 
         if podem != EX_OK {
             exit(podem)

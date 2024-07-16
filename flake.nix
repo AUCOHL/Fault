@@ -10,6 +10,7 @@
   outputs = {self, nix-eda, quaigh, ...}: {
     packages = nix-eda.forAllSystems { current = self; withInputs = [nix-eda quaigh]; } (util: with util; rec{
       atalanta = callPackage ./nix/atalanta.nix {};
+      podem = callPackage ./nix/podem.nix {};
       fault = callPackage ./default.nix {};
       default = fault;
     });
