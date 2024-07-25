@@ -15,6 +15,7 @@
 import BigInt
 import Defile
 import Foundation
+import Collections
 
 typealias TestVector = [BigUInt]
 
@@ -124,17 +125,19 @@ enum TVSet {
     }
 
     static func readFromTest(_ file: String, withInputsFrom bench: String) throws -> ([TestVector], [Port]) {
-        var inputs: [Port] = []
+        var inputDict: OrderedDictionary<String, Port> = [:]
         let benchStr = File.read(bench)!
-        let inputRx = #/INPUT\((\w+)\)/#
-        var ordinal = 0
+        let inputRx = #/INPUT\(([^\(\)]+?)(\[\d+\])?\)/#
+        var ordinal = -1
         for line in benchStr.components(separatedBy: "\n") {
             if let match = try? inputRx.firstMatch(in: line) {
-                inputs.append(Port(name: String(match.1), at: ordinal))
-                ordinal += 1
+                let name = String(match.1)
+                inputDict[name] = inputDict[name] ?? Port(name: name, polarity: .input, from: 0, to: -1, at: { ordinal += 1; return ordinal }())
+                inputDict[name]!.to += 1
             }
         }
         
+        let inputs: [Port] = inputDict.values.sorted { $0.ordinal < $1.ordinal }
         var vectors: [TestVector] = []
         let testStr = File.read(file)!
         let tvRx = #/(\d+):\s*([01]+)/#

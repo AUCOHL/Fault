@@ -22,7 +22,6 @@ module spm #(parameter bits=32) (
     input x,
     input[bits-1: 0] a,
     output y,
-    output always_high,
 );
     wire[bits: 0] y_chain;
     assign y_chain[0] = 0;
@@ -43,8 +42,6 @@ module spm #(parameter bits=32) (
         .y_in(y_chain[bits-1:0]),
         .y_out(y_chain[bits:1])
     );
-    
-    assign always_high = 1'b1;
 
 endmodule
 

@@ -59,6 +59,28 @@
         "type": "github"
       }
     },
+    "libparse": {
+      "inputs": {
+        "nixpkgs": [
+          "nl2bench",
+          "nix-eda",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1713178934,
+        "narHash": "sha256-1w6HBBE2bWAD0GM98O8WZRmZDW9+EzD0KFvnnH2ho/k=",
+        "owner": "efabless",
+        "repo": "libparse-python",
+        "rev": "cec8b6dfd3d1c97bc5ccd1d0a41c44e51bc9c1eb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "efabless",
+        "repo": "libparse-python",
+        "type": "github"
+      }
+    },
     "nix-eda": {
       "inputs": {
         "nixpkgs": "nixpkgs"
@@ -69,6 +91,24 @@
         "owner": "efabless",
         "repo": "nix-eda",
         "rev": "90f2333a2dd634fa3462b6b23a8c99d4132d340e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "efabless",
+        "repo": "nix-eda",
+        "type": "github"
+      }
+    },
+    "nix-eda_2": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1719830786,
+        "narHash": "sha256-meVPi2d6TI44FjuqQc57Ve3UV1GP12uDVrRfHcACBdg=",
+        "owner": "efabless",
+        "repo": "nix-eda",
+        "rev": "8fd46e08259a761d5078c6c3b8b19dd58bb69e75",
         "type": "github"
       },
       "original": {
@@ -93,6 +133,41 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1717144377,
+        "narHash": "sha256-F/TKWETwB5RaR8owkPPi+SPJh83AQsm6KrQAlJ8v/uA=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "805a384895c696f802a9bf5bf4720f37385df547",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-24.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nl2bench": {
+      "inputs": {
+        "libparse": "libparse",
+        "nix-eda": "nix-eda_2"
+      },
+      "locked": {
+        "lastModified": 1721923472,
+        "narHash": "sha256-Rvjd/0WYNTVg1hF1ODK7KagXrs4eLP/mTZROA+psWag=",
+        "owner": "donn",
+        "repo": "nl2bench",
+        "rev": "4fc66fb534bff125d437f7807d1dd660a08ed03c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "donn",
+        "repo": "nl2bench",
+        "type": "github"
+      }
+    },
     "quaigh": {
       "inputs": {
         "cargo2nix": "cargo2nix",
@@ -102,15 +177,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1719607439,
+        "lastModified": 1721137344,
         "narHash": "sha256-ZRWbrI+HCpTZAbgTjqf4IWMuUspk++DI4DGeVTBNumQ=",
-        "owner": "donn",
+        "owner": "coloquinte",
         "repo": "quaigh",
-        "rev": "2253ddcfb8ba62683f1da54a54d06734126fb612",
+        "rev": "1b690ebece60a0181df7af22546f13427914cf82",
         "type": "github"
       },
       "original": {
-        "owner": "donn",
+        "owner": "coloquinte",
         "repo": "quaigh",
         "type": "github"
       }
@@ -118,6 +193,7 @@
     "root": {
       "inputs": {
         "nix-eda": "nix-eda",
+        "nl2bench": "nl2bench",
         "quaigh": "quaigh"
       }
     },

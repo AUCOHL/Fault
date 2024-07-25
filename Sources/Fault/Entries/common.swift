@@ -27,7 +27,7 @@ struct BypassOptions: ParsableArguments {
     var clock: String
     
     @Option(name: [.customLong("reset")], help: "Reset name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held low.")
-    var resetName: String
+    var resetName: String = "rst"
 
     @Flag(name: [.long, .customLong("activeLow")], help: "The reset signal is considered active-low insted, and will be held high during simulations.")
     var resetActiveLow: Bool = false
@@ -43,9 +43,9 @@ struct BypassOptions: ParsableArguments {
         for bypassed in bypassing {
             let split = bypassed.components(separatedBy: "=")
             if split.count == 1 {
-                result[bypassed] = .holdHigh
+                result[split[0]] = .holdHigh
             } else if split.count == 2 {
-                result[bypassed] = split[1] == "0" ? .holdLow : .holdHigh
+                result[split[0]] = split[1] == "0" ? .holdLow : .holdHigh
             }
         }
         return result

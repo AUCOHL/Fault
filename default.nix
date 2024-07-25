@@ -9,6 +9,7 @@
   yosys,
   verilog,
   quaigh,
+  nl2bench,
   ncurses,
   makeBinaryWrapper,
 }:
@@ -44,6 +45,7 @@ stdenv.mkDerivation (finalAttrs: {
     yosys
     verilog
     quaigh
+    nl2bench
   ];
   
   buildInputs = with swiftPackages; [

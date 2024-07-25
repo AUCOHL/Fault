@@ -197,16 +197,24 @@ extension Fault {
 
                 var faultPoints: Set<String> = []
                 var gateCount = 0
-                var inputsMinusIgnored: [Port] = []
-                if etvSetVectors.count == 0 {
-                    inputsMinusIgnored = inputs.filter {
-                        !bypass.bypassedInputs.contains($0.name)
+                var inputsMinusIgnored: [Port] = inputs.filter {
+                    !bypass.bypassedInputs.contains($0.name)
+                }
+                if etvSetVectors.count > 0 {
+                    var evtInputsMinusIgnored: [Port] = []
+                    var offset = 0
+                    for (i, input) in etvSetInputs.enumerated() {
+                        if bypass.bypassedInputs.contains(input.name) {
+                            for (j, _) in etvSetVectors.enumerated() {
+                                etvSetVectors[j].remove(at: i - offset)
+                            }
+                            offset += 1
+                        } else {
+                            evtInputsMinusIgnored.append(input)
+                        }
                     }
-                } else {
-                    etvSetInputs.sort { $0.ordinal < $1.ordinal }
-                    inputsMinusIgnored = etvSetInputs.filter {
-                        !bypass.bypassedInputs.contains($0.name)
-                    }
+                    assert(inputsMinusIgnored.count == evtInputsMinusIgnored.count);
+                    inputsMinusIgnored = evtInputsMinusIgnored
                 }
 
                 for (_, port) in ports {

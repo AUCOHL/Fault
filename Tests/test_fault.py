@@ -1,30 +1,28 @@
 import os
+import shlex
 import pytest
 import subprocess
 
 
 def run(label, steps):
     for i, step in enumerate(steps):
-        print(f"\n=== {label}: Step {i + 1}/6 ===\n")
-        subprocess.check_call(["swift", "run", "fault"] + step)
+        print(f"\n=== {label}: Step {i + 1}/{len(steps)} ===\n")
+        if step[0] == "nl2bench":
+            cmd = step
+        else:
+            cmd = ["swift", "run", "fault"] + step
+        print(f"$ {shlex.join(cmd)}")
+        subprocess.check_call(cmd)
 
 
 @pytest.mark.parametrize(
-    "liberty,models,config,atpg",
+    "liberty,models,config",
     [
         pytest.param(
             "Tech/osu035/osu035_stdcells.lib",
             "Tech/osu035/osu035_stdcells.v",
             "Tech/osu035/config.yml",
-            None,
             id="osu035",
-        ),
-        pytest.param(
-            "Tech/osu035/osu035_stdcells.lib",
-            "Tech/osu035/osu035_stdcells.v",
-            "Tech/osu035/config.yml",
-            "Quaigh",
-            id="osu035/quaigh",
         ),
         # (
         #     "Tech/sky130_fd_sc_hd/sky130_fd_sc_hd__trimmed.lib",
@@ -34,21 +32,68 @@ def run(label, steps):
         # ),
     ],
 )
-def test_spm(request, liberty, models, config, atpg):
-    fileName = "Tests/RTL/spm/spm.v"
-    topModule = "spm"
-    clock = "clk"
-    reset = "rst"
-
+@pytest.mark.parametrize("atpg", ["PRNG", "Quaigh"])
+@pytest.mark.parametrize(
+    "fileName,topModule,clock,reset,other_bypassed,activeLow",
+    [
+        pytest.param(
+            "Tests/RTL/spm/spm.v",
+            "spm",
+            "clk",
+            "rst",
+            [],
+            True,
+            id="spm",
+        ),
+        pytest.param(
+            "Benchmarks/ISCAS_89/s27.v",
+            "s27",
+            "CK",
+            "reset",
+            ["VDD=1", "GND=0"],
+            False,
+            id="s27",
+        ),
+        # pytest.param(
+        #     "Benchmarks/ISCAS_89/s344.v",
+        #     "s344",
+        #     "CK",
+        #     None,
+        #     ["VDD=1", "GND=0"],
+        #     False,
+        #     id="s344",
+        # ),
+    ],
+)
+def test_flat(
+    request,
+    liberty,
+    models,
+    config,
+    fileName,
+    topModule,
+    clock,
+    reset,
+    other_bypassed,
+    activeLow,
+    atpg,
+):
     base = os.path.splitext("Netlists/" + fileName)[0]
     fileSynth = base + ".nl.v"
     fileCut = base + ".cut.v"
     fileJson = base + ".tv.json"
+    fileBench = base + ".bench"
     fileChained = base + ".chained.v"
     fileAsmVec = base + ".tv.bin"
     fileAsmOut = base + ".au.bin"
 
-    bypassOptions = ["--clock", clock, "--reset", reset, "--activeLow"]
+    bypassOptions = ["--clock", clock] + (["--activeLow"] if activeLow else [])
+    if reset is not None:
+        bypassOptions.append("--reset")
+        bypassOptions.append(reset)
+    for bypassed in other_bypassed:
+        bypassOptions.append("--bypassing")
+        bypassOptions.append(bypassed)
 
     for file in [fileSynth, fileCut, fileJson, fileChained, fileAsmVec, fileAsmOut]:
         try:
@@ -56,13 +101,35 @@ def test_spm(request, liberty, models, config, atpg):
         except OSError:
             pass
 
+    atpg_options = []
+    if atpg != "PRNG":
+        atpg_options = ["-g", atpg, "-b", fileBench]
+
     run(
         request.node.name,
         [
             ["synth", "-l", liberty, "-t", topModule, "-o", fileSynth, fileName],
             ["cut", "-o", fileCut, "--sclConfig", config, fileSynth] + bypassOptions,
-            ["bench", fileCut, "--sclConfig", config, fileSynth] + bypassOptions,
-            ["-c", models, "-o", fileJson, fileCut] + bypassOptions,
+            [
+                "nl2bench",
+                "-o",
+                fileBench,
+                "-l",
+                liberty,
+                fileCut,
+            ],
+            [
+                "atpg",
+                "-c",
+                models,
+                "-o",
+                fileJson,
+                fileCut,
+                "--output-coverage-metadata",
+                base + f".{atpg}.coverage.yml",
+            ]
+            + bypassOptions
+            + atpg_options,
             [
                 "chain",
                 "-c",
