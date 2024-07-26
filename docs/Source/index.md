@@ -5,12 +5,7 @@ automatic test pattern generation (ATPG), scan stitching, static test vector
 compaction, and JTAG insertion. Fault generates test vectors pseudo-randomly and
 performs fault simulations using the stuck-at-fault model.
 
-<div align="center">
-<img src="https://user-images.githubusercontent.com/25064257/80364707-a6950280-8886-11ea-9fd6-d8dbbc689081.png">
-<p> Fault Design Flow. </p>
-</div>
-
-Fault is composed of seven main options:
+Fault is composed of five main options:
 
 ## 1. Synth
 
@@ -36,14 +31,14 @@ linear feedback shift register (LFSR).
 
 ATPG also optimizes the test vector set by eliminating redundant vectors.
 
-### 4. Chain
+## 4. Chain
 
 Chain performs scan-chain stitching. Using
 [Pyverilog](https://github.com/PyHDI/Pyverilog), a boundary scan chain is
 constructed through a netlist's input and output ports. An internal register
 chain is also constructed through the netlist's D-flip-flops.
 
-### 5. Tap
+## 5. Tap
 
 Tap adds the
 [JTAG interface](https://opencores.org/websvn/listing?repname=adv_debug_sys&path=%2Fadv_debug_sys%2Ftrunk%2FHardware%2Fjtag%2Ftap%2Fdoc%2F#path_adv_debug_sys_trunk_Hardware_jtag_tap_doc_)
