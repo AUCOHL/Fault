@@ -3,7 +3,7 @@
     nix-eda.url = github:efabless/nix-eda;
     nl2bench.url = github:donn/nl2bench;
     quaigh = {
-      url = github:coloquinte/quaigh;
+      url = github:donn/quaigh/fix_nix_linux;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";
     };
   };

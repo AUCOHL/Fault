@@ -177,15 +177,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1721137344,
-        "narHash": "sha256-ZRWbrI+HCpTZAbgTjqf4IWMuUspk++DI4DGeVTBNumQ=",
-        "owner": "coloquinte",
+        "lastModified": 1722000917,
+        "narHash": "sha256-OcvZO3l8CyjGpfIoR0nAMKqUQu8FPwY1dNX2vqopvrk=",
+        "owner": "donn",
         "repo": "quaigh",
-        "rev": "1b690ebece60a0181df7af22546f13427914cf82",
+        "rev": "cfad5cae30496b1ad49e58118d4649e2aac20935",
         "type": "github"
       },
       "original": {
-        "owner": "coloquinte",
+        "owner": "donn",
+        "ref": "fix_nix_linux",
         "repo": "quaigh",
         "type": "github"
       }

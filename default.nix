@@ -23,7 +23,6 @@ stdenv.mkDerivation (finalAttrs: {
 	
 	src = nix-gitignore.gitignoreSourcePure ./.gitignore ./.;
   
-  nativeBuildInputs = [ swift swiftpm makeBinaryWrapper ];
 	swiftpmFlags = [
     "--verbose"
   ];
@@ -39,6 +38,12 @@ stdenv.mkDerivation (finalAttrs: {
   #   "-Xswiftc"
   #   "x86_64-apple-macosx11"
   # ];
+  nativeBuildInputs = [ swift swiftpm makeBinaryWrapper ];
+  
+  buildInputs = with swiftPackages; [
+    Foundation
+    XCTest
+  ] ++ lib.lists.optional (!stdenv.isDarwin) [Dispatch];
   
   propagatedBuildInputs = [
     pyenv
@@ -48,10 +53,9 @@ stdenv.mkDerivation (finalAttrs: {
     nl2bench
   ];
   
-  buildInputs = with swiftPackages; [
-    Foundation
-    XCTest
-  ] ++ lib.lists.optional (!stdenv.isDarwin) [Dispatch];
+  nativeCheckInputs = with python3.pkgs; [
+    pytest
+  ];
   
   configurePhase = generated.configure;
 
@@ -66,9 +70,9 @@ stdenv.mkDerivation (finalAttrs: {
     export LD_LIBRARY_PATH=${swiftPackages.Dispatch}/lib:$LD_LIBRARY_PATH
   '';
   
-  doCheck = !swiftPackages.stdenv.isDarwin;
+  doCheck = true;
   
-  preCheck = ''
+  faultEnv = ''
     export PYTHONPATH=${pyenv}/${pyenv.sitePackages}
     export PATH=${verilog}/bin:$PATH
     export PATH=${yosys}/bin:$PATH
@@ -77,9 +81,8 @@ stdenv.mkDerivation (finalAttrs: {
   '';
   
   checkPhase = ''
-    ${finalAttrs.preCheck}
-    echo $PATH
-    swift test
+    ${finalAttrs.faultEnv}
+    PYTEST_FAULT_BIN="$(swiftpmBinPath)/fault" pytest
   '';
   
   fixupPhase = ''
@@ -98,5 +101,5 @@ stdenv.mkDerivation (finalAttrs: {
     platforms = platforms.linux ++ platforms.darwin;
   };
   
-  shellHook = finalAttrs.preCheck + finalAttrs.preBuild;
+  shellHook = finalAttrs.faultEnv + finalAttrs.preBuild;
 })
