@@ -14,6 +14,11 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            extra-substituters = https://openlane.cachix.org
+            extra-trusted-public-keys = openlane.cachix.org-1:qqdwh+QMNGmZAuyeQJTH9ErW57OWSvdtuwfBKdS254E=
+      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build
   push_to_pypi:
     name: Build
