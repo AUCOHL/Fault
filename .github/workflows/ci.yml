@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Test/Nix
-    runs-on: ubuntu-24.04
+    runs-on: macos-14
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v3

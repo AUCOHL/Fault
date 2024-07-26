@@ -10,7 +10,7 @@ def run(label, steps):
         if step[0] == "nl2bench":
             cmd = step
         else:
-            cmd = shlex.split(os.getenv("PYTEST_FAULT_BIN", "swift run Fault")) + step
+            cmd = shlex.split(os.getenv("PYTEST_FAULT_BIN", "swift run fault")) + step
         print(f"$ {shlex.join(cmd)}")
         subprocess.check_call(cmd)
 

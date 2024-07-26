@@ -44,9 +44,6 @@ extension Fault {
         @Option(name: [.short, .long], help: ".bin file for golden output. Required iff testVectors is provided.")
         var goldenOutput: String?
         
-        @Option(name: [.short, .long], help: "Inputs to ignore. May be specified multiple times.")
-        var ignoring: [String] = []
-        
         @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
         var blackboxModels: [String] = []
 
