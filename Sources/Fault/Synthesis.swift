@@ -70,8 +70,9 @@ enum Synthesis {
         # names
         # autoname
 
-        write_verilog -noexpr \(output)+attrs
-        write_verilog -noexpr -noattr \(output)
+        write_verilog -noexpr -nohex -nodec -defparam \(output)+attrs
+        write_verilog -noexpr -noattr -noexpr -nohex -nodec -defparam \(output)
+        # write_blif -gates -unbuf DFFSR D Q \(output).blif
         """
     }
 }

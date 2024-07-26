@@ -245,15 +245,7 @@ class Atalanta: ExternalTestVectorGenerator {
     required init() {}
 
     func generate(file: String, module: String) -> ([TestVector], [Port]) {
-        let tempDir = "\(NSTemporaryDirectory())"
-
-        let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        try? FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
-        defer {
-            try? FileManager.default.removeItem(atPath: folderName)
-        }
-
-        let output = "\(folderName)/\(module).test"
+        let output = file.replacingExtension(".bench", with: ".test")
         let atalanta = "atalanta -t \(output) \(file)".sh()
 
         if atalanta != EX_OK {
@@ -261,7 +253,7 @@ class Atalanta: ExternalTestVectorGenerator {
         }
 
         do {
-            let (testvectors, inputs) = try TVSet.readFromTest(file: output)
+            let (testvectors, inputs) = try TVSet.readFromTest(output, withInputsFrom: file)
             return (vectors: testvectors, inputs: inputs)
         } catch {
             Stderr.print("Internal software error: \(error)")
@@ -270,6 +262,29 @@ class Atalanta: ExternalTestVectorGenerator {
     }
 
     static let registered = ETVGFactory.register(name: "Atalanta", type: Atalanta.self)
+}
+
+class Quaigh: ExternalTestVectorGenerator {
+    required init() {}
+
+    func generate(file: String, module: String) -> ([TestVector], [Port]) {
+        let output = file.replacingExtension(".bench", with: ".test")
+        let quaigh = "quaigh atpg \(file) -o \(output)".sh()
+
+        if quaigh != EX_OK {
+            exit(quaigh)
+        }
+
+        do {
+            let (testvectors, inputs) = try TVSet.readFromTest(output, withInputsFrom: file)
+            return (vectors: testvectors, inputs: inputs)
+        } catch {
+            Stderr.print("Internal software error: \(error)")
+            exit(EX_SOFTWARE)
+        }
+    }
+
+    static let registered = ETVGFactory.register(name: "Quaigh", type: Quaigh.self)
 }
 
 class PODEM: ExternalTestVectorGenerator {
@@ -285,7 +300,7 @@ class PODEM: ExternalTestVectorGenerator {
         }
 
         let output = "\(folderName)/\(module).out"
-        let podem = "atpg -output \(output) \(file) > /dev/null 2>&1".sh()
+        let podem = "atpg-podem -output \(output) \(file) > /dev/null 2>&1".sh()
 
         if podem != EX_OK {
             exit(podem)

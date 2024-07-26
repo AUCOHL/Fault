@@ -15,6 +15,7 @@
 import BigInt
 import Defile
 import Foundation
+import Collections
 
 typealias TestVector = [BigUInt]
 
@@ -123,92 +124,40 @@ enum TVSet {
         return (vectors: vectors, inputs: inputs)
     }
 
-    static func readFromTest(file: String) throws -> ([TestVector], [Port]) {
+    static func readFromTest(_ file: String, withInputsFrom bench: String) throws -> ([TestVector], [Port]) {
+        var inputDict: OrderedDictionary<String, Port> = [:]
+        let benchStr = File.read(bench)!
+        let inputRx = #/INPUT\(([^\(\)]+?)(\[\d+\])?\)/#
+        var ordinal = -1
+        for line in benchStr.components(separatedBy: "\n") {
+            if let match = try? inputRx.firstMatch(in: line) {
+                let name = String(match.1)
+                inputDict[name] = inputDict[name] ?? Port(name: name, polarity: .input, from: 0, to: -1, at: { ordinal += 1; return ordinal }())
+                inputDict[name]!.to += 1
+            }
+        }
+        
+        let inputs: [Port] = inputDict.values.sorted { $0.ordinal < $1.ordinal }
         var vectors: [TestVector] = []
-        var inputs: [Port] = []
-        do {
-            let string = try String(contentsOf: URL(fileURLWithPath: file), encoding: .utf8)
-
-            let inputPattern = "(?s)(?<=\\* Primary inputs :).*?(?=\\* Primary outputs:)"
-            let tvPattern = "(?s)(?<=: ).*?(?= [0-1]*)"
-            let multibitPattern = "(?<name>.*).{1}(?<=\\[)(?<bit>[0-9]+)(?=\\])"
-
-            var inputResult = ""
-            if let range = string.range(of: inputPattern, options: .regularExpression) {
-                inputResult = String(string[range])
-                inputResult = inputResult.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-
-            let ports = inputResult.components(separatedBy: " ")
-            let multiBitRegex = try NSRegularExpression(pattern: multibitPattern)
-
-            var multiBitPorts: [String: Port] = [:]
-            var portName = "", bitNumber = 0
-
-            var count = 0
-            for port in ports {
-                if !port.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if let match = multiBitRegex.firstMatch(in: port, options: [], range: NSRange(location: 0, length: port.utf16.count)) {
-                        if let nameRange = Range(match.range(at: 1), in: port) {
-                            portName = String(port[nameRange])
-                            let exists = multiBitPorts[portName] != nil
-                            if !exists {
-                                multiBitPorts[portName] = Port(name: portName, at: count)
-                                multiBitPorts[portName]!.from = 0
-                            }
-                        }
-                        if let bitRange = Range(match.range(at: 2), in: port) {
-                            bitNumber = Int(port[bitRange])!
-                            multiBitPorts[portName]!.to = bitNumber
-                        }
-                    } else {
-                        inputs.append(Port(name: port, at: count))
-                    }
-                    count += 1
+        let testStr = File.read(file)!
+        let tvRx = #/(\d+):\s*([01]+)/#
+        for line in testStr.components(separatedBy: "\n") {
+            if let match = try? tvRx.firstMatch(in: line) {
+                let vectorStr = match.2
+                guard var vectorCat = BigUInt(String(vectorStr.reversed()), radix: 2) else {
+                    Stderr.print("Failed to parse test vector in .test file: \(vectorStr)")
+                    exit(EX_DATAERR)
                 }
-            }
-
-            var vectorSlices: [Range<Int>] = []
-            for port in multiBitPorts.values {
-                inputs.append(port)
-                vectorSlices.append(port.ordinal ..< (port.to + port.ordinal) + 1)
-            }
-            vectorSlices.sort { $0.lowerBound < $1.lowerBound }
-
-            let vectorRegex = try NSRegularExpression(pattern: tvPattern)
-            let range = NSRange(string.startIndex..., in: string)
-            let results = vectorRegex.matches(in: string, range: range)
-            let matches = results.map { String(string[Range($0.range, in: string)!]) }
-
-            inputs.sort { $0.ordinal < $1.ordinal }
-
-            for match in matches {
-                let vector = Array(match)
-                if vector.count != 0 {
-                    var testVector: TestVector = []
-                    var start = 0
-                    for slice in vectorSlices {
-                        let lowerVec = vector[start ..< slice.lowerBound].map { BigUInt(String($0), radix: 2)! }
-                        if lowerVec.count != 0 {
-                            testVector.append(contentsOf: lowerVec)
-                        }
-                        let middleVec = BigUInt(String(vector[slice]), radix: 2)!
-                        testVector.append(middleVec)
-
-                        start = slice.upperBound
-                    }
-
-                    if start < vector.count {
-                        let remVector = vector[start...].map { BigUInt(String($0), radix: 2)! }
-                        testVector.append(contentsOf: remVector)
-                    }
-                    vectors.append(testVector)
+                let tv: TestVector = inputs.map {
+                    input in
+                    let value = vectorCat & ((1 << input.width) - 1)
+                    vectorCat >>= input.width
+                    return value
                 }
+                vectors.append(tv)
             }
-        } catch {
-            exit(EX_DATAERR)
         }
 
-        return (vectos: vectors, inputs: inputs)
+        return (vectors: vectors, inputs: inputs)
     }
 }

@@ -24,13 +24,7 @@ be skipped if the user wants to run their own synthesis script.
 Cut removes the flip flops from the flatten netlist and converts it into a pure
 combinational design.
 
-## 3. Bench
-
-Bench converts a flatten netlist to the ISCAS bench format by mapping the
-netlist cells to primitive gates. This option is needed only, if atalanta is set
-as the test vector generator in the Main option.
-
-## 4. ATPG
+## 3. ATPG
 
 ATPG is the main event. It runs Fault simulations for a generated test vector
 set using the stuck-at fault model. The test vector set could be supplied to the
@@ -40,18 +34,16 @@ number generator or by using [Atalanta](https://github.com/hsluoyz/Atalanta).
 Fault supports two random number generators Swift system default generator and a
 linear feedback shift register (LFSR).
 
-### 5. Compact
+ATPG also optimizes the test vector set by eliminating redundant vectors.
 
-Compact performs static test vector compaction on the generated test vector set.
-
-### 6. Chain
+### 4. Chain
 
 Chain performs scan-chain stitching. Using
 [Pyverilog](https://github.com/PyHDI/Pyverilog), a boundary scan chain is
 constructed through a netlist's input and output ports. An internal register
 chain is also constructed through the netlist's D-flip-flops.
 
-### 7. Tap
+### 5. Tap
 
 Tap adds the
 [JTAG interface](https://opencores.org/websvn/listing?repname=adv_debug_sys&path=%2Fadv_debug_sys%2Ftrunk%2FHardware%2Fjtag%2Ftap%2Fdoc%2F#path_adv_debug_sys_trunk_Hardware_jtag_tap_doc_)

@@ -26,10 +26,10 @@ extension Fault {
             abstract: "Assemble test vectors and golden outputs from JSON and Verilog files."
         )
         
-        @Option(name: [.customShort("o"), .long], help: "Path to the output vector file. (Default: <json input> + .vec.bin)")
+        @Option(name: [.customShort("o"), .long], help: "Path to the output vector file.")
         var output: String?
         
-        @Option(name: [.customShort("O"), .long], help: "Path to the golden output file. (Default: <json input> + .out.bin)")
+        @Option(name: [.customShort("O"), .long], help: "Path to the golden output file.")
         var goldenOutput: String?
         
         @Argument(help: "JSON file (.json).")
@@ -47,11 +47,10 @@ extension Fault {
                 throw ValidationError("JSON file '\(json)' not found.")
             }
             
-            let vectorOutput = output ?? "\(json).vec.bin"
-            let goldenOutput = goldenOutput ?? "\(json).out.bin"
+            let vectorOutput = output ?? json.replacingExtension(".json", with: ".bin")
+            let goldenOutput = goldenOutput ?? json.replacingExtension(".tv.json", with: ".au.bin")
             
             print("Loading JSON data…")
-            let start = DispatchTime.now()
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: json)) else {
                 throw ValidationError("Failed to open test vector JSON file.")
             }
@@ -60,10 +59,6 @@ extension Fault {
             guard let tvinfo = try? decoder.decode(TVInfo.self, from: data) else {
                 throw ValidationError("Test vector JSON file is invalid.")
             }
-            let end = DispatchTime.now()
-            let nanoTime = end.uptimeNanoseconds - start.uptimeNanoseconds
-            let timeInterval = Double(nanoTime) / 1_000_000_000
-            print("Loaded JSON data in \(timeInterval)s.")
             
             // Extract chain metadata
             let (chain, _, _) = ChainMetadata.extract(file: verilog)
@@ -80,7 +75,7 @@ extension Fault {
             // Check input order
             let chainOrder = order.filter { $0.kind != .bypassInput }
             guard chainOrder.count == jsInputOrder.count else {
-                throw ValidationError("Number of inputs in the JSON (\(jsInputOrder.count)) does not match scan-chain registers (\(chainOrder.count)).")
+                throw ValidationError("Number of inputs in the test-vector JSON file (\(jsInputOrder.count)) does not match scan-chain registers (\(chainOrder.count)): Found \(Set(chainOrder.map { $0.name }).symmetricDifference(jsInputOrder.map { $0.name })).")
             }
             
             for (i, input) in jsInputOrder.enumerated() {
@@ -93,7 +88,7 @@ extension Fault {
             
             for (i, output) in jsOutputOrder.enumerated() {
                 var name = output.name.hasPrefix("\\") ? String(output.name.dropFirst()) : output.name
-                name = name.hasSuffix(".q") ? String(name.dropLast(2)) : name
+                name = name.hasSuffix(".d") ? String(name.dropLast(2)) : name
                 outputMap[name] = i
             }
             

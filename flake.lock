@@ -59,6 +59,28 @@
         "type": "github"
       }
     },
+    "libparse": {
+      "inputs": {
+        "nixpkgs": [
+          "nl2bench",
+          "nix-eda",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1713178934,
+        "narHash": "sha256-1w6HBBE2bWAD0GM98O8WZRmZDW9+EzD0KFvnnH2ho/k=",
+        "owner": "efabless",
+        "repo": "libparse-python",
+        "rev": "cec8b6dfd3d1c97bc5ccd1d0a41c44e51bc9c1eb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "efabless",
+        "repo": "libparse-python",
+        "type": "github"
+      }
+    },
     "nix-eda": {
       "inputs": {
         "nixpkgs": "nixpkgs"
@@ -93,6 +115,27 @@
         "type": "github"
       }
     },
+    "nl2bench": {
+      "inputs": {
+        "libparse": "libparse",
+        "nix-eda": [
+          "nix-eda"
+        ]
+      },
+      "locked": {
+        "lastModified": 1721923472,
+        "narHash": "sha256-Rvjd/0WYNTVg1hF1ODK7KagXrs4eLP/mTZROA+psWag=",
+        "owner": "donn",
+        "repo": "nl2bench",
+        "rev": "4fc66fb534bff125d437f7807d1dd660a08ed03c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "donn",
+        "repo": "nl2bench",
+        "type": "github"
+      }
+    },
     "quaigh": {
       "inputs": {
         "cargo2nix": "cargo2nix",
@@ -102,15 +145,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1719607439,
-        "narHash": "sha256-ZRWbrI+HCpTZAbgTjqf4IWMuUspk++DI4DGeVTBNumQ=",
+        "lastModified": 1722015420,
+        "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
         "owner": "donn",
         "repo": "quaigh",
-        "rev": "2253ddcfb8ba62683f1da54a54d06734126fb612",
+        "rev": "39b14e2d3e45b5e04338cf22adeede35dddc3dd6",
         "type": "github"
       },
       "original": {
         "owner": "donn",
+        "ref": "fix_nix_linux",
         "repo": "quaigh",
         "type": "github"
       }
@@ -118,6 +162,7 @@
     "root": {
       "inputs": {
         "nix-eda": "nix-eda",
+        "nl2bench": "nl2bench",
         "quaigh": "quaigh"
       }
     },

@@ -9,6 +9,7 @@
   yosys,
   verilog,
   quaigh,
+  nl2bench,
   ncurses,
   makeBinaryWrapper,
 }:
@@ -22,7 +23,6 @@ stdenv.mkDerivation (finalAttrs: {
 	
 	src = nix-gitignore.gitignoreSourcePure ./.gitignore ./.;
   
-  nativeBuildInputs = [ swift swiftpm makeBinaryWrapper ];
 	swiftpmFlags = [
     "--verbose"
   ];
@@ -38,25 +38,31 @@ stdenv.mkDerivation (finalAttrs: {
   #   "-Xswiftc"
   #   "x86_64-apple-macosx11"
   # ];
-  
-  propagatedBuildInputs = [
-    pyenv
-    yosys
-    verilog
-    quaigh
-  ];
+  nativeBuildInputs = [ swift swiftpm makeBinaryWrapper ];
   
   buildInputs = with swiftPackages; [
     Foundation
     XCTest
   ] ++ lib.lists.optional (!stdenv.isDarwin) [Dispatch];
   
+  propagatedBuildInputs = [
+    pyenv
+    yosys
+    verilog
+    quaigh
+    nl2bench
+  ];
+  
+  nativeCheckInputs = with python3.pkgs; [
+    pytest
+  ];
+  
   configurePhase = generated.configure;
 
   installPhase = ''
     binPath="$(swiftpmBinPath)"
     mkdir -p $out/bin
-    cp $binPath/Fault $out/bin/fault
+    cp $binPath/fault $out/bin/fault
   '';
   
   # This doesn't work on Linux otherwise and I don't know why.
@@ -64,9 +70,9 @@ stdenv.mkDerivation (finalAttrs: {
     export LD_LIBRARY_PATH=${swiftPackages.Dispatch}/lib:$LD_LIBRARY_PATH
   '';
   
-  doCheck = !swiftPackages.stdenv.isDarwin;
+  doCheck = true;
   
-  preCheck = ''
+  faultEnv = ''
     export PYTHONPATH=${pyenv}/${pyenv.sitePackages}
     export PATH=${verilog}/bin:$PATH
     export PATH=${yosys}/bin:$PATH
@@ -75,9 +81,8 @@ stdenv.mkDerivation (finalAttrs: {
   '';
   
   checkPhase = ''
-    ${finalAttrs.preCheck}
-    echo $PATH
-    swift test
+    ${finalAttrs.faultEnv}
+    PYTEST_FAULT_BIN="$(swiftpmBinPath)/fault" pytest
   '';
   
   fixupPhase = ''
@@ -96,5 +101,5 @@ stdenv.mkDerivation (finalAttrs: {
     platforms = platforms.linux ++ platforms.darwin;
   };
   
-  shellHook = finalAttrs.preCheck + finalAttrs.preBuild;
+  shellHook = finalAttrs.faultEnv + finalAttrs.preBuild;
 })

@@ -147,7 +147,7 @@ struct Port: Codable {
 
 extension Port: CustomStringConvertible {
     var description: String {
-        "Port(\(name): \(polarity ?? .unknown)[\(from)..\(to)])"
+        "Port@\(ordinal)(\(name): \(polarity ?? .unknown)[\(from)..\(to)])"
     }
 }
 
