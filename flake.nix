@@ -1,7 +1,10 @@
 {
   inputs = {
     nix-eda.url = github:efabless/nix-eda;
-    nl2bench.url = github:donn/nl2bench;
+    nl2bench = {
+      url = github:donn/nl2bench;
+      inputs.nix-eda.follows = "nix-eda";
+    };
     quaigh = {
       url = github:donn/quaigh/fix_nix_linux;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";

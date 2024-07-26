@@ -99,41 +99,7 @@
         "type": "github"
       }
     },
-    "nix-eda_2": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_2"
-      },
-      "locked": {
-        "lastModified": 1719830786,
-        "narHash": "sha256-meVPi2d6TI44FjuqQc57Ve3UV1GP12uDVrRfHcACBdg=",
-        "owner": "efabless",
-        "repo": "nix-eda",
-        "rev": "8fd46e08259a761d5078c6c3b8b19dd58bb69e75",
-        "type": "github"
-      },
-      "original": {
-        "owner": "efabless",
-        "repo": "nix-eda",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
-      "locked": {
-        "lastModified": 1717144377,
-        "narHash": "sha256-F/TKWETwB5RaR8owkPPi+SPJh83AQsm6KrQAlJ8v/uA=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "805a384895c696f802a9bf5bf4720f37385df547",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "nixos-24.05",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
       "locked": {
         "lastModified": 1717144377,
         "narHash": "sha256-F/TKWETwB5RaR8owkPPi+SPJh83AQsm6KrQAlJ8v/uA=",
@@ -152,7 +118,9 @@
     "nl2bench": {
       "inputs": {
         "libparse": "libparse",
-        "nix-eda": "nix-eda_2"
+        "nix-eda": [
+          "nix-eda"
+        ]
       },
       "locked": {
         "lastModified": 1721923472,
@@ -177,11 +145,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1722000917,
-        "narHash": "sha256-OcvZO3l8CyjGpfIoR0nAMKqUQu8FPwY1dNX2vqopvrk=",
+        "lastModified": 1722015420,
+        "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
         "owner": "donn",
         "repo": "quaigh",
-        "rev": "cfad5cae30496b1ad49e58118d4649e2aac20935",
+        "rev": "39b14e2d3e45b5e04338cf22adeede35dddc3dd6",
         "type": "github"
       },
       "original": {
