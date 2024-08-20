@@ -58,12 +58,6 @@ stdenv.mkDerivation (finalAttrs: {
   ];
   
   configurePhase = generated.configure;
-
-  installPhase = ''
-    binPath="$(swiftpmBinPath)"
-    mkdir -p $out/bin
-    cp $binPath/fault $out/bin/fault
-  '';
   
   # This doesn't work on Linux otherwise and I don't know why.
   preBuild = if stdenv.isDarwin then "" else ''
@@ -81,17 +75,31 @@ stdenv.mkDerivation (finalAttrs: {
   '';
   
   checkPhase = ''
+    runHook preCheck
     ${finalAttrs.faultEnv}
     PYTEST_FAULT_BIN="$(swiftpmBinPath)/fault" pytest
+    runHook postCheck
+  '';
+
+  installPhase = ''
+    runHook preInstall
+    binPath="$(swiftpmBinPath)"
+    mkdir -p $out/bin
+    cp $binPath/fault $out/bin/fault
+    ln -s ${nl2bench}/bin/nl2bench $out/bin/nl2bench
+    runHook postInstall
   '';
   
   fixupPhase = ''
+    runHook preFixup
     wrapProgram $out/bin/fault\
       --prefix PYTHONPATH : ${pyenv}/${pyenv.sitePackages}\
       --prefix PATH : ${verilog}/bin\
+      --prefix PATH : ${quaigh}/bin\
       --prefix PATH : ${yosys}/bin\
       --set PYTHON_LIBRARY ${pyenv}/lib/lib${pyenv.libPrefix}${swiftPackages.stdenv.hostPlatform.extensions.sharedLibrary}\
       --set FAULT_IVL_BASE ${verilog}/lib/ivl
+    runHook postFixup
   '';
   
   meta = with lib; {

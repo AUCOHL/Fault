@@ -14,8 +14,8 @@ and system configuration.
 To install Nix, follow OpenLane 2's Nix installation guide at
 https://openlane2.readthedocs.io/en/stable/getting_started/common/nix_installation/index.html.
 
-Afterwards, running Fault is simply `nix run github:AUCOHL/Fault`. To make
-the `fault` command available in path, you can
+Afterwards, to make the `fault` command (and the requisite `nl2bench` tool for
+using alternative ATPGs) available in PATH, you can simply invoke
 `nix profile install github:AUCOHL/Fault`.
 
 ## Docker

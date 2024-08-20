@@ -155,8 +155,12 @@ extension Fault {
                 print("Read \(etvSetVectors.count) externally-generated vectors to verify.")
             }
 
-            if let tvGenerator = etvGen, ETVGFactory.validNames.contains(tvGenerator) {
-                let etvgen = ETVGFactory.get(name: tvGenerator)!
+            if let tvGenerator = etvGen {
+                guard let etvgen = ETVGFactory.get(name: tvGenerator) else {
+                    Stderr.print("Unknown external test vector generator '\(tvGenerator)'.")
+                    Foundation.exit(EX_USAGE)
+                }
+                
                 let benchUnwrapped = bench! // Program exits if etvGen.value isn't nil and bench.value is or vice versa
 
                 if !fileManager.fileExists(atPath: benchUnwrapped) {
