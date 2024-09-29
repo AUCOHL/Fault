@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-module aes128(clk, state, key, out);
+module aes128(clk, state, key, out, reset);
     input          clk;
+    input reset;
     input  [127:0] state, key;
     output [127:0] out;
     reg    [127:0] s0, k0;

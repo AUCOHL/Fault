@@ -217,6 +217,8 @@ extension Fault {
                             evtInputsMinusIgnored.append(input)
                         }
                     }
+                    print(inputsMinusIgnored);
+                    print(evtInputsMinusIgnored);
                     assert(inputsMinusIgnored.count == evtInputsMinusIgnored.count);
                     inputsMinusIgnored = evtInputsMinusIgnored
                 }

@@ -36,6 +36,7 @@ enum Synthesis {
 
         # check design hierarchy
         hierarchy \(checkHierarchy ? "-check" : "") -top \(module)
+        flatten;
 
         # translate processes (always blocks)
         proc; \(opt)
@@ -60,6 +61,7 @@ enum Synthesis {
 
         # mapping logic to mycells.lib
         abc -liberty \(libertyFile)
+        splitnets -ports
 
         # print gate count
         stat

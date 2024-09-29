@@ -38,6 +38,7 @@ _ = [ // Register all TVGens
     Atalanta.registered,
     Quaigh.registered,
     PODEM.registered,
+    PodemQuest.registered,
 ]
 
 let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
