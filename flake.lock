@@ -242,15 +242,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1719607439,
-        "narHash": "sha256-ZRWbrI+HCpTZAbgTjqf4IWMuUspk++DI4DGeVTBNumQ=",
-        "owner": "donn",
+        "lastModified": 1722162293,
+        "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
+        "owner": "coloquinte",
         "repo": "quaigh",
-        "rev": "2253ddcfb8ba62683f1da54a54d06734126fb612",
+        "rev": "2fec998178d4e48c5379dd0a2025f8688797f99a",
         "type": "github"
       },
       "original": {
-        "owner": "donn",
+        "owner": "coloquinte",
         "repo": "quaigh",
         "type": "github"
       }

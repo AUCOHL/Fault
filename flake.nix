@@ -6,7 +6,7 @@
       inputs.nix-eda.follows = "nix-eda";
     };
     quaigh = {
-      url = github:donn/quaigh;
+      url = github:coloquinte/quaigh;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";
     };
   };
