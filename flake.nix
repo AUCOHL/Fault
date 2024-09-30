@@ -2,11 +2,11 @@
   inputs = {
     nix-eda.url = github:efabless/nix-eda;
     nl2bench = {
-      url = github:donn/nl2bench/dirtiest_workaround_imaginable;
+      url = github:donn/nl2bench/pyosys;
       inputs.nix-eda.follows = "nix-eda";
     };
     quaigh = {
-      url = github:donn/quaigh/fix_nix_linux;
+      url = github:donn/quaigh;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";
     };
   };

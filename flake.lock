@@ -5,10 +5,36 @@
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
         "nixpkgs": [
+          "nl2bench",
           "quaigh",
           "nixpkgs"
         ],
         "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1705129117,
+        "narHash": "sha256-LgdDHibvimzYhxBK3kxCk2gAL7k4Hyigl5KI0X9cijA=",
+        "owner": "cargo2nix",
+        "repo": "cargo2nix",
+        "rev": "ae19a9e1f8f0880c088ea155ab66cee1fa001f59",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cargo2nix",
+        "ref": "release-0.11.0",
+        "repo": "cargo2nix",
+        "type": "github"
+      }
+    },
+    "cargo2nix_2": {
+      "inputs": {
+        "flake-compat": "flake-compat_2",
+        "flake-utils": "flake-utils_2",
+        "nixpkgs": [
+          "quaigh",
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay_2"
       },
       "locked": {
         "lastModified": 1705129117,
@@ -41,9 +67,43 @@
         "type": "github"
       }
     },
+    "flake-compat_2": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696426674,
+        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1694529238,
+        "narHash": "sha256-zsNZZGTGnMOf9YpHKJqMSsa0dXbfmxeoJ7xHlrt+xmY=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "ff7b65b44d01cf9ba6a71320833626af21126384",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems_2"
       },
       "locked": {
         "lastModified": 1694529238,
@@ -86,11 +146,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1718284527,
-        "narHash": "sha256-J3Enh0VOQO9kW9xjSJmCly/6K4Jma8UL/LrCJd1/tP8=",
+        "lastModified": 1727685714,
+        "narHash": "sha256-WI7eCVT8fp4k6Iizky0UeFr/3vPnOat1P1gr+tLufRk=",
         "owner": "efabless",
         "repo": "nix-eda",
-        "rev": "90f2333a2dd634fa3462b6b23a8c99d4132d340e",
+        "rev": "3fc4884a62cd3b62230ee90b9687f5aaebe98543",
         "type": "github"
       },
       "original": {
@@ -115,24 +175,41 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1717144377,
+        "narHash": "sha256-F/TKWETwB5RaR8owkPPi+SPJh83AQsm6KrQAlJ8v/uA=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "805a384895c696f802a9bf5bf4720f37385df547",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-24.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nl2bench": {
       "inputs": {
         "libparse": "libparse",
         "nix-eda": [
           "nix-eda"
-        ]
+        ],
+        "quaigh": "quaigh"
       },
       "locked": {
-        "lastModified": 1727023453,
-        "narHash": "sha256-dh7gV/vRmTFrG1sbVLewq3tieSonn8uHMgFHdasep+g=",
+        "lastModified": 1727695229,
+        "narHash": "sha256-WZUPoPKAilBWRfnRifMzwEXJePFuc2imN2XUNkGklRI=",
         "owner": "donn",
         "repo": "nl2bench",
-        "rev": "42f08f65b35c286af42478b5ce3efd68e559b60e",
+        "rev": "179d8dfdf7c0843a54fbadaeed007586525e1d77",
         "type": "github"
       },
       "original": {
         "owner": "donn",
-        "ref": "dirtiest_workaround_imaginable",
+        "ref": "pyosys",
         "repo": "nl2bench",
         "type": "github"
       }
@@ -140,22 +217,40 @@
     "quaigh": {
       "inputs": {
         "cargo2nix": "cargo2nix",
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1722162293,
+        "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
+        "owner": "coloquinte",
+        "repo": "quaigh",
+        "rev": "2fec998178d4e48c5379dd0a2025f8688797f99a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "coloquinte",
+        "repo": "quaigh",
+        "type": "github"
+      }
+    },
+    "quaigh_2": {
+      "inputs": {
+        "cargo2nix": "cargo2nix_2",
         "nixpkgs": [
           "nix-eda",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1722015420,
-        "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
+        "lastModified": 1719607439,
+        "narHash": "sha256-ZRWbrI+HCpTZAbgTjqf4IWMuUspk++DI4DGeVTBNumQ=",
         "owner": "donn",
         "repo": "quaigh",
-        "rev": "39b14e2d3e45b5e04338cf22adeede35dddc3dd6",
+        "rev": "2253ddcfb8ba62683f1da54a54d06734126fb612",
         "type": "github"
       },
       "original": {
         "owner": "donn",
-        "ref": "fix_nix_linux",
         "repo": "quaigh",
         "type": "github"
       }
@@ -164,10 +259,39 @@
       "inputs": {
         "nix-eda": "nix-eda",
         "nl2bench": "nl2bench",
-        "quaigh": "quaigh"
+        "quaigh": "quaigh_2"
       }
     },
     "rust-overlay": {
+      "inputs": {
+        "flake-utils": [
+          "nl2bench",
+          "quaigh",
+          "cargo2nix",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nl2bench",
+          "quaigh",
+          "cargo2nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1705112162,
+        "narHash": "sha256-IAM0+Uijh/fwlfoeDrOwau9MxcZW3zeDoUHc6Z3xfqM=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "9e0af26ffe52bf955ad5575888f093e41fba0104",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
       "inputs": {
         "flake-utils": [
           "quaigh",
@@ -195,6 +319,21 @@
       }
     },
     "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "systems_2": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
