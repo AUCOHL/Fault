@@ -2,11 +2,11 @@
   inputs = {
     nix-eda.url = github:efabless/nix-eda;
     nl2bench = {
-      url = github:donn/nl2bench;
+      url = github:donn/nl2bench/pyosys;
       inputs.nix-eda.follows = "nix-eda";
     };
     quaigh = {
-      url = github:donn/quaigh/fix_nix_linux;
+      url = github:coloquinte/quaigh;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";
     };
   };
@@ -21,7 +21,7 @@
     
     devShells = nix-eda.forAllSystems { withInputs = [nix-eda quaigh nl2bench self]; } (util: with util; rec {
       mac-testing = pkgs.stdenvNoCC.mkDerivation (with pkgs; let
-        pyenv = (python3.withPackages(ps: with ps; [pyverilog pyyaml pytest]));
+        pyenv = (python3.withPackages(ps: with ps; [pyverilog pyyaml pytest pkgs.nl2bench]));
       in {
         # Use the host's Clang and Swift
         name = "shell";
@@ -29,7 +29,6 @@
           yosys
           verilog
           pkgs.quaigh
-          pkgs.nl2bench
           pyenv
           gtkwave
         ];

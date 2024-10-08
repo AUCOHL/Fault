@@ -10,7 +10,7 @@ function usage() {
   echo "  --all               Runs Fault's complete flow"
   echo "  --synth             Runs synthesis script"
   echo "  --cut               Runs cut option on the synthesized netlist" 
-  echo "  -g, --tvgen         Runs fault simulation using the specified TV generator (swift, atalanta, LFSR, PODEM)"
+  echo "  -g, --tvgen         Runs fault simulation using the specified TV generator (swift, atalanta, LFSR, PODEM, PodemQuest)"
   echo "  --delay             Runs the transition fault simulator" 
   echo "  --chain             Runs chain option on the synthesized netlist" 
   echo "  --tap               Runs tap option on the chained netlist" 
@@ -194,7 +194,7 @@ do
         ignoring="-i $ignored_input,$clock_signal,$reset_signal"
     fi
     # Check tvgen type
-    if [ $tvgen = "atalanta" ] || [ $tvgen = "podem" ];
+    if [ $tvgen = "atalanta" ] || [ $tvgen = "podem" ] || [ $tvgen = "PodemQuest" ];
         then
         bench=$cut_netlist.bench
         echo "Generating bench circuit for $cut_netlist"
