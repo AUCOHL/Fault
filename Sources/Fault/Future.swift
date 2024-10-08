@@ -12,23 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import CThreadPool
 import Foundation
 
+var pool: threadpool?
+
 public class Future {
+    static var pool: threadpool?
+
     private var semaphore: DispatchSemaphore
     private var store: Any?
+    private var executor: () -> Any
 
     init(executor: @escaping () -> Any) {
-        semaphore = DispatchSemaphore(value: 0)
+        self.semaphore = DispatchSemaphore(value: 0)
+        self.executor = executor
 
-        DispatchQueue.global(qos: .utility).async {
-            self.store = executor()
-            self.semaphore.signal()
+        if Future.pool == nil {
+            Future.pool = thpool_init(
+                CInt(
+                    ProcessInfo.processInfo.environment["FAULT_THREADS"] ?? ""
+                ) ?? CInt(clamping: ProcessInfo.processInfo.processorCount))
         }
+
+        let _ = thpool_add_work(
+            Future.pool!,
+            {
+                pointer in
+                let this = Unmanaged<Future>.fromOpaque(pointer!).takeUnretainedValue()
+                this.store = this.executor()
+                this.semaphore.signal()
+            }, Unmanaged.passUnretained(self).toOpaque())
     }
 
     public var value: Any {
-        semaphore.wait()
+        self.semaphore.wait()
         let value = store!
         return value
     }
