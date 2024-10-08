@@ -6,11 +6,12 @@ import PackageDescription
 let package = Package(
     name: "Fault",
     platforms: [
-        .macOS(.v13), // executableURL and a bunch of other things are not available before High Sierra
+        .macOS(.v13)  // Regex features only available in Ventura+
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0")),
+        .package(
+            url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/pvieito/PythonKit", from: "0.5.0"),
         .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.2.1"),
@@ -22,8 +23,24 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .executableTarget(
             name: "fault",
-            dependencies: ["PythonKit", .product(name: "ArgumentParser", package: "swift-argument-parser"), "Defile", .product(name: "Collections", package: "swift-collections"), "BigInt", "Yams"],
-            path: "Sources"
-        )
+            dependencies: [
+                "PythonKit", .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                "Defile", .product(name: "Collections", package: "swift-collections"), "BigInt",
+                "Yams",
+                "CThreadPool",
+            ],
+            path: "Sources/Fault"
+        ),
+        .target(
+            name: "CThreadPool",
+            dependencies: [],
+            path: "Sources/CThreadPool",
+            sources: [
+                "thpool.c"
+            ],
+            cSettings: [
+                .headerSearchPath("Sources/CThreadPool/include")
+            ]
+        ),
     ]
 )
