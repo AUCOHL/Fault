@@ -45,13 +45,6 @@ in
       ]
       ++ lib.lists.optional (!stdenv.isDarwin) [Dispatch];
 
-    propagatedBuildInputs = [
-      pyenv
-      yosys
-      verilog
-      quaigh
-    ];
-
     nativeCheckInputs = with python3.pkgs; [
       pytest
     ];
@@ -69,9 +62,8 @@ in
     doCheck = true;
 
     faultEnv = ''
+      export PATH=${pyenv}/bin:${quaigh}/bin:${yosys}/bin:${verilog}/bin:$PATH
       export PYTHONPATH=${pyenv}/${pyenv.sitePackages}
-      export PATH=${verilog}/bin:$PATH
-      export PATH=${yosys}/bin:$PATH
       export PYTHON_LIBRARY=${pyenv}/lib/lib${pyenv.libPrefix}${swiftPackages.stdenv.hostPlatform.extensions.sharedLibrary}
       export FAULT_IVL_BASE=${verilog}/lib/ivl
     '';
@@ -95,10 +87,11 @@ in
     fixupPhase = ''
       runHook preFixup
       wrapProgram $out/bin/fault\
-        --prefix PYTHONPATH : ${pyenv}/${pyenv.sitePackages}\
+        --prefix PATH : ${pyenv}/bin\
         --prefix PATH : ${verilog}/bin\
         --prefix PATH : ${quaigh}/bin\
         --prefix PATH : ${yosys}/bin\
+        --prefix PYTHONPATH : ${pyenv}/${pyenv.sitePackages}\
         --set PYTHON_LIBRARY ${pyenv}/lib/lib${pyenv.libPrefix}${swiftPackages.stdenv.hostPlatform.extensions.sharedLibrary}\
         --set FAULT_IVL_BASE ${verilog}/lib/ivl
       runHook postFixup
