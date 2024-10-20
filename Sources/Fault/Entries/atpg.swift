@@ -105,12 +105,6 @@ extension Fault {
 
         @Option(
             help:
-                "If provided, this JSON file's test vectors are simulated and no generation is attempted."
-        )
-        var externalTVSet: String?
-
-        @Option(
-            help:
                 "If provided, this JSON file's test vector are used as the initial set of test vectors, with iterations taking place with them in mind."
         )
         var iteratingUpon: String?
@@ -182,18 +176,6 @@ extension Fault {
 
             var etvSetVectors: [TestVector] = []
             var etvSetInputs: [Port] = []
-
-            if let tvSetTest = externalTVSet {
-                if !fileManager.fileExists(atPath: tvSetTest) {
-                    throw ValidationError("TVs JSON file '\(tvSetTest)' not found.")
-                }
-                if tvSetTest.hasSuffix(".json") {
-                    (etvSetVectors, etvSetInputs) = try TVSet.readFromJson(file: tvSetTest)
-                } else {
-                    (etvSetVectors, etvSetInputs) = try TVSet.readFromText(file: tvSetTest)
-                }
-                print("Read \(etvSetVectors.count) externally-generated vectors to verify.")
-            }
 
             if let tvGenerator = etvGen {
                 guard let etvgen = ETVGFactory.get(name: tvGenerator) else {
