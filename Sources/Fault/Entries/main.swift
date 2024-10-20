@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import ArgumentParser
 import BigInt
 import Collections
-import ArgumentParser
-import CoreFoundation // Not automatically imported on Linux
+import CoreFoundation  // Not automatically imported on Linux
 import Defile
 import Foundation
 import PythonKit
 import Yams
 
-let VERSION = "0.7.1"
+let VERSION = "0.8.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -29,20 +29,22 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 
-_ = [ // Register all RNGs
+_ = [  // Register all RNGs
     SwiftRNG.registered,
     LFSR.registered,
     PatternGenerator.registered,
 ]
-_ = [ // Register all TVGens
+_ = [  // Register all TVGens
     Atalanta.registered,
     Quaigh.registered,
     PODEM.registered,
+    PodemQuest.registered,
 ]
 
 let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
 if yosysTest != EX_OK {
-    Stderr.print("Yosys must be installed to PATH on your computer for Fault to work. Fault will now quit.")
+    Stderr.print(
+        "Yosys must be installed to PATH on your computer for Fault to work. Fault will now quit.")
     exit(EX_UNAVAILABLE)
 }
 
@@ -55,7 +57,8 @@ let pythonVersions = {
         if let pythonPath = env["PYTHONPATH"] {
             sys.path.append(pythonPath)
         } else {
-            let pythonPathProcess = "python3 -c \"import sys; print(':'.join(sys.path), end='')\"".shOutput()
+            let pythonPathProcess = "python3 -c \"import sys; print(':'.join(sys.path), end='')\""
+                .shOutput()
             let pythonPath = pythonPathProcess.output
             let pythonPathComponents = pythonPath.components(separatedBy: ":")
             for component in pythonPathComponents {
@@ -69,7 +72,7 @@ let pythonVersions = {
         Stderr.print("\(error)")
         exit(EX_UNAVAILABLE)
     }
-}() // Just to check
+}()  // Just to check
 
 struct Fault: ParsableCommand {
     static let configuration = CommandConfiguration(

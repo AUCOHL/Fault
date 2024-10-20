@@ -316,3 +316,28 @@ class PODEM: ExternalTestVectorGenerator {
 
     static let registered = ETVGFactory.register(name: "PODEM", type: PODEM.self)
 }
+
+
+class PodemQuest: ExternalTestVectorGenerator {
+
+    required init() {}
+
+    func generate(file: String, module: String) -> ([TestVector], [Port]) {
+        let output = file.replacingExtension(".bench", with: ".test")
+        let podemQuest = "podemquest -i\(file) -o \(output)".sh()
+
+        if podemQuest != EX_OK {
+            exit(podemQuest)
+        }
+
+        do {
+            let (testvectors, inputs) = try TVSet.readFromTest(output, withInputsFrom: file)
+            return (vectors: testvectors, inputs: inputs)
+        } catch {
+            Stderr.print("Internal software error: \(error)")
+            exit(EX_SOFTWARE)
+        }
+    }
+
+    static let registered = ETVGFactory.register(name: "PodemQuest", type: PodemQuest.self)
+}

@@ -1,2 +1,2 @@
 pyverilog
-nl2bench
+nl2bench>=0.5.0
