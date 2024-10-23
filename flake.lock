@@ -86,11 +86,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1718284527,
-        "narHash": "sha256-J3Enh0VOQO9kW9xjSJmCly/6K4Jma8UL/LrCJd1/tP8=",
+        "lastModified": 1728905391,
+        "narHash": "sha256-iox9yGNG4MwSKhQuwegLcDW6wVGzfdBPrh8SrhSLA8c=",
         "owner": "efabless",
         "repo": "nix-eda",
-        "rev": "90f2333a2dd634fa3462b6b23a8c99d4132d340e",
+        "rev": "0814aa6c1c7d556aa08212cc875063cff62cb9b0",
         "type": "github"
       },
       "original": {
@@ -120,14 +120,17 @@
         "libparse": "libparse",
         "nix-eda": [
           "nix-eda"
+        ],
+        "quaigh": [
+          "quaigh"
         ]
       },
       "locked": {
-        "lastModified": 1721923472,
-        "narHash": "sha256-Rvjd/0WYNTVg1hF1ODK7KagXrs4eLP/mTZROA+psWag=",
+        "lastModified": 1729429745,
+        "narHash": "sha256-dQgCxAcoEv1NTqSRpNGEE4NhNufc76Cyc3HDInqL2+0=",
         "owner": "donn",
         "repo": "nl2bench",
-        "rev": "4fc66fb534bff125d437f7807d1dd660a08ed03c",
+        "rev": "23d4e0954d56ec15a12bb27064501e93566ee8e7",
         "type": "github"
       },
       "original": {
@@ -145,16 +148,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1722015420,
+        "lastModified": 1722162293,
         "narHash": "sha256-WILtL6WKXs5pB5Jujx9HIT2w1jiVTZymXC7DTuqLPEM=",
-        "owner": "donn",
+        "owner": "coloquinte",
         "repo": "quaigh",
-        "rev": "39b14e2d3e45b5e04338cf22adeede35dddc3dd6",
+        "rev": "2fec998178d4e48c5379dd0a2025f8688797f99a",
         "type": "github"
       },
       "original": {
-        "owner": "donn",
-        "ref": "fix_nix_linux",
+        "owner": "coloquinte",
         "repo": "quaigh",
         "type": "github"
       }
