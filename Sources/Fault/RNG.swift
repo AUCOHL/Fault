@@ -17,9 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin
+  import Darwin
 #else
-import Glibc
+  import Glibc
 #endif
 
 /// A type that provides seedable deterministic pseudo-random data.
@@ -42,7 +42,7 @@ public protocol SeedableRandomNumberGenerator: RandomNumberGenerator {
 }
 
 extension SeedableRandomNumberGenerator {
-  public init<T: BinaryInteger>(seed: T) {
+  public init(seed: some BinaryInteger) {
     var newSeed: [UInt8] = []
     for i in 0..<seed.bitWidth / UInt8.bitWidth {
       newSeed.append(UInt8(truncatingIfNeeded: seed >> (UInt8.bitWidth * i)))
@@ -94,7 +94,7 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
 
   // Helper to access the state.
   private func S(_ index: UInt8) -> UInt8 {
-    return state[Int(index)]
+    state[Int(index)]
   }
 
   // Helper to swap elements of the state.

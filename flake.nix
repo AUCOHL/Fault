@@ -55,7 +55,7 @@
         callPackage = lib.callPackageWith pkgs;
       in {
         mac-testing = pkgs.stdenvNoCC.mkDerivation (with pkgs; let
-          pyenv = python3.withPackages (ps: with ps; [pyverilog pyyaml pytest nl2bench]);
+          pyenv = python3.withPackages (ps: [ps.pyverilog ps.pyyaml ps.pytest ps.nl2bench]);
         in {
           # Use the host's Clang and Swift
           name = "shell";
@@ -68,6 +68,7 @@
           ];
 
           PYTHON_LIBRARY = "${pyenv}/lib/lib${python3.libPrefix}${stdenvNoCC.hostPlatform.extensions.sharedLibrary}";
+          NIX_PYTHONPATH = "${pyenv}/${pyenv.sitePackages}";
           PYTHONPATH = "${pyenv}/${pyenv.sitePackages}";
           FAULT_IVL_BASE = "${verilog}/lib/ivl";
         });

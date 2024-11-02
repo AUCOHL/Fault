@@ -13,7 +13,7 @@
 // limitations under the License.
 
 extension TapCreator {
-    static let info = """
+  static let info = """
     {
         "tap":{
             "tms": "tms",
@@ -32,7 +32,7 @@ extension TapCreator {
     }
     """
 
-    static let wrapper: String = """
+  static let wrapper: String = """
     module tap_wrapper(
         // tap ports
         tdi,
@@ -105,7 +105,7 @@ extension TapCreator {
     endmodule
     """
 
-    static let top: String = """
+  static let top: String = """
     //////////////////////////////////////////////////////////////////////
     ////                                                              ////
     ////  tap_top.v                                                   ////
