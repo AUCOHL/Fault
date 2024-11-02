@@ -13,13 +13,13 @@
 // limitations under the License.
 
 struct RuntimeError: Error {
-    let description: String
+  let description: String
 
-    init(_ description: String) {
-        self.description = description
-    }
+  init(_ description: String) {
+    self.description = description
+  }
 
-    var errorDescription: String? {
-        description
-    }
+  var errorDescription: String? {
+    description
+  }
 }

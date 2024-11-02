@@ -13,68 +13,68 @@
 // limitations under the License.
 
 enum Synthesis {
-    static func script(
-        for module: String,
-        in files: [String],
-        cutting: Bool = false,
-        checkHierarchy: Bool = true,
-        liberty libertyFile: String,
-        blackboxing blackboxedModules: [String] = [],
-        output: String,
-        optimize: Bool = true
-    ) -> String {
-        let opt = optimize ? "opt" : ""
-        return """
-        # read liberty
-        read_liberty -lib -ignore_miss_dir -setattr blackbox \(libertyFile)
+  static func script(
+    for module: String,
+    in files: [String],
+    cutting: Bool = false,
+    checkHierarchy: Bool = true,
+    liberty libertyFile: String,
+    blackboxing blackboxedModules: [String] = [],
+    output: String,
+    optimize: Bool = true
+  ) -> String {
+    let opt = optimize ? "opt" : ""
+    return """
+      # read liberty
+      read_liberty -lib -ignore_miss_dir -setattr blackbox \(libertyFile)
 
-        # read black boxes
-        read_verilog -sv -lib \(blackboxedModules.map { "'\($0)'" }.joined(separator: " "))
+      # read black boxes
+      read_verilog -sv -lib \(blackboxedModules.map { "'\($0)'" }.joined(separator: " "))
 
-        # read design
-        read_verilog -sv \(files.map { "'\($0)'" }.joined(separator: " "))
+      # read design
+      read_verilog -sv \(files.map { "'\($0)'" }.joined(separator: " "))
 
-        # check design hierarchy
-        hierarchy \(checkHierarchy ? "-check" : "") -top \(module)
-        flatten;
+      # check design hierarchy
+      hierarchy \(checkHierarchy ? "-check" : "") -top \(module)
+      flatten;
 
-        # translate processes (always blocks)
-        proc; \(opt)
+      # translate processes (always blocks)
+      proc; \(opt)
 
-        # detect and optimize FSM encodings
-        fsm; \(opt)
+      # detect and optimize FSM encodings
+      fsm; \(opt)
 
-        # implement memories (arrays)
-        memory; \(opt)
+      # implement memories (arrays)
+      memory; \(opt)
 
-        # convert to gate logic
-        techmap; \(opt)
+      # convert to gate logic
+      techmap; \(opt)
 
-        # flatten
-        flatten; \(opt)
+      # flatten
+      flatten; \(opt)
 
-        # mapping flip-flops to mycells.lib
-        dfflibmap -liberty \(libertyFile)
+      # mapping flip-flops to mycells.lib
+      dfflibmap -liberty \(libertyFile)
 
-        # expose dff
-        \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
+      # expose dff
+      \(cutting ? "expose -cut -evert-dff; \(opt)" : "")
 
-        # mapping logic to mycells.lib
-        abc -liberty \(libertyFile)
-        splitnets
+      # mapping logic to mycells.lib
+      abc -liberty \(libertyFile)
+      splitnets
 
-        # print gate count
-        stat
+      # print gate count
+      stat
 
-        # cleanup
-        opt_clean -purge
+      # cleanup
+      opt_clean -purge
 
-        # names
-        # autoname
+      # names
+      # autoname
 
-        write_verilog -noexpr -nohex -nodec -defparam \(output)+attrs
-        write_verilog -noexpr -noattr -noexpr -nohex -nodec -defparam \(output)
-        # write_blif -gates -unbuf DFFSR D Q \(output).blif
-        """
-    }
+      write_verilog -noexpr -nohex -nodec -defparam \(output)+attrs
+      write_verilog -noexpr -noattr -noexpr -nohex -nodec -defparam \(output)
+      # write_blif -gates -unbuf DFFSR D Q \(output).blif
+      """
+  }
 }

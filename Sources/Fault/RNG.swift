@@ -17,9 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    import Darwin
+  import Darwin
 #else
-    import Glibc
+  import Glibc
 #endif
 
 /// A type that provides seedable deterministic pseudo-random data.
@@ -37,18 +37,18 @@
 /// must form a deterministic sequence that depends only on the seed provided
 /// upon initialization.
 public protocol SeedableRandomNumberGenerator: RandomNumberGenerator {
-    init(seed: [UInt8])
-    init<T: BinaryInteger>(seed: T)
+  init(seed: [UInt8])
+  init<T: BinaryInteger>(seed: T)
 }
 
-public extension SeedableRandomNumberGenerator {
-    init(seed: some BinaryInteger) {
-        var newSeed: [UInt8] = []
-        for i in 0 ..< seed.bitWidth / UInt8.bitWidth {
-            newSeed.append(UInt8(truncatingIfNeeded: seed >> (UInt8.bitWidth * i)))
-        }
-        self.init(seed: newSeed)
+extension SeedableRandomNumberGenerator {
+  public init(seed: some BinaryInteger) {
+    var newSeed: [UInt8] = []
+    for i in 0..<seed.bitWidth / UInt8.bitWidth {
+      newSeed.append(UInt8(truncatingIfNeeded: seed >> (UInt8.bitWidth * i)))
     }
+    self.init(seed: newSeed)
+  }
 }
 
 /// An implementation of `SeedableRandomNumberGenerator` using ARC4.
@@ -64,49 +64,49 @@ public extension SeedableRandomNumberGenerator {
 /// suitable for cryptographic applications.
 @frozen
 public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
-    public static var global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
-    var state: [UInt8] = Array(0 ... 255)
-    var iPos: UInt8 = 0
-    var jPos: UInt8 = 0
+  public static var global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
+  var state: [UInt8] = Array(0...255)
+  var iPos: UInt8 = 0
+  var jPos: UInt8 = 0
 
-    /// Initialize ARC4RandomNumberGenerator using an array of UInt8. The array
-    /// must have length between 1 and 256 inclusive.
-    public init(seed: [UInt8]) {
-        precondition(seed.count > 0, "Length of seed must be positive")
-        precondition(seed.count <= 256, "Length of seed must be at most 256")
-        var j: UInt8 = 0
-        for i: UInt8 in 0 ... 255 {
-            j &+= S(i) &+ seed[Int(i) % seed.count]
-            swapAt(i, j)
-        }
+  /// Initialize ARC4RandomNumberGenerator using an array of UInt8. The array
+  /// must have length between 1 and 256 inclusive.
+  public init(seed: [UInt8]) {
+    precondition(seed.count > 0, "Length of seed must be positive")
+    precondition(seed.count <= 256, "Length of seed must be at most 256")
+    var j: UInt8 = 0
+    for i: UInt8 in 0...255 {
+      j &+= S(i) &+ seed[Int(i) % seed.count]
+      swapAt(i, j)
     }
+  }
 
-    // Produce the next random UInt64 from the stream, and advance the internal
-    // state.
-    public mutating func next() -> UInt64 {
-        var result: UInt64 = 0
-        for _ in 0 ..< UInt64.bitWidth / UInt8.bitWidth {
-            result <<= UInt8.bitWidth
-            result += UInt64(nextByte())
-        }
-        return result
+  // Produce the next random UInt64 from the stream, and advance the internal
+  // state.
+  public mutating func next() -> UInt64 {
+    var result: UInt64 = 0
+    for _ in 0..<UInt64.bitWidth / UInt8.bitWidth {
+      result <<= UInt8.bitWidth
+      result += UInt64(nextByte())
     }
+    return result
+  }
 
-    // Helper to access the state.
-    private func S(_ index: UInt8) -> UInt8 {
-        state[Int(index)]
-    }
+  // Helper to access the state.
+  private func S(_ index: UInt8) -> UInt8 {
+    state[Int(index)]
+  }
 
-    // Helper to swap elements of the state.
-    private mutating func swapAt(_ i: UInt8, _ j: UInt8) {
-        state.swapAt(Int(i), Int(j))
-    }
+  // Helper to swap elements of the state.
+  private mutating func swapAt(_ i: UInt8, _ j: UInt8) {
+    state.swapAt(Int(i), Int(j))
+  }
 
-    // Generates the next byte in the keystream.
-    private mutating func nextByte() -> UInt8 {
-        iPos &+= 1
-        jPos &+= S(iPos)
-        swapAt(iPos, jPos)
-        return S(S(iPos) &+ S(jPos))
-    }
+  // Generates the next byte in the keystream.
+  private mutating func nextByte() -> UInt8 {
+    iPos &+= 1
+    jPos &+= S(iPos)
+    swapAt(iPos, jPos)
+    return S(S(iPos) &+ S(jPos))
+  }
 }

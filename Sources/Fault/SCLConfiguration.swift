@@ -14,58 +14,59 @@
 import PythonKit
 
 class DFFMatch: Codable, CustomStringConvertible {
-    var name: String
-    var clk: String
-    var d: String
-    var q: String
+  var name: String
+  var clk: String
+  var d: String
+  var q: String
 
-    init(name: String, clk: String, d: String, q: String) {
-        self.name = name
-        self.clk = clk
-        self.d = d
-        self.q = q
-    }
+  init(name: String, clk: String, d: String, q: String) {
+    self.name = name
+    self.clk = clk
+    self.d = d
+    self.q = q
+  }
 
-    var description: String {
-        "<DFFMatch \(name): @\(clk) \(d) -> \(q)>"
-    }
+  var description: String {
+    "<DFFMatch \(name): @\(clk) \(d) -> \(q)>"
+  }
 }
 
-func getMatchingDFFInfo(from list: [DFFMatch], for cell: String, fnmatch: PythonObject) -> DFFMatch? {
-    for dffinfo in list {
-        for name in dffinfo.name.components(separatedBy: ",") {
-            if Bool(fnmatch.fnmatch(cell, name))! {
-                return dffinfo
-            }
-        }
+func getMatchingDFFInfo(from list: [DFFMatch], for cell: String, fnmatch: PythonObject) -> DFFMatch?
+{
+  for dffinfo in list {
+    for name in dffinfo.name.components(separatedBy: ",") {
+      if Bool(fnmatch.fnmatch(cell, name))! {
+        return dffinfo
+      }
     }
-    return nil
+  }
+  return nil
 }
 
 class MuxInfo: Codable {
-    var name: String
-    var a: String
-    var b: String
-    var y: String
-    var s: String
-    var invertedOutput: Bool = false
+  var name: String
+  var a: String
+  var b: String
+  var y: String
+  var s: String
+  var invertedOutput: Bool = false
 
-    init(name: String, a: String, b: String, y: String, s: String, invertedOutput: Bool = false) {
-        self.name = name
-        self.a = a
-        self.b = b
-        self.y = y
-        self.s = s
-        self.invertedOutput = invertedOutput
-    }
+  init(name: String, a: String, b: String, y: String, s: String, invertedOutput: Bool = false) {
+    self.name = name
+    self.a = a
+    self.b = b
+    self.y = y
+    self.s = s
+    self.invertedOutput = invertedOutput
+  }
 }
 
 class SCLConfiguration: Codable {
-    var dffMatches: [DFFMatch]
-    var muxInfo: MuxInfo?
+  var dffMatches: [DFFMatch]
+  var muxInfo: MuxInfo?
 
-    init(dffMatches: [DFFMatch], muxInfo: MuxInfo? = nil) {
-        self.dffMatches = dffMatches
-        self.muxInfo = muxInfo
-    }
+  init(dffMatches: [DFFMatch], muxInfo: MuxInfo? = nil) {
+    self.dffMatches = dffMatches
+    self.muxInfo = muxInfo
+  }
 }

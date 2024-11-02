@@ -18,37 +18,37 @@ import Foundation
 var pool: threadpool?
 
 public class Future {
-    static var pool: threadpool?
+  static var pool: threadpool?
 
-    private var semaphore: DispatchSemaphore
-    private var store: Any?
-    private var executor: () -> Any
+  private var semaphore: DispatchSemaphore
+  private var store: Any?
+  private var executor: () -> Any
 
-    init(executor: @escaping () -> Any) {
-        semaphore = DispatchSemaphore(value: 0)
-        self.executor = executor
+  init(executor: @escaping () -> Any) {
+    semaphore = DispatchSemaphore(value: 0)
+    self.executor = executor
 
-        if Future.pool == nil {
-            Future.pool = thpool_init(
-                CInt(
-                    ProcessInfo.processInfo.environment["FAULT_THREADS"] ?? ""
-                ) ?? CInt(clamping: ProcessInfo.processInfo.processorCount))
-        }
-
-        _ = thpool_add_work(
-            Future.pool!,
-            {
-                pointer in
-                let this = Unmanaged<Future>.fromOpaque(pointer!).takeUnretainedValue()
-                this.store = this.executor()
-                this.semaphore.signal()
-            }, Unmanaged.passUnretained(self).toOpaque()
-        )
+    if Future.pool == nil {
+      Future.pool = thpool_init(
+        CInt(
+          ProcessInfo.processInfo.environment["FAULT_THREADS"] ?? ""
+        ) ?? CInt(clamping: ProcessInfo.processInfo.processorCount))
     }
 
-    public var value: Any {
-        semaphore.wait()
-        let value = store!
-        return value
-    }
+    _ = thpool_add_work(
+      Future.pool!,
+      {
+        pointer in
+        let this = Unmanaged<Future>.fromOpaque(pointer!).takeUnretainedValue()
+        this.store = this.executor()
+        this.semaphore.signal()
+      }, Unmanaged.passUnretained(self).toOpaque()
+    )
+  }
+
+  public var value: Any {
+    semaphore.wait()
+    let value = store!
+    return value
+  }
 }

@@ -16,154 +16,154 @@ import Foundation
 import PythonKit
 
 class BoundaryScanRegisterCreator {
-    var name: String
-    private var inputName: String
-    private var outputName: String
-    var counter: Int = 0
+  var name: String
+  private var inputName: String
+  private var outputName: String
+  var counter: Int = 0
 
-    var clock: String
-    var reset: String
-    var resetActive: Simulator.Active
-    var testing: String
-    var shift: String
+  var clock: String
+  var reset: String
+  var resetActive: Simulator.Active
+  var testing: String
+  var shift: String
 
-    private var clockIdentifier: PythonObject
-    private var resetIdentifier: PythonObject
-    private var testingIdentifier: PythonObject
-    private var shiftIdentifier: PythonObject
+  private var clockIdentifier: PythonObject
+  private var resetIdentifier: PythonObject
+  private var testingIdentifier: PythonObject
+  private var shiftIdentifier: PythonObject
 
-    private var Node: PythonObject
+  private var Node: PythonObject
 
-    init(
-        name: String,
-        clock: String,
-        reset: String,
-        resetActive: Simulator.Active,
-        testing: String,
-        shift: String,
-        using Node: PythonObject
-    ) {
-        self.name = name
-        inputName = "\(name)_input"
-        outputName = "\(name)_output"
+  init(
+    name: String,
+    clock: String,
+    reset: String,
+    resetActive: Simulator.Active,
+    testing: String,
+    shift: String,
+    using Node: PythonObject
+  ) {
+    self.name = name
+    inputName = "\(name)_input"
+    outputName = "\(name)_output"
 
-        self.clock = clock
-        clockIdentifier = Node.Identifier(clock)
+    self.clock = clock
+    clockIdentifier = Node.Identifier(clock)
 
-        self.reset = reset
-        resetIdentifier = Node.Identifier(reset)
+    self.reset = reset
+    resetIdentifier = Node.Identifier(reset)
 
-        self.resetActive = resetActive
+    self.resetActive = resetActive
 
-        self.testing = testing
-        testingIdentifier = Node.Identifier(testing)
+    self.testing = testing
+    testingIdentifier = Node.Identifier(testing)
 
-        self.shift = shift
-        shiftIdentifier = Node.Identifier(shift)
+    self.shift = shift
+    shiftIdentifier = Node.Identifier(shift)
 
-        self.Node = Node
-    }
+    self.Node = Node
+  }
 
-    func create(
-        group: String,
-        din: PythonObject,
-        dout: PythonObject,
-        sin: String,
-        sout: String,
-        input: Bool
-    ) -> PythonObject {
-        let sinIdentifier = Node.Identifier(sin)
-        let soutIdentifier = Node.Identifier(sout)
+  func create(
+    group: String,
+    din: PythonObject,
+    dout: PythonObject,
+    sin: String,
+    sout: String,
+    input: Bool
+  ) -> PythonObject {
+    let sinIdentifier = Node.Identifier(sin)
+    let soutIdentifier = Node.Identifier(sout)
 
-        let name = input ? inputName : outputName
+    let name = input ? inputName : outputName
 
-        let portArguments = [
-            Node.PortArg("din", din),
-            Node.PortArg("dout", dout),
-            Node.PortArg("sin", sinIdentifier),
-            Node.PortArg("sout", soutIdentifier),
-            Node.PortArg("clock", clockIdentifier),
-            Node.PortArg("reset", resetIdentifier),
-            Node.PortArg("testing", testingIdentifier),
-            Node.PortArg("shift", shiftIdentifier),
-        ]
+    let portArguments = [
+      Node.PortArg("din", din),
+      Node.PortArg("dout", dout),
+      Node.PortArg("sin", sinIdentifier),
+      Node.PortArg("sout", soutIdentifier),
+      Node.PortArg("clock", clockIdentifier),
+      Node.PortArg("reset", resetIdentifier),
+      Node.PortArg("testing", testingIdentifier),
+      Node.PortArg("shift", shiftIdentifier),
+    ]
 
-        let instanceName = "__\(name)_\(group)_\(counter)__"
+    let instanceName = "__\(name)_\(group)_\(counter)__"
 
-        let submoduleInstance = Node.Instance(
-            name,
-            instanceName,
-            Python.tuple(portArguments),
-            Python.tuple()
-        )
+    let submoduleInstance = Node.Instance(
+      name,
+      instanceName,
+      Python.tuple(portArguments),
+      Python.tuple()
+    )
 
-        counter += 1
+    counter += 1
 
-        return Node.InstanceList(
-            name,
-            Python.tuple(),
-            Python.tuple([submoduleInstance])
-        )
-    }
+    return Node.InstanceList(
+      name,
+      Python.tuple(),
+      Python.tuple([submoduleInstance])
+    )
+  }
 
-    var inputDefinition: String {
-        """
-        module \(inputName) (
-            din,
-            dout,
-            sin,
-            sout,
-            clock,
-            reset,
-            testing,
-            shift
-        );
-            input din; output dout;
-            input sin; output sout;
-            input clock, reset, testing, shift;
+  var inputDefinition: String {
+    """
+    module \(inputName) (
+        din,
+        dout,
+        sin,
+        sout,
+        clock,
+        reset,
+        testing,
+        shift
+    );
+        input din; output dout;
+        input sin; output sout;
+        input clock, reset, testing, shift;
 
-            reg store;
-            always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
-                if (\(resetActive == .high ? "" : "~") reset) begin
-                    store <= 1'b0;
-                end else begin
-                    store <= shift ? sin: dout;
-                end
+        reg store;
+        always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
+            if (\(resetActive == .high ? "" : "~") reset) begin
+                store <= 1'b0;
+            end else begin
+                store <= shift ? sin: dout;
             end
-            assign sout = store;
-            assign dout = testing ? store : din;
-        endmodule
+        end
+        assign sout = store;
+        assign dout = testing ? store : din;
+    endmodule
 
-        """
-    }
+    """
+  }
 
-    var outputDefinition: String {
-        """
-        module \(outputName) (
-            din,
-            dout,
-            sin,
-            sout,
-            clock,
-            reset,
-            testing,
-            shift
-        );
-            input din; output dout;
-            input sin; output sout;
-            input clock, reset, testing, shift;
-            reg store;
-            always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
-                if (\(resetActive == .high ? "" : "~") reset) begin
-                    store <= 1'b0;
-                end else begin
-                    store <= shift ? sin: dout;
-                end
+  var outputDefinition: String {
+    """
+    module \(outputName) (
+        din,
+        dout,
+        sin,
+        sout,
+        clock,
+        reset,
+        testing,
+        shift
+    );
+        input din; output dout;
+        input sin; output sout;
+        input clock, reset, testing, shift;
+        reg store;
+        always @ (posedge clock or \(resetActive == .high ? "posedge" : "negedge") reset) begin
+            if (\(resetActive == .high ? "" : "~") reset) begin
+                store <= 1'b0;
+            end else begin
+                store <= shift ? sin: dout;
             end
-            assign sout = store;
-            assign dout = din;
-        endmodule
+        end
+        assign sout = store;
+        assign dout = din;
+    endmodule
 
-        """
-    }
+    """
+  }
 }

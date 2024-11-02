@@ -15,7 +15,7 @@
 import ArgumentParser
 import BigInt
 import Collections
-import CoreFoundation // Not automatically imported on Linux
+import CoreFoundation  // Not automatically imported on Linux
 import Defile
 import Foundation
 import PythonKit
@@ -29,57 +29,57 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 
-_ = [ // Register all RNGs
-    SwiftRNG.registered,
-    LFSR.registered,
-    PatternGenerator.registered,
+_ = [  // Register all RNGs
+  SwiftRNG.registered,
+  LFSR.registered,
+  PatternGenerator.registered,
 ]
-_ = [ // Register all TVGens
-    Atalanta.registered,
-    Quaigh.registered,
-    PODEM.registered,
-    PodemQuest.registered,
+_ = [  // Register all TVGens
+  Atalanta.registered,
+  Quaigh.registered,
+  PODEM.registered,
+  PodemQuest.registered,
 ]
 
 let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
 if yosysTest != EX_OK {
-    Stderr.print(
-        "Yosys must be installed to PATH on your computer for Fault to work. Fault will now quit.")
-    exit(EX_UNAVAILABLE)
+  Stderr.print(
+    "Yosys must be installed to PATH on your computer for Fault to work. Fault will now quit.")
+  exit(EX_UNAVAILABLE)
 }
 
 let pythonVersions = {
-    // Test Yosys, Python
-    () -> (python: String, pyverilog: String) in
-    do {
-        let pythonVersion = try Python.attemptImport("platform").python_version()
-        let sys = Python.import("sys")
-        if let pythonPath = env["PYTHONPATH"] {
-            sys.path.append(pythonPath)
-        } else {
-            let pythonPathProcess = "python3 -c \"import sys; print(':'.join(sys.path), end='')\""
-                .shOutput()
-            let pythonPath = pythonPathProcess.output
-            let pythonPathComponents = pythonPath.components(separatedBy: ":")
-            for component in pythonPathComponents {
-                sys.path.append(component)
-            }
-        }
-
-        let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
-        return (python: "\(pythonVersion)", pyverilog: "\(pyverilogVersion)")
-    } catch {
-        Stderr.print("\(error)")
-        exit(EX_UNAVAILABLE)
+  // Test Yosys, Python
+  () -> (python: String, pyverilog: String) in
+  do {
+    let pythonVersion = try Python.attemptImport("platform").python_version()
+    let sys = Python.import("sys")
+    if let pythonPath = env["PYTHONPATH"] {
+      sys.path.append(pythonPath)
+    } else {
+      let pythonPathProcess = "python3 -c \"import sys; print(':'.join(sys.path), end='')\""
+        .shOutput()
+      let pythonPath = pythonPathProcess.output
+      let pythonPathComponents = pythonPath.components(separatedBy: ":")
+      for component in pythonPathComponents {
+        sys.path.append(component)
+      }
     }
-}() // Just to check
+
+    let pyverilogVersion = try Python.attemptImport("pyverilog").__version__
+    return (python: "\(pythonVersion)", pyverilog: "\(pyverilogVersion)")
+  } catch {
+    Stderr.print("\(error)")
+    exit(EX_UNAVAILABLE)
+  }
+}()  // Just to check
 
 struct Fault: ParsableCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Open-source EDA's missing DFT Toolchain",
-        subcommands: [ATPG.self, Cut.self, Synth.self, Assemble.self, Tap.self, Chain.self],
-        defaultSubcommand: ATPG.self
-    )
+  static let configuration = CommandConfiguration(
+    abstract: "Open-source EDA's missing DFT Toolchain",
+    subcommands: [ATPG.self, Cut.self, Synth.self, Assemble.self, Tap.self, Chain.self],
+    defaultSubcommand: ATPG.self
+  )
 }
 
 Fault.main()
