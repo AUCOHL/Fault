@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import BigInt
+import Collections
 import Defile
 import Foundation
-import Collections
 import PythonKit
 
 struct CoverageMeta: Codable {
@@ -57,14 +57,18 @@ enum Simulator {
         var portHooksGM = ""
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name).gm ;\n"
+            portWires +=
+                "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portWires +=
+                "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name).gm ;\n"
             portHooks += ".\(name) ( \(name) ) , "
             portHooksGM += ".\(name) ( \(name).gm ) , "
         }
 
         let folderName = "\(filePrefix)/thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        try FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
+        try FileManager.default.createDirectory(
+            atPath: folderName, withIntermediateDirectories: true, attributes: nil
+        )
 
         var inputAssignment = ""
         var fmtString = ""
@@ -80,12 +84,11 @@ enum Simulator {
             inputList += "\(name) , "
         }
 
-
         for (rawName, behavior) in bypassingWithBehavior {
             guard ports[rawName] != nil else {
                 continue // black-box module ignore probably
             }
-            
+
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
 
             inputAssignment += "        \(name) = \(behavior.rawValue) ;\n"
@@ -108,7 +111,8 @@ enum Simulator {
             outputComparison += " ( \(name) != \(name).gm ) || "
             if output.width > 1 {
                 for i in 0 ..< output.width {
-                    outputAssignment += "   assign goldenOutput[\(outputCount)] = gm.\(output.name) [\(i)] ; \n"
+                    outputAssignment +=
+                        "   assign goldenOutput[\(outputCount)] = gm.\(output.name) [\(i)] ; \n"
                     outputCount += 1
                 }
             } else {
@@ -185,7 +189,8 @@ enum Simulator {
         let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp \(defineStatements) -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp \(defineStatements) -o \(aoutName) \(tbName) 2>&1 > /dev/null"
+                .sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
@@ -258,9 +263,8 @@ enum Simulator {
             }
         }
 
-        var coverage: Float =
-            Float(sa0Covered.count + sa1Covered.count) /
-            Float(2 * faultPoints.count)
+        var coverage =
+            Float(sa0Covered.count + sa1Covered.count) / Float(2 * faultPoints.count)
         print("Initial coverage: \(coverage * 100)%")
 
         var totalTVAttempts = 0
@@ -275,7 +279,9 @@ enum Simulator {
                 if sampleRun {
                     break
                 }
-                print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
+                print(
+                    "Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…"
+                )
             }
 
             var futureList: [Future] = []
@@ -379,8 +385,7 @@ enum Simulator {
             }
 
             coverage =
-                Float(sa0Covered.count + sa1Covered.count) /
-                Float(2 * faultPoints.count)
+                Float(sa0Covered.count + sa1Covered.count) / Float(2 * faultPoints.count)
 
             totalTVAttempts += tvAttempts
             let remainingTV = ceiling - totalTVAttempts
@@ -395,7 +400,7 @@ enum Simulator {
             coverageList: coverageList,
             coverageMeta: CoverageMeta(
                 ratio: coverage,
-                faultPoints: [String](faultPoints), 
+                faultPoints: [String](faultPoints),
                 sa0Covered: sa0Covered.sorted(),
                 sa1Covered: sa1Covered.sorted(),
                 sa0Uncovered: faultPoints.filter { !sa0Covered.contains($0) },
@@ -434,7 +439,8 @@ enum Simulator {
         var portHooks = ""
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portWires +=
+                "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
             portHooks += ".\(name) ( \(name) ) , "
         }
 
@@ -550,7 +556,8 @@ enum Simulator {
         var portHooks = ""
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portWires +=
+                "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
             portHooks += ".\(name) ( \(name) ) , "
         }
 
@@ -699,7 +706,8 @@ enum Simulator {
         var portHooks = ""
         for (rawName, port) in ports {
             let name = (rawName.hasPrefix("\\")) ? rawName : "\\\(rawName)"
-            portWires += "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
+            portWires +=
+                "    \(port.polarity == .input ? "reg" : "wire")[\(port.from):\(port.to)] \(name) ;\n"
             portHooks += ".\(name) ( \(name) ) , "
         }
 
@@ -892,11 +900,13 @@ enum Simulator {
                 let _ = "rm \(aoutName)".sh()
             }
         }
-        let iverilogCmd = "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
+        let iverilogCmd =
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
         try outputFile.write(string: "$ \(iverilogCmd)\n")
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1".shOutput()
+            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
+                .shOutput()
         try outputFile.write(string: iverilogResult.output)
 
         if iverilogResult.terminationStatus != EX_OK {

@@ -16,12 +16,11 @@ import BigInt
 import Defile
 import Foundation
 
-
 protocol TVGenerator {
     var current: BigUInt { get set }
-    
+
     init(allBits: Int, seed: UInt)
-    
+
     func generate(count: Int)
 }
 
@@ -37,7 +36,7 @@ extension TVGenerator {
 enum TVGeneratorFactory {
     private static var registry: [String: TVGenerator.Type] = [:]
 
-    static func register<T: TVGenerator>(name: String, type: T.Type) -> Bool {
+    static func register(name: String, type: (some TVGenerator).Type) -> Bool {
         registry[name] = type
         return true
     }
@@ -58,15 +57,15 @@ class SwiftRNG: TVGenerator {
     var current: BigUInt
     var bits: Int
     var rng: ARC4RandomNumberGenerator
-    
+
     required init(allBits bits: Int, seed: UInt) {
-        self.current = 0
+        current = 0
         self.bits = bits
-        self.rng = ARC4RandomNumberGenerator(seed: seed) 
+        rng = ARC4RandomNumberGenerator(seed: seed)
     }
 
-    func generate(count: Int) {
-        self.current = BigUInt.randomInteger(withMaximumWidth: bits, using: &self.rng)
+    func generate(count _: Int) {
+        current = BigUInt.randomInteger(withMaximumWidth: bits, using: &rng)
     }
 
     static let registered = TVGeneratorFactory.register(name: "swift", type: SwiftRNG.self)
@@ -75,7 +74,7 @@ class SwiftRNG: TVGenerator {
 class LFSR: TVGenerator {
     var current: BigUInt
     var bits: Int
-    
+
     static let taps: [UInt: [UInt]] = [
         // nbits : Feedback Polynomial
         2: [2, 1],
@@ -120,8 +119,8 @@ class LFSR: TVGenerator {
         self.seed = seed
         self.nbits = nbits
         self.bits = bits
-        self.current = 0
-        
+        current = 0
+
         let polynomial = LFSR.taps[nbits]!
 
         polynomialHex = 0
@@ -151,7 +150,7 @@ class LFSR: TVGenerator {
         return seed
     }
 
-    func generate(count: Int) {
+    func generate(count _: Int) {
         var returnValue: BigUInt = 0
         var generations = bits / Int(nbits)
         let leftover = bits % Int(nbits)
@@ -173,16 +172,16 @@ class LFSR: TVGenerator {
 class PatternGenerator: TVGenerator {
     var current: BigUInt = 0
     var bits: Int = 0
-    
+
     required init(allBits bits: Int, seed _: UInt) {
         self.bits = bits
-        self.current = 0
+        current = 0
     }
 
     func generate(count: Int) {
         let selector = count / 2
         let complement = (count % 2) == 1
-        self.current = 0
+        current = 0
         if selector == 0 {
             // Nothing, it's already all zeroes
         } else if selector == 1 {
@@ -201,19 +200,17 @@ class PatternGenerator: TVGenerator {
             let window = (BigUInt(1) << windowSize) - 1
             current |= (window << windowShift)
         }
-        
+
         let mask = (BigUInt(1) << bits) - 1
         current &= mask
-        
-        if (complement) {
+
+        if complement {
             current ^= mask
         }
     }
-    
+
     static let registered = TVGeneratorFactory.register(name: "pattern", type: PatternGenerator.self)
 }
-
-
 
 // TODO: Unify external and internal TV generators
 protocol ExternalTestVectorGenerator {
@@ -224,7 +221,7 @@ protocol ExternalTestVectorGenerator {
 enum ETVGFactory {
     private static var registry: [String: ExternalTestVectorGenerator.Type] = [:]
 
-    static func register<T: ExternalTestVectorGenerator>(name: String, type: T.Type) -> Bool {
+    static func register(name: String, type: (some ExternalTestVectorGenerator).Type) -> Bool {
         registry[name] = type
         return true
     }
@@ -244,7 +241,7 @@ enum ETVGFactory {
 class Atalanta: ExternalTestVectorGenerator {
     required init() {}
 
-    func generate(file: String, module: String) -> ([TestVector], [Port]) {
+    func generate(file: String, module _: String) -> ([TestVector], [Port]) {
         let output = file.replacingExtension(".bench", with: ".test")
         let atalanta = "atalanta -t \(output) \(file)".sh()
 
@@ -267,7 +264,7 @@ class Atalanta: ExternalTestVectorGenerator {
 class Quaigh: ExternalTestVectorGenerator {
     required init() {}
 
-    func generate(file: String, module: String) -> ([TestVector], [Port]) {
+    func generate(file: String, module _: String) -> ([TestVector], [Port]) {
         let output = file.replacingExtension(".bench", with: ".test")
         let quaigh = "quaigh atpg \(file) -o \(output)".sh()
 
@@ -294,7 +291,9 @@ class PODEM: ExternalTestVectorGenerator {
         let tempDir = "\(NSTemporaryDirectory())"
 
         let folderName = "\(tempDir)thr\(Unmanaged.passUnretained(Thread.current).toOpaque())"
-        try? FileManager.default.createDirectory(atPath: folderName, withIntermediateDirectories: true, attributes: nil)
+        try? FileManager.default.createDirectory(
+            atPath: folderName, withIntermediateDirectories: true, attributes: nil
+        )
         defer {
             try? FileManager.default.removeItem(atPath: folderName)
         }
@@ -317,12 +316,10 @@ class PODEM: ExternalTestVectorGenerator {
     static let registered = ETVGFactory.register(name: "PODEM", type: PODEM.self)
 }
 
-
 class PodemQuest: ExternalTestVectorGenerator {
-
     required init() {}
 
-    func generate(file: String, module: String) -> ([TestVector], [Port]) {
+    func generate(file: String, module _: String) -> ([TestVector], [Port]) {
         let output = file.replacingExtension(".bench", with: ".test")
         let podemQuest = "podemquest -i\(file) -o \(output)".sh()
 

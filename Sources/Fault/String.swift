@@ -44,7 +44,7 @@ extension String {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", self]
-        //print("$ \(self)")
+        // print("$ \(self)")
         if silent {
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
@@ -61,7 +61,7 @@ extension String {
 
         return task.terminationStatus
     }
-    
+
     func replacingExtension(_ before: String, with after: String) -> String {
         var result = self
         if result.hasSuffix(before) {

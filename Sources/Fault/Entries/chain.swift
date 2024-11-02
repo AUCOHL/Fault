@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import Collections
 import ArgumentParser
+import Collections
 import Defile
 import Foundation
 import PythonKit
@@ -95,7 +95,9 @@ func chainInternal(
             let instance = itemDeclaration.instances[0]
             let moduleName = String(describing: instance.module)
             let instanceName = String(describing: instance.name)
-            if let dffinfo = getMatchingDFFInfo(from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch) {
+            if let dffinfo = getMatchingDFFInfo(
+                from: sclConfig.dffMatches, for: moduleName, fnmatch: fnmatch
+            ) {
                 for hook in instance.portlist {
                     let portnameStr = String(describing: hook.portname)
                     if portnameStr == dffinfo.clk {
@@ -107,7 +109,9 @@ func chainInternal(
                     }
                     if portnameStr == dffinfo.d {
                         if let mc = muxCreator {
-                            let (muxCellDecls, muxWireDecls, muxOut) = mc.create(for: instanceName, selection: shiftIdentifier, a: previousOutput, b: hook.argname)
+                            let (muxCellDecls, muxWireDecls, muxOut) = mc.create(
+                                for: instanceName, selection: shiftIdentifier, a: previousOutput, b: hook.argname
+                            )
                             hook.argname = muxOut
                             statements += muxCellDecls
                             statements += muxWireDecls
@@ -142,7 +146,7 @@ func chainInternal(
                     // Note that `hook.argname` is actually an expression
                     let portInfo = blackboxModule.portsByName["\(hook.portname)"]!
 
-                    if bypass.bypassedInputs.contains(portInfo.name) {
+                    if bypass.bypassedIOs.contains(portInfo.name) {
                         // Leave it alone
                         continue
                     }
@@ -150,7 +154,9 @@ func chainInternal(
                     let wireNameOriginal = "\\\(instanceName).\(portInfo.name).original"
                     let wireNameMultiplexed = "\\\(instanceName).\(portInfo.name).multiplexed"
                     let width = Node.Width(Node.IntConst(portInfo.from), Node.IntConst(portInfo.to))
-                    let wiresDecl = Node.Decl([Node.Wire(wireNameOriginal, width: width), Node.Wire(wireNameMultiplexed, width: width)])
+                    let wiresDecl = Node.Decl([
+                        Node.Wire(wireNameOriginal, width: width), Node.Wire(wireNameMultiplexed, width: width),
+                    ])
                     statements.append(wiresDecl)
 
                     var kind: ChainRegister.Kind
@@ -167,7 +173,9 @@ func chainInternal(
 
                     for bit in portInfo.bits {
                         let originalBit = Node.Pointer(Node.Identifier(wireNameOriginal), Node.IntConst(bit))
-                        let multiplexedBit = Node.Pointer(Node.Identifier(wireNameMultiplexed), Node.IntConst(bit))
+                        let multiplexedBit = Node.Pointer(
+                            Node.Identifier(wireNameMultiplexed), Node.IntConst(bit)
+                        )
                         let nextOutput = newShiftWire()
                         let decl = bsrCreator.create(
                             group: instanceName,
@@ -295,11 +303,12 @@ func chainTop(
         if input.name != bypass.clock, input.name != bypass.reset.name {
             statements.append(inputStatement)
         }
-        if bypass.bypassedInputs.contains(input.name) {
-            portArguments.append(Node.PortArg(
-                input.name,
-                Node.Identifier(input.name)
-            ))
+        if bypass.bypassedIOs.contains(input.name) {
+            portArguments.append(
+                Node.PortArg(
+                    input.name,
+                    Node.Identifier(input.name)
+                ))
             continue
         }
 
@@ -315,10 +324,11 @@ func chainTop(
         }
         statements.append(doutStatement)
 
-        portArguments.append(Node.PortArg(
-            input.name,
-            Node.Identifier(doutName)
-        ))
+        portArguments.append(
+            Node.PortArg(
+                input.name,
+                Node.Identifier(doutName)
+            ))
         if input.width == 1 {
             let nextOutput = newShiftWire()
             let decl = bsrCreator.create(
@@ -357,29 +367,34 @@ func chainTop(
         )
     }
 
-    portArguments.append(Node.PortArg(
-        shiftName,
-        Node.Identifier(shiftName)
-    ))
-    portArguments.append(Node.PortArg(
-        tckName,
-        Node.Identifier(tckName)
-    ))
-    portArguments.append(Node.PortArg(
-        testName,
-        Node.Identifier(testName)
-    ))
+    portArguments.append(
+        Node.PortArg(
+            shiftName,
+            Node.Identifier(shiftName)
+        ))
+    portArguments.append(
+        Node.PortArg(
+            tckName,
+            Node.Identifier(tckName)
+        ))
+    portArguments.append(
+        Node.PortArg(
+            testName,
+            Node.Identifier(testName)
+        ))
 
-    portArguments.append(Node.PortArg(
-        inputName,
-        previousOutput
-    ))
+    portArguments.append(
+        Node.PortArg(
+            inputName,
+            previousOutput
+        ))
 
     let nextOutput = newShiftWire()
-    portArguments.append(Node.PortArg(
-        outputName,
-        nextOutput
-    ))
+    portArguments.append(
+        Node.PortArg(
+            outputName,
+            nextOutput
+        ))
 
     order += internalOrder
     previousOutput = nextOutput
@@ -399,10 +414,11 @@ func chainTop(
         statements.append(outputStatement)
         statements.append(dinStatement)
 
-        portArguments.append(Node.PortArg(
-            output.name,
-            Node.Identifier(dinName)
-        ))
+        portArguments.append(
+            Node.PortArg(
+                output.name,
+                Node.Identifier(dinName)
+            ))
 
         if output.width == 1 {
             let nextOutput = newShiftWire()
@@ -448,11 +464,12 @@ func chainTop(
         Python.tuple()
     )
 
-    statements.append(Node.InstanceList(
-        module.definition.name,
-        Python.tuple(),
-        Python.tuple([submoduleInstance])
-    ))
+    statements.append(
+        Node.InstanceList(
+            module.definition.name,
+            Python.tuple(),
+            Python.tuple([submoduleInstance])
+        ))
 
     let boundaryAssignment = Node.Assign(
         Node.Lvalue(Node.Identifier(outputName)),
@@ -466,54 +483,78 @@ func chainTop(
         Node.Portlist(Python.tuple(ports)),
         Python.tuple(statements)
     )
-    print("Boundary scan cells successfully chained. Length: ", order.reduce(0) { $0 + $1.width } - internalOrder.reduce(0) { $0 + $1.width })
+    print(
+        "Boundary scan cells successfully chained. Length: ",
+        order.reduce(0) { $0 + $1.width } - internalOrder.reduce(0) { $0 + $1.width }
+    )
 
     return (supermodel, order)
 }
-
 
 extension Fault {
     struct Chain: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Manipulate a netlist to create a scan chain, and resynthesize."
         )
-        
+
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
         var output: String?
-        
-        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify scan chain using given cell model.")
+
+        @Option(
+            name: [.short, .long, .customLong("cellModel")],
+            help: "Verify scan chain using given cell model."
+        )
         var cellModel: String?
-        
+
         @Option(name: [.long], help: "Inverted clk tree source cell name. (Default: none)")
         var invClock: String?
-        
+
         @Option(name: [.short, .long], help: "Liberty file. (Required.)")
         var liberty: String
-        
+
         @OptionGroup
         var bypass: BypassOptions
-        
-        @Option(name: [.short, .long, .customLong("sclConfig")], help: "Path for the YAML SCL config file. Recommended.")
+
+        @Option(
+            name: [.short, .long, .customLong("sclConfig")],
+            help: "Path for the YAML SCL config file. Recommended."
+        )
         var sclConfig: String?
-        
-        @Option(name: [.short, .long], help: "Optional override for the DFF names from the PDK config. Comma-delimited.")
+
+        @Option(
+            name: [.short, .long],
+            help: "Optional override for the DFF names from the PDK config. Comma-delimited."
+        )
         var dff: String?
-        
-        @Option(name: [.customShort("b"), .customLong("blackbox")], help: "Blackbox module names. Comma-delimited. (Default: none)")
+
+        @Option(
+            name: [.customShort("b"), .customLong("blackbox")],
+            help: "Blackbox module names. Specify multiple times to specify multiple modules."
+        )
         var blackbox: [String] = []
-        
-        @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+
+        @Option(
+            name: [.customShort("B"), .long, .customLong("blackboxModel")],
+            help: "Blackbox model verilog files. Specify multiple times to specify multiple models."
+        )
         var blackboxModels: [String] = []
-        
-        @Option(name: [.customShort("D"), .customLong("define")], help: "define statements to include during simulations. Comma-delimited. (Default: none)")
+
+        @Option(
+            name: [.customShort("D"), .customLong("define")],
+            help:
+            "`define statements to include during simulations. Specify multiple times to specify multiple defines."
+        )
         var defines: [String] = []
-        
-        @Option(name: .long, help: "Extra verilog models to include during simulations. Comma-delimited. (Default: none)")
-        var inc: String?
-        
+
+        @Option(
+            name: [.customShort("I"), .customLong("inc"), .customLong("include")],
+            help: "Extra verilog models to include during simulations. (Default: none)"
+        )
+        var includes: [String] = []
+
         @Flag(name: .long, help: "Skip Re-synthesizing the chained netlist. (Default: none)")
         var skipSynth: Bool = false
-        
+
         @Option(name: .long, help: "Name for scan-chain serial data in signal.")
         var sin: String = "sin"
 
@@ -528,10 +569,10 @@ extension Fault {
 
         @Option(name: .long, help: "Name for JTAG test clock signal.")
         var tck: String = "tck"
-        
+
         @Argument
         var file: String
-        
+
         mutating func run() throws {
             let fileManager = FileManager()
 
@@ -541,7 +582,9 @@ extension Fault {
             }
 
             // Required options validation
-            var sclConfig = SCLConfiguration(dffMatches: [DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q")])
+            var sclConfig = SCLConfiguration(dffMatches: [
+                DFFMatch(name: "DFFSR,DFFNEGX1,DFFPOSX1", clk: "CLK", d: "D", q: "Q"),
+            ])
             if let sclConfigPath = self.sclConfig {
                 guard let sclConfigYML = File.read(sclConfigPath) else {
                     throw ValidationError("File not found: \(sclConfigPath)")
@@ -564,8 +607,6 @@ extension Fault {
 
             let output = output ?? file.replacingExtension(".nl.v", with: ".chained.v")
             let intermediate = output.replacingExtension(".chained.v", with: ".chain-intermediate.v")
-
-            let includeFiles = Set<String>(inc?.components(separatedBy: ",").filter { !$0.isEmpty } ?? [])
 
             // MARK: Importing Python and Pyverilog
 
@@ -632,7 +673,10 @@ extension Fault {
             let finalCount = finalOrder.reduce(0) { $0 + $1.width }
 
             let finalAst = parse([bsrCreator.inputDefinition + bsrCreator.outputDefinition])[0]
-            let finalDefinitions = [PythonObject](finalAst[dynamicMember: "description"].definitions)! + [module.definition, supermodel]
+            let finalDefinitions =
+                [PythonObject](finalAst[dynamicMember: "description"].definitions)! + [
+                    module.definition, supermodel,
+                ]
             finalAst[dynamicMember: "description"].definitions = Python.tuple(finalDefinitions)
 
             try File.open(intermediate, mode: .write) {
@@ -692,7 +736,7 @@ extension Fault {
             // MARK: Verification
 
             if let model = cellModel {
-                let models = [model] + Array(includeFiles) + Array(blackboxModels)
+                let models = [model] + Array(includes) + Array(blackboxModels)
 
                 print("Verifying scan chain integrity…")
                 let ast = parse([netlist])[0]
@@ -736,19 +780,22 @@ extension Fault {
                     print("Scan chain verified successfully.")
                 } else {
                     print("Scan chain verification failed.")
-                    print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
+                    print(
+                        "・Ensure that clock and reset signals, if they exist are passed as such to the program."
+                    )
                     if !bypass.resetActiveLow {
                         print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
                     if internalOrder.count == 0 {
-                        print("・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides.")
+                        print(
+                            "・Ensure that D flip-flop cell names match those either in the defaults, the PDK config, or the overrides."
+                        )
                     }
                     print("・Ensure that there are no other asynchronous resets anywhere in the circuit.")
                     Foundation.exit(EX_DATAERR)
                 }
             }
             print("Done.")
-
         }
     }
 }

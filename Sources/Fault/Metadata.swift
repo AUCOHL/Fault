@@ -76,7 +76,11 @@ struct ChainMetadata: Codable {
         }
         let decoder = JSONDecoder()
         let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
-        guard let metadata = try? decoder.decode(ChainMetadata.self, from: metadataString.data(using: .utf8)!) else {
+        guard
+            let metadata = try? decoder.decode(
+                ChainMetadata.self, from: metadataString.data(using: .utf8)!
+            )
+        else {
             Stderr.print("Metadata json is invalid.")
             exit(EX_DATAERR)
         }
@@ -113,7 +117,9 @@ struct binMetadata: Codable {
 
         let decoder = JSONDecoder()
         let metadataString = slice.components(separatedBy: "' END FAULT METADATA */")[0]
-        guard let metadata = try? decoder.decode(binMetadata.self, from: metadataString.data(using: .utf8)!) else {
+        guard
+            let metadata = try? decoder.decode(binMetadata.self, from: metadataString.data(using: .utf8)!)
+        else {
             Stderr.print("Metadata json is invalid.")
             exit(EX_DATAERR)
         }

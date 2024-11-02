@@ -43,7 +43,8 @@ enum SerialVectorCreator {
                 let mask = String(repeating: "f", count: tdiHex.count)
                 if let output = BigUInt(tvcPair.goldenOutput, radix: 16) {
                     let hexOutput = String(output, radix: 16)
-                    scanStatements += "SDR \(chainLength) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
+                    scanStatements +=
+                        "SDR \(chainLength) TDI (\(tdiHex)) MASK (\(mask)) TDO (\(hexOutput)); \n"
                 } else {
                     print("TV golden output \(tvcPair.goldenOutput) is invalid.")
                 }

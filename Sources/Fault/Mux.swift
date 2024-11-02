@@ -28,7 +28,10 @@ class MuxCreator {
         selection: PythonObject,
         a: PythonObject,
         b: PythonObject
-    ) -> (cellDeclarations: [PythonObject], wireDeclarations: [PythonObject], replacementHook: PythonObject) {
+    ) -> (
+        cellDeclarations: [PythonObject], wireDeclarations: [PythonObject],
+        replacementHook: PythonObject
+    ) {
         let muxName = instance + "__scanchain_mux"
         let outputWireName = "\(muxName)_\(muxInfo.y)"
         let outputWireDecl = Node.Wire(outputWireName)
@@ -63,11 +66,14 @@ class MuxCreator {
         if muxInfo.invertedOutput {
             hook = Node.Unot(hook)
         }
-        return ([
-            pragma,
-            instanceDecl,
-        ], [
-            outputWireDecl,
-        ], hook)
+        return (
+            [
+                pragma,
+                instanceDecl,
+            ],
+            [
+                outputWireDecl,
+            ], hook
+        )
     }
 }

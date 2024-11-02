@@ -174,5 +174,7 @@ struct TapInfo: Codable {
         self.chain = chain
     }
 
-    static let `default`: TapInfo = try! JSONDecoder().decode(TapInfo.self, from: Data(TapCreator.info.utf8))
+    static let `default`: TapInfo = try! JSONDecoder().decode(
+        TapInfo.self, from: Data(TapCreator.info.utf8)
+    )
 }

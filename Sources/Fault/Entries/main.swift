@@ -15,13 +15,13 @@
 import ArgumentParser
 import BigInt
 import Collections
-import CoreFoundation  // Not automatically imported on Linux
+import CoreFoundation // Not automatically imported on Linux
 import Defile
 import Foundation
 import PythonKit
 import Yams
 
-let VERSION = "0.8.0"
+let VERSION = "0.9.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
@@ -29,12 +29,12 @@ let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
 
-_ = [  // Register all RNGs
+_ = [ // Register all RNGs
     SwiftRNG.registered,
     LFSR.registered,
     PatternGenerator.registered,
 ]
-_ = [  // Register all TVGens
+_ = [ // Register all TVGens
     Atalanta.registered,
     Quaigh.registered,
     PODEM.registered,
@@ -72,7 +72,7 @@ let pythonVersions = {
         Stderr.print("\(error)")
         exit(EX_UNAVAILABLE)
     }
-}()  // Just to check
+}() // Just to check
 
 struct Fault: ParsableCommand {
     static let configuration = CommandConfiguration(

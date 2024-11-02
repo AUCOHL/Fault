@@ -25,7 +25,7 @@ public class Future {
     private var executor: () -> Any
 
     init(executor: @escaping () -> Any) {
-        self.semaphore = DispatchSemaphore(value: 0)
+        semaphore = DispatchSemaphore(value: 0)
         self.executor = executor
 
         if Future.pool == nil {
@@ -35,18 +35,19 @@ public class Future {
                 ) ?? CInt(clamping: ProcessInfo.processInfo.processorCount))
         }
 
-        let _ = thpool_add_work(
+        _ = thpool_add_work(
             Future.pool!,
             {
                 pointer in
                 let this = Unmanaged<Future>.fromOpaque(pointer!).takeUnretainedValue()
                 this.store = this.executor()
                 this.semaphore.signal()
-            }, Unmanaged.passUnretained(self).toOpaque())
+            }, Unmanaged.passUnretained(self).toOpaque()
+        )
     }
 
     public var value: Any {
-        self.semaphore.wait()
+        semaphore.wait()
         let value = store!
         return value
     }

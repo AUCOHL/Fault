@@ -20,23 +20,36 @@ struct Reset {
 }
 
 struct BypassOptions: ParsableArguments {
-    @Option(name: [.long], help: "Inputs to bypass when performing operations. May be specified multiple times to bypass multiple inputs. Will be held high during simulations by default, unless =0 is appended to the option.")
+    @Option(
+        name: [.long],
+        help:
+        "I/Os to bypass when performing operations. May be specified multiple times to bypass multiple I/Os. Inputs will be held high during simulations by default, unless =0 is appended to the option."
+    )
     var bypassing: [String] = []
-    
-    @Option(help: "Clock name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held high.")
+
+    @Option(
+        help:
+        "Clock name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held high."
+    )
     var clock: String
-    
-    @Option(name: [.customLong("reset")], help: "Reset name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held low.")
+
+    @Option(
+        name: [.customLong("reset")],
+        help:
+        "Reset name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held low."
+    )
     var resetName: String = "rst"
 
-    @Flag(name: [.long, .customLong("activeLow")], help: "The reset signal is considered active-low insted, and will be held high during simulations.")
+    @Flag(
+        name: [.long, .customLong("activeLow")],
+        help:
+        "The reset signal is considered active-low insted, and will be held high during simulations."
+    )
     var resetActiveLow: Bool = false
-    
-    lazy var reset: Reset = {
-        return Reset(name: resetName, active: resetActiveLow ? .low : .high)
-    }()
-    
-    lazy var simulationValues: OrderedDictionary<String, Simulator.Behavior>  = {
+
+    lazy var reset: Reset = .init(name: resetName, active: resetActiveLow ? .low : .high)
+
+    lazy var simulationValues: OrderedDictionary<String, Simulator.Behavior> = {
         var result: OrderedDictionary<String, Simulator.Behavior> = [:]
         result[clock] = .holdHigh
         result[reset.name] = reset.active == .low ? .holdHigh : .holdLow
@@ -50,9 +63,6 @@ struct BypassOptions: ParsableArguments {
         }
         return result
     }()
-    
-    lazy var bypassedInputs: Set<String> = {
-        return Set<String>(simulationValues.keys)
-    }()
-    
-} 
+
+    lazy var bypassedIOs: Set<String> = .init(simulationValues.keys)
+}

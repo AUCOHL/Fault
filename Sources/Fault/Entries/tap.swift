@@ -13,23 +13,25 @@
 // limitations under the License.
 
 import ArgumentParser
+import BigInt
 import CoreFoundation
 import Defile
 import Foundation
 import PythonKit
-import BigInt
-
 
 extension Fault {
     struct Tap: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Add a JTAG TAP port and controller to a netlist with a scan-chain."
         )
-        
+
         @Option(name: [.short, .long], help: "Path to the output file.")
         var output: String?
 
-        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify JTAG port using given cell model.")
+        @Option(
+            name: [.short, .long, .customLong("cellModel")],
+            help: "Verify JTAG port using given cell model."
+        )
         var cellModel: String?
 
         @OptionGroup
@@ -41,16 +43,35 @@ extension Fault {
         @Option(name: [.short, .long], help: ".bin file for test vectors.")
         var testVectors: String?
 
-        @Option(name: [.short, .long], help: ".bin file for golden output. Required iff testVectors is provided.")
+        @Option(
+            name: [.short, .long],
+            help: ".bin file for golden output. Required iff testVectors is provided."
+        )
         var goldenOutput: String?
-        
-        @Option(name: [.customShort("B"), .long, .customLong("blackboxModel")], help: "Files containing definitions for blackbox models. Comma-delimited. (Default: none)")
+
+        @Option(
+            name: [.customShort("b"), .customLong("blackbox")],
+            help: "Blackbox module names. Specify multiple times to specify multiple modules."
+        )
+        var blackbox: [String] = []
+
+        @Option(
+            name: [.customShort("B"), .long, .customLong("blackboxModel")],
+            help: "Blackbox model verilog files. Specify multiple times to specify multiple models."
+        )
         var blackboxModels: [String] = []
 
-        @Option(name: [.customShort("D"), .customLong("define")], help: "Define statements to include during simulations.")
+        @Option(
+            name: [.customShort("D"), .customLong("define")],
+            help:
+            "`define statements to include during simulations. Specify multiple times to specify multiple defines."
+        )
         var defines: [String] = []
-        
-        @Option(name: [.customShort("I"), .customLong("include")], help: "Extra verilog models to include during simulations.")
+
+        @Option(
+            name: [.customShort("I"), .customLong("inc"), .customLong("include")],
+            help: "Extra verilog models to include during simulations. (Default: none)"
+        )
         var includes: [String] = []
 
         @Flag(name: [.long], help: "Skip re-synthesizing the chained netlist.")
@@ -86,10 +107,10 @@ extension Fault {
 
         @Option(name: .long, help: "Name for JTAG test reset (active low) signal.")
         var trst: String = "trst"
-        
+
         @Argument
         var file: String
-    
+
         mutating func run() throws {
             let fileManager = FileManager()
             if !fileManager.fileExists(atPath: file) {
@@ -98,9 +119,8 @@ extension Fault {
 
             let (_, boundaryCount, internalCount) = ChainMetadata.extract(file: file)
 
-            let defines
-                = Set<String>(defines)
-                
+            let defines = Set<String>(defines)
+
             if !fileManager.fileExists(atPath: liberty) {
                 throw ValidationError("Liberty file '\(liberty)' not found.")
             }
@@ -131,7 +151,7 @@ extension Fault {
                         "Warning: Test vectors file provided does not end with .bin."
                     )
                 }
-                guard let _ = goldenOutput else {
+                guard goldenOutput != nil else {
                     throw ValidationError("Using goldenOutput (-g) option is required '\(tvTest)'.")
                 }
             }
@@ -184,28 +204,35 @@ extension Fault {
                     tck,
                     test,
                 ]
-                let topModulePorts = Python.list(ports.filter {
-                    !chainPorts.contains(String($0.name)!)
-                })
+                let topModulePorts = Python.list(
+                    ports.filter {
+                        !chainPorts.contains(String($0.name)!)
+                    })
 
-                topModulePorts.append(Node.Port(
-                    tms, Python.None, Python.None, Python.None
-                ))
-                topModulePorts.append(Node.Port(
-                    tck, Python.None, Python.None, Python.None
-                ))
-                topModulePorts.append(Node.Port(
-                    tdi, Python.None, Python.None, Python.None
-                ))
-                topModulePorts.append(Node.Port(
-                    tdo, Python.None, Python.None, Python.None
-                ))
-                topModulePorts.append(Node.Port(
-                    trst, Python.None, Python.None, Python.None
-                ))
-                topModulePorts.append(Node.Port(
-                    tdoEnable, Python.None, Python.None, Python.None
-                ))
+                topModulePorts.append(
+                    Node.Port(
+                        tms, Python.None, Python.None, Python.None
+                    ))
+                topModulePorts.append(
+                    Node.Port(
+                        tck, Python.None, Python.None, Python.None
+                    ))
+                topModulePorts.append(
+                    Node.Port(
+                        tdi, Python.None, Python.None, Python.None
+                    ))
+                topModulePorts.append(
+                    Node.Port(
+                        tdo, Python.None, Python.None, Python.None
+                    ))
+                topModulePorts.append(
+                    Node.Port(
+                        trst, Python.None, Python.None, Python.None
+                    ))
+                topModulePorts.append(
+                    Node.Port(
+                        tdoEnable, Python.None, Python.None, Python.None
+                    ))
 
                 let statements = Python.list()
                 statements.append(Node.Input(tms))
@@ -219,10 +246,11 @@ extension Fault {
                 for input in inputs {
                     if !chainPorts.contains(input.name) {
                         let inputStatement = Node.Input(input.name)
-                        portArguments.append(Node.PortArg(
-                            input.name,
-                            Node.Identifier(input.name)
-                        ))
+                        portArguments.append(
+                            Node.PortArg(
+                                input.name,
+                                Node.Identifier(input.name)
+                            ))
                         if input.width > 1 {
                             let width = Node.Width(
                                 Node.Constant(input.from),
@@ -233,10 +261,11 @@ extension Fault {
                         statements.append(inputStatement)
                     } else {
                         let portIdentifier = input.name
-                        portArguments.append(Node.PortArg(
-                            input.name,
-                            Node.Identifier(portIdentifier)
-                        ))
+                        portArguments.append(
+                            Node.PortArg(
+                                input.name,
+                                Node.Identifier(portIdentifier)
+                            ))
                     }
                 }
 
@@ -252,10 +281,11 @@ extension Fault {
                         }
                         statements.append(outputStatement)
                     }
-                    portArguments.append(Node.PortArg(
-                        output.name,
-                        Node.Identifier(output.name)
-                    ))
+                    portArguments.append(
+                        Node.PortArg(
+                            output.name,
+                            Node.Identifier(output.name)
+                        ))
                 }
 
                 // MARK: tap module
@@ -291,11 +321,12 @@ extension Fault {
                     Python.tuple()
                 )
 
-                statements.append(Node.InstanceList(
-                    alteredName,
-                    Python.tuple(),
-                    Python.tuple([submoduleInstance])
-                ))
+                statements.append(
+                    Node.InstanceList(
+                        alteredName,
+                        Python.tuple(),
+                        Python.tuple([submoduleInstance])
+                    ))
 
                 let supermodel = Node.ModuleDef(
                     definitionName,
@@ -386,6 +417,7 @@ extension Fault {
                 }
 
                 // MARK: Verification
+
                 let models = [model] + includes + blackboxModels
 
                 print("Verifying tap port integrity…")
@@ -429,7 +461,9 @@ extension Fault {
                     print("Tap port verified successfully.")
                 } else {
                     print("Tap port verification failed.")
-                    print("・Ensure that clock and reset signals, if they exist are passed as such to the program.")
+                    print(
+                        "・Ensure that clock and reset signals, if they exist are passed as such to the program."
+                    )
                     if bypass.reset.active == .high {
                         print("・Ensure that the reset is active high- pass --activeLow for activeLow.")
                     }
@@ -474,8 +508,10 @@ extension Fault {
                         print("Test vectors verified successfully.")
                     } else {
                         print("Test vector simulation failed.")
-                        if bypass.reset.active == .high {// default is ignored inputs are held high
-                            print("・The reset is assumed active-high and thus held low. Pass --activeLow if reset is active low.")
+                        if bypass.reset.active == .high { // default is ignored inputs are held high
+                            print(
+                                "・The reset is assumed active-high and thus held low. Pass --activeLow if reset is active low."
+                            )
                         }
                         Foundation.exit(EX_DATAERR)
                     }

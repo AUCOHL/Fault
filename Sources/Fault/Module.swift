@@ -17,7 +17,7 @@ import Defile
 import Foundation
 import PythonKit
 
-struct Port: Codable {
+struct Port: Codable, Hashable {
     enum Polarity: String, Codable {
         case input
         case output
@@ -46,7 +46,9 @@ struct Port: Codable {
         self.ordinal = ordinal
     }
 
-    static func extract(from definition: PythonObject) throws -> (ports: [String: Port], inputs: [Port], outputs: [Port]) {
+    static func extract(from definition: PythonObject) throws -> (
+        ports: [String: Port], inputs: [Port], outputs: [Port]
+    ) {
         var ports: [String: Port] = [:]
 
         var paramaters: [String: Int] = [:]
@@ -108,10 +110,15 @@ struct Port: Codable {
             }
         }
 
-        let inputs: [Port] = ports.values.filter { $0.polarity == .input }.sorted(by: { $0.ordinal < $1.ordinal })
-        let outputs: [Port] = ports.values.filter { $0.polarity == .output }.sorted(by: { $0.ordinal < $1.ordinal })
+        let inputs: [Port] = ports.values.filter { $0.polarity == .input }.sorted(by: {
+            $0.ordinal < $1.ordinal
+        })
+        let outputs: [Port] = ports.values.filter { $0.polarity == .output }.sorted(by: {
+            $0.ordinal < $1.ordinal
+        })
         if ports.count != inputs.count + outputs.count {
-            throw RuntimeError("Some ports in \(definition.name) are not properly declared as an input or output.")
+            throw RuntimeError(
+                "Some ports in \(definition.name) are not properly declared as an input or output.")
         }
 
         return (ports: ports, inputs: inputs, outputs: outputs)
@@ -132,7 +139,8 @@ struct Port: Codable {
         case "Identifier":
             value = params["\(expr.name)"]!
         default:
-            Stderr.print("Got unknown expression type \(type) while evaluating port expression \(expr)")
+            Stderr.print(
+                "Got unknown expression type \(type) while evaluating port expression \(expr)")
             exit(EX_DATAERR)
         }
         return value
@@ -147,7 +155,11 @@ struct Port: Codable {
 
 extension Port: CustomStringConvertible {
     var description: String {
-        "Port@\(ordinal)(\(name): \(polarity ?? .unknown)[\(from)..\(to)])"
+        var pfx = ""
+        if from != to || from != 0 {
+            pfx = "[\(from)..\(to)]"
+        }
+        return "Port@\(ordinal)(\(name)\(pfx): \(polarity ?? .unknown))"
     }
 }
 
@@ -180,7 +192,9 @@ struct Module {
         portsByName = ports.reduce(into: [String: Port]()) { $0[$1.name] = $1 }
     }
 
-    static func getModules(in files: [String], filter filterOpt: Set<String>? = nil) throws -> OrderedDictionary<String, Module> {
+    static func getModules(in files: [String], filter filterOpt: Set<String>? = nil) throws
+        -> OrderedDictionary<String, Module>
+    {
         let parse = Python.import("pyverilog.vparser.parser").parse
         var result: OrderedDictionary<String, Module> = [:]
 
@@ -202,7 +216,9 @@ struct Module {
                     }
                 }
                 let (_, inputs, outputs) = try Port.extract(from: definition)
-                result[name] = Module(name: name, inputs: inputs, outputs: outputs, definition: definition)
+                result[name] = Module(
+                    name: name, inputs: inputs, outputs: outputs, definition: definition
+                )
             }
         }
 
