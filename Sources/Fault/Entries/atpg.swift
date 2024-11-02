@@ -38,7 +38,8 @@ extension Fault {
 
     @Option(
       name: [.long, .customLong("output-faultPoints")],
-      help: "Path to the output yml file listing all generated fault points. (Default: nil)")
+      help: "Path to the output yml file listing all generated fault points. (Default: nil)"
+    )
     var outputFaultPoints: String?
 
     @Option(
@@ -50,12 +51,14 @@ extension Fault {
 
     @Option(
       name: [.short, .long, .customLong("cellModel")],
-      help: "A Verilog model with which standard cells can be simulated.")
+      help: "A Verilog model with which standard cells can be simulated."
+    )
     var cellModel: String
 
     @Option(
       name: [.customShort("v"), .long],
-      help: "Number of test vectors to generate in the first batch.")
+      help: "Number of test vectors to generate in the first batch."
+    )
     var tvCount: Int = 100
 
     @Option(
@@ -89,13 +92,23 @@ extension Fault {
 
     @Option(
       name: [.customShort("g"), .long],
-      help: "Use an external TV Generator: Atalanta or PODEM.")
+      help: "Use an external TV Generator: Atalanta or PODEM."
+    )
     var etvGen: String?
 
     @Option(
       name: [.short, .long],
-      help: "Netlist in bench format. (Required iff generator is set to Atalanta or PODEM.)")
+      help:
+        "Netlist in bench format. (Required if generator is set to Atalanta or PODEM and a liberty file is not passed.)"
+    )
     var bench: String?
+
+    @Option(
+      name: [.customShort("l"), .long],
+      help:
+        "Liberty file. (Required if generator is set to Atalanta or PODEM and a bench file is not passed.)"
+    )
+    var liberty: String?
 
     @Flag(help: "Generate only one testbench for inspection, and do not delete it.")
     var sampleRun: Bool = false
@@ -111,19 +124,20 @@ extension Fault {
 
     @Option(
       name: [.customShort("D"), .customLong("define")],
-      help: "Define statements to include during simulations.")
+      help: "Define statements to include during simulations."
+    )
     var defines: [String] = []
 
     @Option(
       name: [.customShort("I"), .customLong("include")],
-      help: "Extra verilog models to include during simulations.")
+      help: "Extra verilog models to include during simulations."
+    )
     var includes: [String] = []
 
     @Argument(help: "The cutaway netlist to generate patterns for.")
     var file: String
 
     mutating func run() throws {
-
       if !TVGeneratorFactory.validNames.contains(tvGen) {
         throw ValidationError("Invalid test-vector generator \(tvGen).")
       }
@@ -182,14 +196,36 @@ extension Fault {
           Stderr.print("Unknown external test vector generator '\(tvGenerator)'.")
           Foundation.exit(EX_USAGE)
         }
+        if bench == nil, liberty == nil {
+          Stderr.print(
+            "Either --bench or --liberty must be passed when using an external test vector generator."
+          )
+          Foundation.exit(EX_USAGE)
+        }
 
-        let benchUnwrapped = bench!  // Program exits if etvGen.value isn't nil and bench.value is or vice versa
+        let benchUnwrapped =
+          bench
+          ?? {
+            let nl2bench = Python.import("nl2bench")
+            let pyPath = Python.import("pathlib").Path
+            let benchPath = file.replacingExtension(".v", with: ".bench")
+            let benchPathF = Python.open(benchPath, "w", encoding: "utf8")
+            nl2bench.nl2bench.verilog_netlist_to_bench(
+              pyPath(file),
+              [
+                liberty!
+              ],
+              benchPathF, Array(bypass.bypassedIOs)
+            )
+            return benchPath
+          }()
 
         if !fileManager.fileExists(atPath: benchUnwrapped) {
           throw ValidationError("Bench file '\(benchUnwrapped)' not found.")
         }
         (etvSetVectors, etvSetInputs) = etvgen.generate(
-          file: benchUnwrapped, module: "\(definition.name)")
+          file: benchUnwrapped, module: "\(definition.name)"
+        )
 
         if etvSetVectors.count == 0 {
           Stderr.print(
@@ -245,9 +281,21 @@ extension Fault {
           inputsMinusIgnored = evtInputsMinusIgnored
         }
 
+        var inputSimulationValues: OrderedDictionary<String, Simulator.Behavior> = [:]
+        var portsMinusBypassedOutputs: [String: Port] = ports
+        var outputsMinusBypassed: [Port] = []
         for (_, port) in ports {
           if bypass.bypassedIOs.contains(port.name) {
+            print("Bypassing \(port.name)…")
+            if port.polarity == .input {
+              inputSimulationValues[port.name] = bypass.simulationValues[port.name]
+            } else {
+              portsMinusBypassedOutputs.removeValue(forKey: port.name)
+            }
             continue
+          }
+          if port.polarity == .output {
+            outputsMinusBypassed.append(port)
           }
           if port.width == 1 {
             faultPoints.insert(port.name)
@@ -311,8 +359,8 @@ extension Fault {
           with: models,
           ports: ports,
           inputs: inputsMinusIgnored,
-          bypassingWithBehavior: bypass.simulationValues,
-          outputs: outputs,
+          bypassingWithBehavior: inputSimulationValues,
+          outputs: outputsMinusBypassed,
           initialVectorCount: tvCount,
           incrementingBy: increment,
           minimumCoverage: tvMinimumCoverage,
@@ -338,7 +386,7 @@ extension Fault {
 
         let rawTVInfo = TVInfo(
           inputs: inputsMinusIgnored,
-          outputs: outputs,
+          outputs: outputsMinusBypassed,
           coverageList: result.coverageList
         )
         let jsonRawOutput = jsonOutput.replacingExtension(".tv.json", with: ".raw_tv.json")
@@ -348,7 +396,7 @@ extension Fault {
 
         let tvInfo = TVInfo(
           inputs: inputsMinusIgnored,
-          outputs: outputs,
+          outputs: outputsMinusBypassed,
           coverageList: Compactor.compact(coverageList: result.coverageList)
         )
         print(
