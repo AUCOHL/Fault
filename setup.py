@@ -64,6 +64,7 @@ class fault_exe(Extension):
             os.unlink(target)
         except FileNotFoundError:
             pass
+        print(os.listdir(".build"))
         shutil.copy(os.path.join(".build", "release", "fault"), target)
 
 class custom_build_ext(build_ext):

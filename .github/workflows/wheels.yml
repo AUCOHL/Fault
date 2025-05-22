@@ -89,8 +89,8 @@ jobs:
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_ALL: |
             if command -v dnf > /dev/null; then
-              dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-              dnf install swift-lang
+              dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+              dnf install -y swift-lang
             fi
           CIBW_ENVIRONMENT: ""
           CIBW_ENVIRONMENT_MACOS: >
