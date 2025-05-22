@@ -1,0 +1,3 @@
+include Package.swift
+recursive-include Sources *.swift
+recursive-include fault *.py

@@ -31,3 +31,4 @@ abc.history
 temp.txt
 *.egg-info
 build/
+dist/
