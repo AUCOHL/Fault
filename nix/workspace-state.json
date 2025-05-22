@@ -46,8 +46,8 @@
         },
         "state": {
           "checkoutState": {
-            "revision": "43647b36cacb99558e57ef98e97ef598f91d1164",
-            "version": "0.5.0"
+            "revision": "6fd4817e33c31a57760e285228ef8f81cd359062",
+            "version": "0.4.2"
           },
           "name": "sourceControlCheckout"
         },
@@ -63,8 +63,8 @@
         },
         "state": {
           "checkoutState": {
-            "revision": "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
-            "version": "1.4.0"
+            "revision": "8f4d2753f0e4778c76d5f05ad16c74f707390531",
+            "version": "1.2.3"
           },
           "name": "sourceControlCheckout"
         },
