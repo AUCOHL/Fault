@@ -135,6 +135,7 @@ jobs:
           repo-token: "${{ secrets.MY_TOKEN }}"
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
         with:
           password: ${{ secrets.PYPI_TOKEN }}
           repository-url: ${{ vars.PYPI_INDEX || 'https://upload.pypi.org/legacy/' }}
