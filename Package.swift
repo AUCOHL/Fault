@@ -1,4 +1,4 @@
-// swift-tools-version:5.8
+// swift-tools-version:5.6
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Fault",
     platforms: [
-        .macOS(.v13)  // Regex features only available in Ventura+
+        .macOS(.v12)
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.

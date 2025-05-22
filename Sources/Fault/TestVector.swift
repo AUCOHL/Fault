@@ -127,35 +127,56 @@ enum TVSet {
     static func readFromTest(_ file: String, withInputsFrom bench: String) throws -> ([TestVector], [Port]) {
         var inputDict: OrderedDictionary<String, Port> = [:]
         let benchStr = File.read(bench)!
-        let inputRx = #/INPUT\(([^\(\)]+?)(\[\d+\])?\)/#
         var ordinal = -1
+        
         for line in benchStr.components(separatedBy: "\n") {
-            if let match = try? inputRx.firstMatch(in: line) {
-                let name = String(match.1)
-                inputDict[name] = inputDict[name] ?? Port(name: name, polarity: .input, from: 0, to: -1, at: { ordinal += 1; return ordinal }())
-                inputDict[name]!.to += 1
-            }
+            guard line.contains("INPUT(") else { continue }
+            
+            // Parse input name
+            let start = line.firstIndex(of: "(").map { line.index(after: $0) } ?? line.startIndex
+            let end = line.firstIndex(of: ")") ?? line.endIndex
+            let content = String(line[start..<end])
+            
+            // Split name and optional array index
+            let bracketIndex = content.firstIndex(of: "[")
+            let name = bracketIndex != nil ? String(content[..<bracketIndex!]) : content
+            
+            inputDict[name] = inputDict[name] ?? Port(name: name, polarity: .input, from: 0, to: -1, at: { ordinal += 1; return ordinal }())
+            inputDict[name]!.to += 1
         }
         
         let inputs: [Port] = inputDict.values.sorted { $0.ordinal < $1.ordinal }
         var vectors: [TestVector] = []
         let testStr = File.read(file)!
-        let tvRx = #/(\d+):\s*([01]+)/#
+        
         for line in testStr.components(separatedBy: "\n") {
-            if let match = try? tvRx.firstMatch(in: line) {
-                let vectorStr = match.2
-                guard var vectorCat = BigUInt(String(vectorStr.reversed()), radix: 2) else {
+            guard line.contains(":") else { continue }
+            
+            // Split line number and vector string
+            let parts = line.components(separatedBy: ":")
+            guard parts.count == 2 else { continue }
+            
+            let vectorStr = parts[1].trimmingCharacters(in: .whitespaces)
+            guard !vectorStr.isEmpty else { continue }
+            
+            // Parse binary string to BigUInt
+            var vectorCat = BigUInt(0)
+            for char in vectorStr.reversed() {
+                vectorCat <<= 1
+                if char == "1" {
+                    vectorCat |= 1
+                } else if char != "0" {
                     Stderr.print("Failed to parse test vector in .test file: \(vectorStr)")
                     exit(EX_DATAERR)
                 }
-                let tv: TestVector = inputs.map {
-                    input in
-                    let value = vectorCat & ((1 << input.width) - 1)
-                    vectorCat >>= input.width
-                    return value
-                }
-                vectors.append(tv)
             }
+            
+            let tv: TestVector = inputs.map { input in
+                let value = vectorCat & ((1 << input.width) - 1)
+                vectorCat >>= input.width
+                return value
+            }
+            vectors.append(tv)
         }
 
         return (vectors: vectors, inputs: inputs)
