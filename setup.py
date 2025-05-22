@@ -64,7 +64,6 @@ class fault_exe(Extension):
             os.unlink(target)
         except FileNotFoundError:
             pass
-        print(os.listdir(".build/release"))
         shutil.copy(os.path.join(".build", "release", "fault"), target)
 
 class custom_build_ext(build_ext):
@@ -90,7 +89,7 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",
     ],
-    python_requires=">=3.10",
+    python_requires=">=3.8",
     ext_modules=[fault_exe()],
     cmdclass={
         "build_ext": custom_build_ext,

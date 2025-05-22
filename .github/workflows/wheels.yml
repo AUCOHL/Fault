@@ -75,11 +75,16 @@ jobs:
       - uses: actions/setup-python@v5
       ## Software installed by default in GitHub Action Runner VMs:
       ##  https://github.com/actions/runner-images
+      - if: ${{ matrix.os.family == 'macos' && matrix.os.archs == 'arm64' }}
+        name: "[macOS/arm64] Install Python 3.8 (see: https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64)"
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.8
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.1
         env:
           # * APIs not supported by PyPy
-          # * Musllinux disabled because it increases build time from 48m to ~3h
+          # * Musllinux disabled to save build time
           CIBW_SKIP: >
             pp*
             *musllinux*
