@@ -2,11 +2,11 @@
 {
   workspaceStateFile = ./workspace-state.json;
   hashes = {
-    "BigInt" = "1iglvwb357qbfjx5iz686rdb6m1p7zm9szivbzmai6y91qk7pi4q";
-    "Defile" = "0szrq1bppc91wakqwwbzjrh7ic68ix2m0hn5z9h5ca34mc3cnr2w";
-    "PythonKit" = "1jrwnnw71l77yw4mjwl11jlil2018n35p56p1xzk78g0ldr4d8z9";
-    "swift-argument-parser" = "0pvsnr651f8bjibni7lar8l6jchnmhs0a294gg85mhldqh9sdmjb";
-    "swift-collections" = "0i19czvb1j0xjbg238k802g72dpsa9mvxn9wf16jc3bgckvgbn2q";
-    "Yams" = "1jf3k2lm5b9i8m9bpnzhqa8mnc3qzj91icv5ykjplk3vy0idz3q1";
+    "BigInt" = "sha256-mMR7Jg7Jm6jqXzt+neo/N1SzWjbI/Fi6dAufMhbf9MU=";
+    "Defile" = "sha256-XGTLBqtkKFZg+sVCUEWPyLB4YJZ/cY6n4iGxe1fA+Ws=";
+    "PythonKit" = "sha256-W5O1lglezaFOoIgIGBAVo1OobXDZwpx0ZO67PSE4A5E=";
+    "swift-argument-parser" = "sha256-qEJ329hqQyQVxtHScD7qPmWW9ZDf9bX+4xgpDlX0w5A=";
+    "swift-collections" = "sha256-WNj19mRvDSZNcDzZvmtS+jZxngBooiHekh3IsPZnKUQ=";
+    "Yams" = "sha256-AY/fIvB7THrl9GWzGJL8eDBbkcLw27tSRTGtUqmYw8k=";
   };
 }

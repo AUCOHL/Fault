@@ -48,7 +48,7 @@ are some pointers nevertheless.
 - [IcarusVerilog](https://steveicarus.github.io/iverilog/usage/installation.html)
   - You will need to set the environment variable `FAULT_IVL_BASE` to point to
     the `ivl` directory installed by IcarusVerilog.
-- [Python 3.8+](https://www.python.org/downloads/) with PIP and venv
+- [Python 3.10+](https://www.python.org/downloads/) with PIP and venv
   - You will need to set the environment variable `PYTHON_LIBARY` to point to
     the `.so`/`.dylib` file for Python.
   - [Pyverilog](https://github.com/pyverilog/pyverilog)

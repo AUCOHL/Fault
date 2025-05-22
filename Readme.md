@@ -1,7 +1,7 @@
 <h1 align="center">🧪 Fault</h1>
 
 <p align="center">
-  <a href="https://developer.apple.com/swift/"><img src="https://img.shields.io/badge/Swift-5.8-orange?logo=swift" alt="Swift 5.8 or higher"/></a>
+  <a href="https://developer.apple.com/swift/"><img src="https://img.shields.io/badge/Swift-5.6-orange?logo=swift" alt="Swift 5.6 or higher"/></a>
   <a href="https://fault.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/fault/badge" alt="Read the Docs"/></a>
   <a href="https://nixos.org/"><img src="https://img.shields.io/static/v1?logo=nixos&logoColor=white&label=&message=Built%20with%20Nix&color=41439a"   
  alt="Built with Nix"/></a>

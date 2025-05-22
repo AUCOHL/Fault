@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# Copyright (C) 2025 The American University in Cairo
+#
+# Adapted from Yosys wheels
+#
+# Copyright (C) 2024 Efabless Corporation
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+name: Build Wheels for PyPI
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+
+jobs:
+  build_wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+            {
+              name: "Ubuntu 22.04",
+              family: "linux",
+              runner: "ubuntu-22.04",
+              archs: "x86_64",
+            },
+            {
+              name: "Ubuntu 22.04",
+              family: "linux",
+              runner: "ubuntu-22.04-arm",
+              archs: "aarch64",
+            },
+            {
+              name: "macOS 13",
+              family: "macos",
+              runner: "macos-13",
+              archs: "x86_64",
+            },
+            {
+              name: "macOS 14",
+              family: "macos",
+              runner: "macos-14",
+              archs: "arm64",
+            },
+            ## Windows is disabled because of an issue with compiling FFI as
+            ## under MinGW in the GitHub Actions environment (SHELL variable has
+            ## whitespace.)
+            # {
+            #   name: "Windows Server 2019",
+            #   family: "windows",
+            #   runner: "windows-2019",
+            #   archs: "AMD64",
+            # },
+          ]
+    name: Build Wheels | ${{ matrix.os.name }} | ${{ matrix.os.archs }}
+    runs-on: ${{ matrix.os.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+      ## Software installed by default in GitHub Action Runner VMs:
+      ##  https://github.com/actions/runner-images
+      - if: ${{ matrix.os.family == 'macos' && matrix.os.archs == 'arm64' }}
+        name: "[macOS/arm64] Install Python 3.8 (see: https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64)"
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.8
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21.1
+        env:
+          # * APIs not supported by PyPy
+          # * Musllinux disabled to save build time
+          CIBW_SKIP: >
+            pp*
+            *musllinux*
+          CIBW_ARCHS: ${{ matrix.os.archs }}
+          CIBW_BUILD_VERBOSITY: "1"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+          CIBW_BEFORE_ALL: |
+            if command -v dnf > /dev/null; then
+              dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+              dnf --enablerepo=powertools install -y libstdc++-static
+              dnf install -y swift-lang
+            fi
+          CIBW_ENVIRONMENT: ""
+          CIBW_ENVIRONMENT_MACOS: >
+            MACOSX_DEPLOYMENT_TARGET=12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels-${{ matrix.os.runner }}
+          path: ./wheelhouse/*.whl
+  upload_wheels:
+    name: Upload Wheels
+    runs-on: ubuntu-latest
+    needs: build_wheels
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: "."
+          pattern: python-wheels-*
+          merge-multiple: true
+      - run: |
+          ls
+          mkdir -p ./dist
+          mv *.whl ./dist
+      - name: Set default for env.NEW_TAG
+        run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
+      - name: Check for new version
+        if: ${{ env.BRANCH_NAME == 'main' }}
+        run: |
+          python3 .github/scripts/generate_tag.py
+      - name: Tag Commit
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        uses: tvdias/github-tagger@v0.0.1
+        with:
+          tag: "${{ env.NEW_TAG }}"
+          repo-token: "${{ secrets.MY_TOKEN }}"
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+          repository-url: ${{ vars.PYPI_INDEX || 'https://upload.pypi.org/legacy/' }}
