@@ -51,9 +51,8 @@ class fault_exe(Extension):
                 "-c",
                 "release",
                 *(["--static-swift-stdlib"] * (platform.system() != "Darwin")),
-                "--target",
+                "--product",
                 "fault",
-                "--show-bin-path"
             ]
             + shlex.split(os.getenv("spmFlags", ""))
             + self.args

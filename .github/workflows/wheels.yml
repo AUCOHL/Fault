@@ -90,6 +90,7 @@ jobs:
           CIBW_BEFORE_ALL: |
             if command -v dnf > /dev/null; then
               dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+              dnf --enablerepo=powertools install -y libstdc++-static
               dnf install -y swift-lang
             fi
           CIBW_ENVIRONMENT: ""

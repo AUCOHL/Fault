@@ -12,7 +12,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         .package(
             url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0")),
-        .package(url: "https://github.com/pvieito/PythonKit", .exact("0.4.2")),
+        .package(url: "https://github.com/pvieito/PythonKit", exact: "0.4.2"),
         .package(url: "https://github.com/donn/Defile.git", from: "5.2.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.2.1"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6"),
