@@ -41,13 +41,6 @@ _ = [  // Register all TVGens
     PodemQuest.registered,
 ]
 
-let yosysTest = "'\(yosysExecutable)' -V".sh(silent: true)
-if yosysTest != EX_OK {
-    Stderr.print(
-        "Yosys must be installed to PATH on your computer for Fault to work. Fault will now quit.")
-    exit(EX_UNAVAILABLE)
-}
-
 let pythonVersions = {
     // Test Yosys, Python
     () -> (python: String, pyverilog: String) in

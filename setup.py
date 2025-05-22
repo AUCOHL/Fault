@@ -52,7 +52,8 @@ class fault_exe(Extension):
                 "release",
                 *(["--static-swift-stdlib"] * (platform.system() != "Darwin")),
                 "--target",
-                "fault"
+                "fault",
+                "--show-bin-path"
             ]
             + shlex.split(os.getenv("spmFlags", ""))
             + self.args
@@ -64,7 +65,7 @@ class fault_exe(Extension):
             os.unlink(target)
         except FileNotFoundError:
             pass
-        print(os.listdir(".build"))
+        print(os.listdir(".build/release"))
         shutil.copy(os.path.join(".build", "release", "fault"), target)
 
 class custom_build_ext(build_ext):
