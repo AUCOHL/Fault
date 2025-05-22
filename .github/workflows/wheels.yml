@@ -89,11 +89,11 @@ jobs:
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_ALL: |
             if ! command -v swift > /dev/null; then
-              curl -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" && \
-              tar zxf "swiftly-$(uname -m).tar.gz" && \
-              ./swiftly init --quiet-shell-followup && \
-              . ${SWIFTLY_HOME_DIR:-~/.local/share/swiftly}/env.sh && \
-              hash -r
+              mkdir swiftly
+              curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar -xzC swiftly
+              ./swiftly/swiftly init --assume-yes --no-modify-profile --skip-install --quiet-shell-followup
+              . "/home/${USER}/.local/share/swiftly/env.sh"
+              swiftly install --assume-yes --use --post-install-file 5.8
             fi
           CIBW_ENVIRONMENT: ""
           CIBW_ENVIRONMENT_MACOS: >
