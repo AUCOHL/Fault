@@ -28,7 +28,10 @@ available via Docker and will update this document when we do.
 
 Fault requires a number of dependencies that you may elect to install manually.
 
-You need a Unix-based, Swift-compatible operating system. 
+To alleviate the annoynaces of installing Fault itself, we provide pre-built
+binary Python wheels on PyPI (requiring Python 3.8+): The short version is
+`python3 -m pip install fault-dft`. You will need to install all other utilities
+on your own however.
 
 Again, if you're on Windows (or you're too lazy to follow these instructions,)
 you can use the Docker container.
@@ -36,24 +39,19 @@ you can use the Docker container.
 We will not be supporting this option as too many things can go wrong, but here
 are some pointers nevertheless.
 
+### Runtime Dependencies
+
+- [Python 3.8+](https://www.python.org/downloads/) with PIP and venv - available in most package managers
+- [Yosys](https://github.com/yosyshq/yosys) - available in most package managers
+- [IcarusVerilog](https://steveicarus.github.io/iverilog/usage/installation.html) - available in most package managers
+- [Quaigh](https://github.com/coloquinte/quaigh) (Optional but really recommended) - `cargo install quaigh`
+  - You can get `cargo` by installing Rust -- https://www.rust-lang.org/tools/install
+- [Atalanta](https://github.com/hsluoyz/atalanta) (Proprietary, optional)
+- [NTU EE PODEM](https://github.com/donn/VLSI-Testing) (Proprietary, optional)
+
 ### Build Dependencies
 
-* [Swift 5.8+](https://swift.org) and the Swift Package Manager
+If you're looking to build it on your own, you will need:
+
+* [Swift 5.6+](https://swift.org) and the Swift Package Manager
   * + a compatible version of Clang (included)
-* Git
-
-### Run-time Dependencies
-
-- [Yosys](https://github.com/yosyshq/yosys)
-- [IcarusVerilog](https://steveicarus.github.io/iverilog/usage/installation.html)
-  - You will need to set the environment variable `FAULT_IVL_BASE` to point to
-    the `ivl` directory installed by IcarusVerilog.
-- [Python 3.10+](https://www.python.org/downloads/) with PIP and venv
-  - You will need to set the environment variable `PYTHON_LIBARY` to point to
-    the `.so`/`.dylib` file for Python.
-  - [Pyverilog](https://github.com/pyverilog/pyverilog)
-  - [nl2bench](https://github.com/donn/nl2bench) (Required if using Quaigh or Atalanta)
-- [Quaigh](https://github.com/coloquinte/quaigh) (Optional but really recommended)
-- [Atalanta](https://github.com/hsluoyz/atalanta) (Optional)
-- [NTU EE PODEM](https://github.com/donn/VLSI-Testing) (Optional)
-//todo: add PodemQuest

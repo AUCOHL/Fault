@@ -21,10 +21,10 @@ import Foundation
 import PythonKit
 import Yams
 
-let VERSION = "0.9.0.dev2"
+let VERSION = "0.9.0.dev3"
 
 var env = ProcessInfo.processInfo.environment
-let iverilogBase = env["FAULT_IVL_BASE"] ?? "/usr/local/lib/ivl"
+let iverilogBase = env["FAULT_IVL_BASE"]
 let iverilogExecutable = env["FAULT_IVERILOG"] ?? env["PYVERILOG_IVERILOG"] ?? "iverilog"
 let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 let yosysExecutable = env["FAULT_YOSYS"] ?? "yosys"
