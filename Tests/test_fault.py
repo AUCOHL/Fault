@@ -24,12 +24,12 @@ def run(label, steps):
             "Tech/osu035/config.yml",
             id="osu035",
         ),
-        # (
-        #     "Tech/sky130_fd_sc_hd/sky130_fd_sc_hd__trimmed.lib",
-        #     "Tech/sky130_fd_sc_hd/sky130_fd_sc_hd.v",
-        #     "Tech/sky130_fd_sc_hd/config.yml",
-        #     id="sky130_fd_sc_hd",
-        # ),
+        pytest.param(
+            "Tech/ihp-sg13g2/sg13g2_stdcell_typ_1p20V_25C.lib",
+            "Tech/ihp-sg13g2/sg13g2_stdcell.v",
+            "Tech/ihp-sg13g2/config.yml",
+            id="ihp-sg13g2",
+        ),
     ],
 )
 @pytest.mark.parametrize("atpg", ["PRNG", "Quaigh"])

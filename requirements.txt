@@ -1,6 +1,6 @@
 wheel
 setuptools
 pyverilog
-nl2bench==0.8.0
+nl2bench>=0.9.1
 find_libpython
 yowasp-yosys

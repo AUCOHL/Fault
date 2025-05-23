@@ -32,6 +32,16 @@
           atalanta = callPackage ./nix/atalanta.nix {};
           podem = callPackage ./nix/podem.nix {};
           fault = callPackage ./default.nix {};
+          verilog = pkgs.verilog.overrideAttrs( {
+            version = "13.0";
+            src = pkgs.fetchFromGitHub {
+              owner = "steveicarus";
+              repo = "iverilog";
+              rev = "ea26587b5ef485f2ca82a3e4364e58ec3307240f";
+              sha256 = "sha256-OIpNUn04A5ViDm8QH7xY2IKPMU3wg9sNZMzMUAq8Q4U=";
+            };
+            patches = [];
+          });
         })
       ];
     };

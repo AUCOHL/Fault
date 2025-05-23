@@ -28,10 +28,10 @@ available via Docker and will update this document when we do.
 
 Fault requires a number of dependencies that you may elect to install manually.
 
-To alleviate the annoynaces of installing Fault itself, we provide pre-built
-binary Python wheels on PyPI (requiring Python 3.8+): The short version is
-`python3 -m pip install fault-dft`. You will need to install all other utilities
-on your own however.
+To alleviate the pain of building Fault itself, we provide pre-built
+binary Python wheels on PyPI (requiring Python 3.8+ and either macOS or
+GNU/Linux): The short version is `python3 -m pip install fault-dft`. You will
+need to install all other utilities on your own however.
 
 Again, if you're on Windows (or you're too lazy to follow these instructions,)
 you can use the Docker container.
@@ -43,7 +43,9 @@ are some pointers nevertheless.
 
 - [Python 3.8+](https://www.python.org/downloads/) with PIP and venv - available in most package managers
 - [Yosys](https://github.com/yosyshq/yosys) - available in most package managers
-- [IcarusVerilog](https://steveicarus.github.io/iverilog/usage/installation.html) - available in most package managers
+- [IcarusVerilog](https://steveicarus.github.io/iverilog/usage/installation.html)
+  - Working with the IHP Open PDK (ihp-sg13g2) requires the ***absolute latest development version*** of IcarusVerilog.
+  - You WILL need to build it from source and install it.
 - [Quaigh](https://github.com/coloquinte/quaigh) (Optional but really recommended) - `cargo install quaigh`
   - You can get `cargo` by installing Rust -- https://www.rust-lang.org/tools/install
 - [Atalanta](https://github.com/hsluoyz/atalanta) (Proprietary, optional)

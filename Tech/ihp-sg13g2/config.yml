@@ -1,0 +1,13 @@
+dffMatches:
+  # Default match should be the last element
+  - name: sg13g2_dfrbp_*
+    d: D
+    q: Q
+    clk: CLK
+muxInfo:
+  name: sg13g2_mux2_1
+  a: A1 # a is S
+  b: A0 # b when !S
+  s: S
+  "y": "X"
+  invertedOutput: false
