@@ -121,6 +121,8 @@ jobs:
           ls
           mkdir -p ./dist
           mv *.whl ./dist
+      - name: Export Repo URL
+        run: echo "REPO_URL=https://github.com/${{ github.repository }}.git" >> $GITHUB_ENV
       - name: Set default for env.NEW_TAG
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
       - name: Export Branch Name
