@@ -184,8 +184,14 @@ enum Simulator {
         let iverilogExecutable = env["FAULT_IVERILOG"] ?? "iverilog"
         let vvpExecutable = env["FAULT_VVP"] ?? "vvp"
 
+        
+        var iverilogBaseFlag = ""
+        if let base = iverilogBase {
+            iverilogBaseFlag = "-B '\(base)'"
+        }
+        
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' -Ttyp \(defineStatements) -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
+            "'\(iverilogExecutable)' \(iverilogBaseFlag) -Ttyp \(defineStatements) -o \(aoutName) \(tbName) 2>&1 > /dev/null".sh()
         if iverilogResult != EX_OK {
             exit(Int32(iverilogResult))
         }
@@ -892,11 +898,17 @@ enum Simulator {
                 let _ = "rm \(aoutName)".sh()
             }
         }
-        let iverilogCmd = "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
+        
+        var iverilogBaseFlag = ""
+        if let base = iverilogBase {
+            iverilogBaseFlag = "-B '\(base)'"
+        }
+        
+        let iverilogCmd = "'\(iverilogExecutable)' \(iverilogBaseFlag) \(define) -Ttyp -o \(aoutName) \(output) 2>&1"
         try outputFile.write(string: "$ \(iverilogCmd)\n")
 
         let iverilogResult =
-            "'\(iverilogExecutable)' -B '\(iverilogBase)' \(define) -Ttyp -o \(aoutName) \(output) 2>&1".shOutput()
+            "'\(iverilogExecutable)' \(iverilogBaseFlag) \(define) -Ttyp -o \(aoutName) \(output) 2>&1".shOutput()
         try outputFile.write(string: iverilogResult.output)
 
         if iverilogResult.terminationStatus != EX_OK {
