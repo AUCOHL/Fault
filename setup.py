@@ -96,7 +96,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'fault = fault:__main__',
+            'fault = fault.__main__:exec_fault',
         ]
     },
 )

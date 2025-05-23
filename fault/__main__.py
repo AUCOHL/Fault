@@ -27,6 +27,10 @@ def prepare_env():
     
     return env
 
-if __name__ == '__main__':
+def exec_fault():
     fault_exe = os.path.join(__dir__, "fault.exe")
     os.execle(fault_exe, "fault", *sys.argv[1:], prepare_env())
+
+
+if __name__ == '__main__':
+    exec_fault()

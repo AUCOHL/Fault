@@ -21,7 +21,7 @@ import Foundation
 import PythonKit
 import Yams
 
-let VERSION = "0.9.0.dev3"
+let VERSION = "0.9.0.dev4"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"]
