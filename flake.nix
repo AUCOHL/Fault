@@ -1,6 +1,6 @@
 {
   inputs = {
-    nix-eda.url = github:efabless/nix-eda;
+    nix-eda.url = github:fossi-foundation/nix-eda/2.1.2;
     quaigh = {
       url = github:coloquinte/quaigh;
       inputs.nixpkgs.follows = "nix-eda/nixpkgs";
