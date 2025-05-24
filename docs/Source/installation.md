@@ -33,12 +33,6 @@ binary Python wheels on PyPI (requiring Python 3.8+ and either macOS or
 GNU/Linux): The short version is `python3 -m pip install fault-dft`. You will
 need to install all other utilities on your own however.
 
-Again, if you're on Windows (or you're too lazy to follow these instructions,)
-you can use the Docker container.
-
-We will not be supporting this option as too many things can go wrong, but here
-are some pointers nevertheless.
-
 ### Runtime Dependencies
 
 - [Python 3.8+](https://www.python.org/downloads/) with PIP and venv - available in most package managers

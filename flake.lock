@@ -126,11 +126,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1729429745,
-        "narHash": "sha256-dQgCxAcoEv1NTqSRpNGEE4NhNufc76Cyc3HDInqL2+0=",
+        "lastModified": 1748004799,
+        "narHash": "sha256-hsyXOPgkFt7wuHLYVjamn7f8+DLMqZGpdqCZ2yrGAmU=",
         "owner": "donn",
         "repo": "nl2bench",
-        "rev": "23d4e0954d56ec15a12bb27064501e93566ee8e7",
+        "rev": "6a8f9d271e1f02c5bc2b75d2d21e38302f0c1c52",
         "type": "github"
       },
       "original": {
