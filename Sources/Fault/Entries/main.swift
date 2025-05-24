@@ -21,7 +21,7 @@ import Foundation
 import PythonKit
 import Yams
 
-let VERSION = "0.9.0.dev5"
+let VERSION = "0.9.0"
 
 var env = ProcessInfo.processInfo.environment
 let iverilogBase = env["FAULT_IVL_BASE"]
@@ -70,6 +70,7 @@ let pythonVersions = {
 struct Fault: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Open-source EDA's missing DFT Toolchain",
+        version: VERSION,
         subcommands: [ATPG.self, Cut.self, Synth.self, Assemble.self, Tap.self, Chain.self],
         defaultSubcommand: ATPG.self
     )
