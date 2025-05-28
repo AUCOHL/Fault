@@ -48,9 +48,8 @@ Obviously, replacing `</path/to/folder>` with your current path. For example, if
 your current folder is `/Users/me/Code`, your options would be
 `-v /Users/me/Code:/Users/me/Code -w /Users/me/Code`.
 
-```{tip}
-You can add as many `-v`s as you want to mount multiple directories.
-```
+> [!TIP]
+> You can add as many `-v`s as you want to mount multiple directories.
 
 This makes the final command:
 

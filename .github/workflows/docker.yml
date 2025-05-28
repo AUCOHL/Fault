@@ -16,16 +16,16 @@ jobs:
               name: "Ubuntu 22.04",
               family: "linux",
               runner: "ubuntu-22.04",
-              archs: "x86_64",
+              arch: "x86_64",
             },
             {
               name: "Ubuntu 22.04",
               family: "linux",
               runner: "ubuntu-22.04-arm",
-              archs: "aarch64",
+              arch: "aarch64",
             }
           ]
-    name: Build Docker Image | ${{ matrix.os.name }} | ${{ matrix.os.archs }}
+    name: Build Docker Image | ${{ matrix.os.name }} | ${{ matrix.os.arch }}
     runs-on: ${{ matrix.os.runner }}
     permissions:
       packages: write
@@ -41,7 +41,27 @@ jobs:
           echo "FAULT_VERSION=$(perl -ne 'print $1 if /let VERSION = "([^"]+)"/' Sources/Fault/Entries/main.swift)" >> $GITHUB_ENV
       - name: Set up Docker
         uses: docker/setup-docker-action@v4
-      - run: docker build -t ghcr.io/aucohl/fault:$FAULT_VERSION ./.github/workflows --build-arg "FAULT_VERSION=$FAULT_VERSION"
+      - run: docker build -t "ghcr.io/aucohl/fault:$FAULT_VERSION-${{ matrix.os.arch }}" ./.github/workflows --build-arg "FAULT_VERSION=$FAULT_VERSION"
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - run: docker push ghcr.io/aucohl/fault:$FAULT_VERSION
+      - run: docker push "ghcr.io/aucohl/fault:$FAULT_VERSION-${{ matrix.os.arch }}"
+  create_manifest:
+    name: Create and push multi-arch manifest
+    needs: build_docker_images
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v4
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Create and push manifest
+        run: |
+          docker manifest create ghcr.io/aucohl/fault:$FAULT_VERSION \
+            --amend ghcr.io/aucohl/fault:$FAULT_VERSION-x86_64 \
+            --amend ghcr.io/aucohl/fault:$FAULT_VERSION-aarch64
+          docker manifest push ghcr.io/aucohl/fault:$FAULT_VERSION
+        env:
+          FAULT_VERSION: ${{ needs.build_docker_images.outputs.FAULT_VERSION }}

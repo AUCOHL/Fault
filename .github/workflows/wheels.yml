@@ -34,25 +34,25 @@ jobs:
               name: "Ubuntu 22.04",
               family: "linux",
               runner: "ubuntu-22.04",
-              archs: "x86_64",
+              arch: "x86_64",
             },
             {
               name: "Ubuntu 22.04",
               family: "linux",
               runner: "ubuntu-22.04-arm",
-              archs: "aarch64",
+              arch: "aarch64",
             },
             {
               name: "macOS 13",
               family: "macos",
               runner: "macos-13",
-              archs: "x86_64",
+              arch: "x86_64",
             },
             {
               name: "macOS 14",
               family: "macos",
               runner: "macos-14",
-              archs: "arm64",
+              arch: "arm64",
             },
             ## Windows is disabled because of an issue with compiling FFI as
             ## under MinGW in the GitHub Actions environment (SHELL variable has
@@ -61,10 +61,10 @@ jobs:
             #   name: "Windows Server 2019",
             #   family: "windows",
             #   runner: "windows-2019",
-            #   archs: "AMD64",
+            #   arch: "AMD64",
             # },
           ]
-    name: Build Wheels | ${{ matrix.os.name }} | ${{ matrix.os.archs }}
+    name: Build Wheels | ${{ matrix.os.name }} | ${{ matrix.os.arch }}
     runs-on: ${{ matrix.os.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/setup-python@v5
       ## Software installed by default in GitHub Action Runner VMs:
       ##  https://github.com/actions/runner-images
-      - if: ${{ matrix.os.family == 'macos' && matrix.os.archs == 'arm64' }}
+      - if: ${{ matrix.os.family == 'macos' && matrix.os.arch == 'arm64' }}
         name: "[macOS/arm64] Install Python 3.8 (see: https://cibuildwheel.pypa.io/en/stable/faq/#macos-building-cpython-38-wheels-on-arm64)"
         uses: actions/setup-python@v5
         with:
@@ -88,7 +88,7 @@ jobs:
           CIBW_SKIP: >
             pp*
             *musllinux*
-          CIBW_ARCHS: ${{ matrix.os.archs }}
+          CIBW_ARCHS: ${{ matrix.os.arch }}
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
