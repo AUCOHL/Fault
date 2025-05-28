@@ -2,9 +2,61 @@
 
 In order to use Fault, you have three options:
 
-- Using Nix (macOS, Linux)
 - Using the Docker Image (Windows, macOS, Linux)
+- Using Nix (macOS, Linux)
 - Bring-your-own-dependencies (macOS, Linux)
+
+## Using the Docker Image
+
+Docker is software working at the OS level that allows small environments called
+"containers" to be run at-will.
+
+It works on Windows, macOS and Linux, where for the first two, a Linux virtual
+machine is used.
+
+For instructions on how to install Docker, check
+[Docker's website](https://docs.docker.com/install/).
+
+### Getting the Fault Docker image
+
+After installing Docker, run the following command in your terminal of choice:
+
+```sh
+docker pull ghcr.io/aucohl/fault:latest
+```
+
+You can then run Fault commands using that image. For example, to run
+`fault --version`:
+
+```sh
+docker run -ti --rm ghcr.io/aucohl/fault:latest fault --version
+```
+
+This should print something like `0.9.4`.
+
+If you see that, you have successfully set the Fault environment up on your
+machine.
+
+To use the current folder inside the Docker container, you need to add these
+options to the command:
+
+```sh
+-v </path/to/folder>:</path/to/folder> -w </path/to/folder>
+```
+
+Obviously, replacing `</path/to/folder>` with your current path. For example, if
+your current folder is `/Users/me/Code`, your options would be
+`-v /Users/me/Code:/Users/me/Code -w /Users/me/Code`.
+
+```{tip}
+You can add as many `-v`s as you want to mount multiple directories.
+```
+
+This makes the final command:
+
+```sh
+docker run -ti -v </path/to/folder>:</path/to/folder> -w </path/to/folder> --rm ghcr.io/aucohl/fault:latest fault --version
+```
 
 ## Using Nix 
 
@@ -17,12 +69,6 @@ https://openlane2.readthedocs.io/en/stable/getting_started/common/nix_installati
 Afterwards, to make the `fault` command (and the requisite `nl2bench` tool for
 using alternative ATPGs) available in PATH, you can simply invoke
 `nix profile install github:AUCOHL/Fault`.
-
-## Docker
-
-We no longer provide Docker images ourselves. We intend to work with
-[IIC-OSIC-TOOLS](https://github.com/iic-jku/IIC-OSIC-TOOLS) to make Fault
-available via Docker and will update this document when we do.
 
 ## Bring-your-own-dependencies
 

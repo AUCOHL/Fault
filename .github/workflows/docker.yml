@@ -1,0 +1,47 @@
+name: Build Docker Images
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build_docker_images:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+            {
+              name: "Ubuntu 22.04",
+              family: "linux",
+              runner: "ubuntu-22.04",
+              archs: "x86_64",
+            },
+            {
+              name: "Ubuntu 22.04",
+              family: "linux",
+              runner: "ubuntu-22.04-arm",
+              archs: "aarch64",
+            }
+          ]
+    name: Build Docker Image | ${{ matrix.os.name }} | ${{ matrix.os.archs }}
+    runs-on: ${{ matrix.os.runner }}
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          persist-credentials: false
+      - name: Get version
+        run: |
+          echo "FAULT_VERSION=$(perl -ne 'print $1 if /let VERSION = "([^"]+)"/' Sources/Fault/Entries/main.swift)" >> $GITHUB_ENV
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v4
+      - run: docker build -t ghcr.io/aucohl/fault:$FAULT_VERSION ./.github/workflows --build-arg "FAULT_VERSION=$FAULT_VERSION"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - run: docker push ghcr.io/aucohl/fault:$FAULT_VERSION

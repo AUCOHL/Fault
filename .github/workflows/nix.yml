@@ -1,4 +1,4 @@
-name: CI
+name: Nix
 # Events that trigger workflow
 on:
   push:
@@ -8,11 +8,11 @@ on:
 
 jobs:
   test:
-    name: Test/Nix
-    runs-on: macos-14
+    name: Build and Test with Nix
+    runs-on: macos-14 # fastest
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           extra-conf: |
