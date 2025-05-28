@@ -29,7 +29,10 @@ __dir__ = os.path.dirname(os.path.abspath(__file__))
 fault_version_rx = re.compile(r"let VERSION\s*=\s*\"([\w\-\+\.]+)\"")
 
 version = fault_version_rx.search(
-    open(os.path.join(__dir__, "Sources", "Fault", "Entries", "main.swift"), encoding="utf8").read()
+    open(
+        os.path.join(__dir__, "Sources", "Fault", "Entries", "main.swift"),
+        encoding="utf8",
+    ).read()
 )[1]
 
 
@@ -66,12 +69,12 @@ class fault_exe(Extension):
             pass
         shutil.copy(os.path.join(".build", "release", "fault"), target)
 
+
 class custom_build_ext(build_ext):
     def build_extension(self, ext) -> None:
         if not hasattr(ext, "custom_build"):
             return super().build_extension(ext)
         return ext.custom_build(self)
-
 
 
 setup(
@@ -95,8 +98,8 @@ setup(
         "build_ext": custom_build_ext,
     },
     entry_points={
-        'console_scripts': [
-            'fault = fault.__main__:exec_fault',
+        "console_scripts": [
+            "fault = fault.__main__:exec_fault",
         ]
     },
 )
