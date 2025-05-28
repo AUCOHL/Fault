@@ -41,10 +41,17 @@ jobs:
           echo "FAULT_VERSION=$(perl -ne 'print $1 if /let VERSION = "([^"]+)"/' Sources/Fault/Entries/main.swift)" >> $GITHUB_ENV
       - name: Set up Docker
         uses: docker/setup-docker-action@v4
-      - run: docker build -t "ghcr.io/aucohl/fault:$FAULT_VERSION-${{ matrix.os.arch }}" ./.github/workflows --build-arg "FAULT_VERSION=$FAULT_VERSION"
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - run: docker push "ghcr.io/aucohl/fault:$FAULT_VERSION-${{ matrix.os.arch }}"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ghcr.io/aucohl/fault:${{ env.FAULT_VERSION}}-${{ matrix.os.arch }}
+          cache-from: type=registry,ref=ghcr.io/aucohl/fault:${{ env.FAULT_VERSION}}-${{ matrix.os.arch }}
+          cache-to: type=inline
+          build-args: FAULT_VERSION=${{ env.FAULT_VERSION }}
+          context: ./.github/workflows
   create_manifest:
     name: Create and push multi-arch manifest
     needs: build_docker_images

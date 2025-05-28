@@ -49,7 +49,7 @@ ENV FAULT_IVERILOG=/iverilog/bin/iverilog
 ENV FAULT_IVL_BASE=/iverilog/lib/ivl
 ENV PATH="/yosys/bin:/iverilog/bin:${PATH}"
 
-# Sanity Checks
-RUN PYTEST_FAULT_BIN=fault pytest -v
+# Sanity Checks; OOMs in CI
+# RUN PYTEST_FAULT_BIN=fault pytest -v
 
 WORKDIR /
