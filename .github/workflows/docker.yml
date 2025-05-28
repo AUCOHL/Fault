@@ -60,15 +60,17 @@ jobs:
       packages: write
       contents: read
     steps:
+      - uses: actions/checkout@v4
       - name: Set up Docker
         uses: docker/setup-docker-action@v4
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Get version
+        run: |
+          echo "FAULT_VERSION=$(perl -ne 'print $1 if /let VERSION = "([^"]+)"/' Sources/Fault/Entries/main.swift)" >> $GITHUB_ENV
       - name: Create and push manifest
         run: |
           docker manifest create ghcr.io/aucohl/fault:$FAULT_VERSION \
             --amend ghcr.io/aucohl/fault:$FAULT_VERSION-x86_64 \
             --amend ghcr.io/aucohl/fault:$FAULT_VERSION-aarch64
           docker manifest push ghcr.io/aucohl/fault:$FAULT_VERSION
-        env:
-          FAULT_VERSION: ${{ needs.build_docker_images.outputs.FAULT_VERSION }}
