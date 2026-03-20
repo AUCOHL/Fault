@@ -24,7 +24,7 @@ struct BypassOptions: ParsableArguments {
     var bypassing: [String] = []
     
     @Option(help: "Clock name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held high.")
-    var clock: String
+    var clock: String?
     
     @Option(name: [.customLong("reset")], help: "Reset name. In addition to being bypassed for certain manipulation operations, during simulations it will always be held low.")
     var resetName: String = "rst"
@@ -38,7 +38,9 @@ struct BypassOptions: ParsableArguments {
     
     lazy var simulationValues: OrderedDictionary<String, Simulator.Behavior>  = {
         var result: OrderedDictionary<String, Simulator.Behavior> = [:]
-        result[clock] = .holdHigh
+        if let clockName = clock {
+            result[clockName] = .holdHigh
+        }
         result[reset.name] = reset.active == .low ? .holdHigh : .holdLow
         for bypassed in bypassing {
             let split = bypassed.components(separatedBy: "=")

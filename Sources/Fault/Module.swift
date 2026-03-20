@@ -83,30 +83,32 @@ struct Port: Codable {
             let type = Python.type(itemDeclaration).__name__
             // Process port declarations further
             if type == "Decl" {
-                let declaration = itemDeclaration.list[0]
-                let declType = Python.type(declaration).__name__
-                if declType == "Parameter" {
-                    paramaters["\(declaration.name)"] =
-                        Port.evaluate(expr: declaration.value.var, params: paramaters)
-                } else if declType == "Input" || declType == "Output" {
-                    guard var port = ports["\(declaration.name)"] else {
-                        throw "Unknown port \(declaration.name)"
+                for declaration in itemDeclaration.list {
+                    let declType = Python.type(declaration).__name__
+                    if declType == "Parameter" {
+                        paramaters["\(declaration.name)"] =
+                            Port.evaluate(expr: declaration.value.var, params: paramaters)
+                    } else if declType == "Input" || declType == "Output" {
+                        guard var port = ports["\(declaration.name)"] else {
+                            throw "Unknown port \(declaration.name)"
+                        }
+                        if declaration.width != Python.None {
+                            let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters)
+                            let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters)
+                            port.from = msb
+                            port.to = lsb
+                        }
+                        if declType == "Input" {
+                            port.polarity = .input
+                        } else {
+                            port.polarity = .output
+                        }
+                        ports["\(declaration.name)"] = port
                     }
-                    if declaration.width != Python.None {
-                        let msb = Port.evaluate(expr: declaration.width.msb, params: paramaters)
-                        let lsb = Port.evaluate(expr: declaration.width.lsb, params: paramaters)
-                        port.from = msb
-                        port.to = lsb
-                    }
-                    if declType == "Input" {
-                        port.polarity = .input
-                    } else {
-                        port.polarity = .output
-                    }
-                    ports["\(declaration.name)"] = port
                 }
             }
         }
+        
 
         let inputs: [Port] = ports.values.filter { $0.polarity == .input }.sorted(by: { $0.ordinal < $1.ordinal })
         let outputs: [Port] = ports.values.filter { $0.polarity == .output }.sorted(by: { $0.ordinal < $1.ordinal })

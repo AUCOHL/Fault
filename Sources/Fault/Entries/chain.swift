@@ -535,6 +535,10 @@ extension Fault {
         mutating func run() throws {
             let fileManager = FileManager()
 
+            guard let clock = bypass.clock else {
+                throw ValidationError("--clock is required for the chain command.")
+            }
+
             // Check if input file exists
             guard fileManager.fileExists(atPath: file) else {
                 throw ValidationError("File '\(file)' not found.")
@@ -719,7 +723,7 @@ extension Fault {
                     inputs: inputs,
                     outputs: outputs,
                     chainLength: finalOrder.reduce(0) { $0 + $1.width },
-                    clock: bypass.clock,
+                    clock: clock,
                     tck: tck,
                     reset: bypass.reset.name,
                     sin: sin,

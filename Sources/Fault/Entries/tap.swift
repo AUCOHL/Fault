@@ -92,6 +92,9 @@ extension Fault {
     
         mutating func run() throws {
             let fileManager = FileManager()
+            guard let clock = bypass.clock else {
+                throw ValidationError("--clock is required for the tap command.")
+            }
             if !fileManager.fileExists(atPath: file) {
                 throw ValidationError("File '\(file)' not found.")
             }
@@ -411,7 +414,7 @@ extension Fault {
                     inputs: myInputs,
                     outputs: myOutputs,
                     chainLength: boundaryCount + internalCount,
-                    clock: bypass.clock,
+                    clock: clock,
                     reset: bypass.reset.name,
                     resetActive: bypass.reset.active,
                     tms: tms,
@@ -451,7 +454,7 @@ extension Fault {
                         inputs: myInputs,
                         bypassingWithBehavior: bypass.simulationValues,
                         outputs: myOutputs,
-                        clock: bypass.clock,
+                        clock: clock,
                         reset: bypass.reset.name,
                         resetActive: bypass.reset.active,
                         tms: tms,
