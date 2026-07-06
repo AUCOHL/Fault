@@ -42,9 +42,12 @@ extension Fault {
         
         @OptionGroup
         var bypass: BypassOptions
-        
+
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
         var output: String?
+
+        @Option(name: [.customShort("l"), .long], help: "Liberty file to generate an area report. (Optional)")
+        var liberty: String?
         
         @Argument(help: "The file to process.")
         var file: String
@@ -192,6 +195,22 @@ extension Fault {
             try File.open(output, mode: .write) {
                 try $0.print(String.boilerplate)
                 try $0.print(Generator.visit(definition))
+            }
+
+            // Generate Area Report if a Liberty file is provided
+            if let lib = liberty {
+                Stderr.print("Generating area report for cut netlist...")
+                let areaReport = output + ".area.txt"
+                
+                // Construct the Yosys command and pipe it directly to the executable
+                let yosysCmd = "echo 'read_verilog \(output); tee -o \(areaReport) stat -liberty \(lib)' | '\(yosysExecutable)' > /dev/null"
+                let result = yosysCmd.sh()
+                
+                if result != EX_OK {
+                    Stderr.print("Warning: Yosys failed to generate area report for the cut netlist.")
+                } else {
+                    Stderr.print("Area report successfully saved to \(areaReport)")
+                }
             }
         }
     }

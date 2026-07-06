@@ -29,8 +29,8 @@ extension Fault {
         @Option(name: [.short, .long], help: "Path to the output file.")
         var output: String?
 
-        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify JTAG port using given cell model.")
-        var cellModel: String?
+        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify JTAG port using given cell models. Can be passed multiple times.")
+        var cellModel: [String] = []
 
         @OptionGroup
         var bypass: BypassOptions
@@ -111,13 +111,13 @@ extension Fault {
                 )
             }
 
-            if let modelTest = cellModel {
+            for modelTest in cellModel {
                 if !fileManager.fileExists(atPath: modelTest) {
                     throw ValidationError("Cell model file '\(modelTest)' not found.")
                 }
                 if !modelTest.hasSuffix(".v"), !modelTest.hasSuffix(".sv") {
                     Stderr.print(
-                        "Warning: Cell model file provided does not end with .v or .sv."
+                        "Warning: Cell model file '\(modelTest)' does not end with .v or .sv."
                     )
                 }
             }
@@ -371,7 +371,7 @@ extension Fault {
                     }
                 }()
 
-                guard let model = cellModel else {
+                if cellModel.isEmpty {
                     print("Done.")
                     return
                 }
@@ -386,7 +386,7 @@ extension Fault {
                 }
 
                 // MARK: Verification
-                let models = [model] + includes + blackboxModels
+                let models = cellModel + includes + blackboxModels
 
                 print("Verifying tap port integrity…")
                 let ast = parse([netlist])[0]

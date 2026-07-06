@@ -50,8 +50,8 @@ extension Fault {
 
         @Option(
             name: [.short, .long, .customLong("cellModel")],
-            help: "A Verilog model with which standard cells can be simulated.")
-        var cellModel: String
+            help: "Verilog models with which standard cells can be simulated. Can be passed multiple times.")
+        var cellModel: [String]
 
         @Option(
             name: [.customShort("v"), .long],
@@ -133,14 +133,15 @@ extension Fault {
                 throw ValidationError("File '\(file)' not found.")
             }
 
-            guard fileManager.fileExists(atPath: cellModel) else {
-                throw ValidationError("Cell model file '\(cellModel)' not found.")
-            }
-
-            if !cellModel.hasSuffix(".v"), !cellModel.hasSuffix(".sv") {
-                Stderr.print(
-                    "Warning: Cell model file provided does not end with .v or .sv."
-                )
+            for model in cellModel {
+                guard fileManager.fileExists(atPath: model) else {
+                    throw ValidationError("Cell model file '\(model)' not found.")
+                }
+                if !model.hasSuffix(".v"), !model.hasSuffix(".sv") {
+                    Stderr.print(
+                        "Warning: Cell model file '\(model)' does not end with .v or .sv."
+                    )
+                }
             }
 
             let jsonOutput = output ?? file.replacingExtension(".cut.v", with: ".tv.json")
@@ -170,7 +171,7 @@ extension Fault {
                 Foundation.exit(EX_DATAERR)
             }
 
-            print("Processing module \(definition.name)…")
+            Stderr.print("Processing module \(definition.name)")
 
             // MARK: TV Generation Mode Selection
 
@@ -284,7 +285,7 @@ extension Fault {
                     )
                 }
 
-                print(
+                Stderr.print(
                     "Found \(faultPoints.count) fault sites in \(gateCount) gates and \(ports.count) ports."
                 )
 
@@ -301,9 +302,9 @@ extension Fault {
 
                 let startTime = CFAbsoluteTimeGetCurrent()
 
-                let models = [cellModel] + includes
+                let models = cellModel + includes
 
-                print("Performing simulations…")
+                Stderr.print("Performing simulations")
                 let result = try Simulator.simulate(
                     for: faultPoints,
                     in: file,

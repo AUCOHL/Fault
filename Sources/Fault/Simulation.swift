@@ -267,7 +267,7 @@ enum Simulator {
         var coverage: Float =
             Float(sa0Covered.count + sa1Covered.count) /
             Float(2 * faultPoints.count)
-        print("Initial coverage: \(coverage * 100)%")
+        Stderr.print("Initial coverage: \(String(format: "%.2f", coverage * 100))%")
 
         var totalTVAttempts = 0
         var tvAttempts = min(initialVectorCount, ceiling, sampleRun ? 1 : Int.max)
@@ -281,7 +281,11 @@ enum Simulator {
                 if sampleRun {
                     break
                 }
-                print("Minimum coverage not met (\(coverage * 100)%/\(minimumCoverage * 100)%,) incrementing to \(totalTVAttempts + tvAttempts)…")
+            } else {
+                let divider = String(repeating: "=", count: 90)
+                Stderr.print("\n" + divider)
+                Stderr.print("| Vectors  | SA0 Detected | SA1 Detected | Total Detected | Total Faults | Coverage   |")
+                Stderr.print(divider)
             }
 
             var futureList: [Future] = []
@@ -382,15 +386,23 @@ enum Simulator {
                         goldenOutput: output
                     )
                 )
+                //let currentCov = String(format: "%.2f", coverage * 100)
+                       // Stderr.print("  -> Completed simulation \(i + 1) of \(testVectors.count) | Overall vector: \(totalTVAttempts + i + 1) | Last coverage: \(currentCov)%")
             }
 
             coverage =
                 Float(sa0Covered.count + sa1Covered.count) /
                 Float(2 * faultPoints.count)
+            
+            let totalDetected = sa0Covered.count + sa1Covered.count
+            let totalFaults = 2 * faultPoints.count
+            let totalVectors = totalTVAttempts + tvAttempts
+            
+            // Format the float directly (%.2f%%) to bypass Linux string bridging bugs
+            Stderr.print(String(format: "| %-8d | %-12d | %-12d | %-14d | %-12d | %-9.2f%% |", totalVectors, sa0Covered.count, sa1Covered.count, totalDetected, totalFaults, coverage * 100))
 
+            // RESTORE THE COUNTER HERE to prevent infinite loops
             totalTVAttempts += tvAttempts
-            let remainingTV = ceiling - totalTVAttempts
-            tvAttempts = (remainingTV < increment) ? remainingTV : increment
         }
 
         if coverage < minimumCoverage {
