@@ -63,8 +63,8 @@ enum Synthesis {
             abc -liberty \(libertyFile)
             splitnets
 
-            # print gate count
-            stat
+            # generate area report
+            tee -o \(output).area.rpt stat -liberty \(libertyFile)
 
             # cleanup
             opt_clean -purge
@@ -72,7 +72,6 @@ enum Synthesis {
             # names
             # autoname
 
-            write_verilog -noexpr -nohex -nodec -defparam \(output)+attrs
             write_verilog -noexpr -noattr -noexpr -nohex -nodec -defparam \(output)
             # write_blif -gates -unbuf DFFSR D Q \(output).blif
             """

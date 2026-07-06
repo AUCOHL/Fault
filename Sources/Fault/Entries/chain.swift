@@ -481,8 +481,8 @@ extension Fault {
         @Option(name: [.short, .long], help: "Path to the output file. (Default: input + .chained.v)")
         var output: String?
         
-        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify scan chain using given cell model.")
-        var cellModel: String?
+        @Option(name: [.short, .long, .customLong("cellModel")], help: "Verify scan chain using given cell models. Can be passed multiple times.")
+        var cellModel: [String] = []
         
         @Option(name: [.long], help: "Inverted clk tree source cell name. (Default: none)")
         var invClock: String?
@@ -668,7 +668,6 @@ extension Fault {
 
                     print("Resynthesizing with yosys…")
                     let result = "echo '\(script)' | '\(yosysExecutable)' > /dev/null".sh()
-
                     if result != EX_OK {
                         Stderr.print("A yosys error has occurred.")
                         Foundation.exit(EX_DATAERR)
@@ -691,8 +690,8 @@ extension Fault {
 
             // MARK: Verification
 
-            if let model = cellModel {
-                let models = [model] + Array(includeFiles) + Array(blackboxModels)
+            if !cellModel.isEmpty {
+                let models = cellModel + Array(includeFiles) + Array(blackboxModels)
 
                 print("Verifying scan chain integrity…")
                 let ast = parse([netlist])[0]

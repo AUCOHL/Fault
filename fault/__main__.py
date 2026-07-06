@@ -11,6 +11,8 @@ def prepare_env():
     env = os.environ.copy()
     env["PATH"] = f"{__dir__}:{os.environ['PATH']}"
     env["PYTHON_LIBRARY"] = find_libpython.find_libpython()
+    env["PYTHONUNBUFFERED"] = "1"
+    env["NSUnbufferedIO"] = "YES"
 
     iverilog = env.get("FAULT_IVERILOG", shutil.which("iverilog"))
     if iverilog is not None:
